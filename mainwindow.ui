@@ -58,17 +58,24 @@
     <addaction name="action_add_file_directory"/>
     <addaction name="action_delete_file_directory"/>
    </widget>
-   <widget class="QMenu" name="menu_edit">
-    <property name="title">
-     <string>&amp;Edit</string>
-    </property>
-    <addaction name="actionCu_t"/>
-    <addaction name="action_copy"/>
-    <addaction name="action_Paste"/>
-    <addaction name="action_Undo"/>
-   </widget>
-   <addaction name="menu_File"/>
-   <addaction name="menu_edit"/>
+    <widget class="QMenu" name="menu_edit">
+     <property name="title">
+      <string>&amp;Edit</string>
+     </property>
+     <addaction name="actionCu_t"/>
+     <addaction name="action_copy"/>
+     <addaction name="action_Paste"/>
+     <addaction name="action_Undo"/>
+    </widget>
+    <widget class="QMenu" name="menu_Settings">
+     <property name="title">
+      <string>&amp;Settings</string>
+     </property>
+     <addaction name="action_settings"/>
+    </widget>
+    <addaction name="menu_File"/>
+    <addaction name="menu_edit"/>
+    <addaction name="menu_Settings"/>
   </widget>
   <widget class="QStatusBar" name="statusbar"/>
   <action name="action_open_project">
@@ -104,6 +111,11 @@
   <action name="action_Undo">
    <property name="text">
     <string>&amp;Undo</string>
+   </property>
+  </action>
+  <action name="action_settings">
+   <property name="text">
+    <string>&amp;Settings</string>
    </property>
   </action>
 <action name="action_delete_file_directory">

@@ -7,7 +7,7 @@
 #include <QTabWidget>
 #include <QTreeView>
 #include <QPlainTextEdit>
-#include <QToolBar>
+#include <QSplitter>
 #include <QToolButton>
 
 QT_BEGIN_NAMESPACE
@@ -39,9 +39,11 @@ private slots:
     void on_action_Undo_triggered();
     void on_action_add_file_directory_triggered();
     void on_action_delete_file_directory_triggered();
-    void on_fileTree_clicked(const QModelIndex &index);
+    void handleFileTreeClicked(const QModelIndex &index);
     void on_tabWidget_tabCloseRequested(int index);
-    void on_goUp_triggered();
+    void handleGoUpClicked();
+    void on_action_settings_triggered();
+    void toggleFileExplorerCollapsed();
 
 private:
     Ui::MainWindow *ui;
@@ -50,7 +52,12 @@ private:
     QModelIndex rootIndex;
     QList<OpenFile> openFiles;
     QFileSystemModel *fileModel;
+    QSplitter *mainSplitter;
+    QWidget *sidebarWidget;
     QToolButton *goUpButton;
+    QToolButton *collapseSidebarButton;
+    int sidebarWidth;
+    bool fileExplorerCollapsed;
     
     void updateCursorPosition();
     QPlainTextEdit* getCurrentEditor();

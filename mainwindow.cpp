@@ -8,12 +8,53 @@
 #include <QFileSystemModel>
 #include <QDir>
 #include <QTextCursor>
+#include <QSplitter>
+#include <QHBoxLayout>
+#include <QToolBar>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
     , ui(new Ui::MainWindow)
 {
     ui->setupUi(this);
+
+    sidebarWidth = 250;
+    fileExplorerCollapsed = false;
+
+    QHBoxLayout *centralLayout = qobject_cast<QHBoxLayout*>(centralWidget()->layout());
+    QLayoutItem *editorItem = nullptr;
+    QLayoutItem *sidebarItem = nullptr;
+    if (centralLayout) {
+        editorItem = centralLayout->takeAt(1);
+        sidebarItem = centralLayout->takeAt(0);
+    }
+
+    sidebarWidget = new QWidget(this);
+    sidebarWidget->setMinimumWidth(0);
+    sidebarWidget->setLayout(ui->sidebarLayout);
+
+    QWidget *editorWidget = new QWidget(this);
+    editorWidget->setLayout(ui->editorLayout);
+
+    mainSplitter = new QSplitter(Qt::Horizontal, this);
+    mainSplitter->addWidget(sidebarWidget);
+    mainSplitter->addWidget(editorWidget);
+    mainSplitter->setStretchFactor(1, 1);
+    mainSplitter->setHandleWidth(0);
+    mainSplitter->setSizes(QList<int>() << sidebarWidth << 750);
+
+    if (centralLayout) {
+        centralLayout->addWidget(mainSplitter, 1);
+        delete editorItem;
+        delete sidebarItem;
+    }
+
+    collapseSidebarButton = new QToolButton(ui->centralwidget);
+    collapseSidebarButton->setGeometry(0, 0, 32, 32);
+    collapseSidebarButton->setText("◀");
+    collapseSidebarButton->setToolTip("Collapse file explorer");
+    collapseSidebarButton->raise();
+    connect(collapseSidebarButton, &QToolButton::clicked, this, &MainWindow::toggleFileExplorerCollapsed);
     
     fileModel = new QFileSystemModel(this);
     fileModel->setRootPath(QDir::homePath());
@@ -26,10 +67,9 @@ MainWindow::MainWindow(QWidget *parent)
     goUpButton = new QToolButton(this);
     goUpButton->setText("Go Up");
     goUpButton->setEnabled(false);
-    connect(goUpButton, &QToolButton::clicked, this, &MainWindow::on_goUp_triggered);
-    toolbar->addWidget(goUpButton);
+    connect(goUpButton, &QToolButton::clicked, this, &MainWindow::handleGoUpClicked);
     
-    connect(ui->fileTreeView, &QTreeView::clicked, this, &MainWindow::on_fileTree_clicked);
+    connect(ui->fileTreeView, &QTreeView::clicked, this, &MainWindow::handleFileTreeClicked);
     
     ui->tabWidget->clear();
     
@@ -195,7 +235,7 @@ void MainWindow::on_action_delete_file_directory_triggered()
     }
 }
 
-void MainWindow::on_fileTree_clicked(const QModelIndex &index)
+void MainWindow::handleFileTreeClicked(const QModelIndex &index)
 {
     QString path = fileModel->filePath(index);
     QFileInfo fileInfo(path);
@@ -263,7 +303,7 @@ void MainWindow::on_tabWidget_tabCloseRequested(int index)
     }
 }
 
-void MainWindow::on_goUp_triggered()
+void MainWindow::handleGoUpClicked()
 {
     if (!rootIndex.isValid())
         return;
@@ -275,5 +315,35 @@ void MainWindow::on_goUp_triggered()
         goUpButton->setEnabled(parentIndex.parent().isValid());
     } else {
         goUpButton->setEnabled(false);
+    }
+}
+
+void MainWindow::on_action_settings_triggered()
+{
+    QMessageBox::information(this, tr("Settings"), tr("Settings are not implemented yet."));
+}
+
+void MainWindow::toggleFileExplorerCollapsed()
+{
+    if (fileExplorerCollapsed) {
+        sidebarWidget->show();
+        QList<int> sizes = mainSplitter->sizes();
+        int editorWidth = sizes.value(1, 750);
+        mainSplitter->setSizes(QList<int>() << sidebarWidth << editorWidth);
+        fileExplorerCollapsed = false;
+        collapseSidebarButton->setText("◀");
+        collapseSidebarButton->setToolTip("Collapse file explorer");
+    } else {
+        QList<int> sizes = mainSplitter->sizes();
+        sidebarWidth = sizes.value(0, sidebarWidth);
+        if (sidebarWidth <= 0) {
+            sidebarWidth = 250;
+        }
+        int editorWidth = sizes.value(1, 750);
+        mainSplitter->setSizes(QList<int>() << 0 << editorWidth);
+        sidebarWidget->hide();
+        fileExplorerCollapsed = true;
+        collapseSidebarButton->setText("▶");
+        collapseSidebarButton->setToolTip("Show file explorer");
     }
 }
