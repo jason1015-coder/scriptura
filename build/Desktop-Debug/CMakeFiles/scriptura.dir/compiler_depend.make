@@ -493,7 +493,10 @@ scriptura_autogen/timestamp: /home/jason/scriptura/CMakeLists.txt \
   /usr/include/x86_64-linux-gnu/qt6/QtWidgets/QMainWindow \
   /usr/include/x86_64-linux-gnu/qt6/QtWidgets/QPlainTextEdit \
   /usr/include/x86_64-linux-gnu/qt6/QtWidgets/QTabWidget \
+  /usr/include/x86_64-linux-gnu/qt6/QtWidgets/QToolBar \
+  /usr/include/x86_64-linux-gnu/qt6/QtWidgets/QToolButton \
   /usr/include/x86_64-linux-gnu/qt6/QtWidgets/QTreeView \
+  /usr/include/x86_64-linux-gnu/qt6/QtWidgets/qabstractbutton.h \
   /usr/include/x86_64-linux-gnu/qt6/QtWidgets/qabstractitemdelegate.h \
   /usr/include/x86_64-linux-gnu/qt6/QtWidgets/qabstractitemview.h \
   /usr/include/x86_64-linux-gnu/qt6/QtWidgets/qabstractscrollarea.h \
@@ -510,6 +513,8 @@ scriptura_autogen/timestamp: /home/jason/scriptura/CMakeLists.txt \
   /usr/include/x86_64-linux-gnu/qt6/QtWidgets/qtabbar.h \
   /usr/include/x86_64-linux-gnu/qt6/QtWidgets/qtabwidget.h \
   /usr/include/x86_64-linux-gnu/qt6/QtWidgets/qtextedit.h \
+  /usr/include/x86_64-linux-gnu/qt6/QtWidgets/qtoolbar.h \
+  /usr/include/x86_64-linux-gnu/qt6/QtWidgets/qtoolbutton.h \
   /usr/include/x86_64-linux-gnu/qt6/QtWidgets/qtreeview.h \
   /usr/include/x86_64-linux-gnu/qt6/QtWidgets/qtwidgets-config.h \
   /usr/include/x86_64-linux-gnu/qt6/QtWidgets/qtwidgetsexports.h \
@@ -1222,7 +1227,10 @@ CMakeFiles/scriptura.dir/main.cpp.o: /home/jason/scriptura/main.cpp \
   /usr/include/x86_64-linux-gnu/qt6/QtWidgets/QMainWindow \
   /usr/include/x86_64-linux-gnu/qt6/QtWidgets/QPlainTextEdit \
   /usr/include/x86_64-linux-gnu/qt6/QtWidgets/QTabWidget \
+  /usr/include/x86_64-linux-gnu/qt6/QtWidgets/QToolBar \
+  /usr/include/x86_64-linux-gnu/qt6/QtWidgets/QToolButton \
   /usr/include/x86_64-linux-gnu/qt6/QtWidgets/QTreeView \
+  /usr/include/x86_64-linux-gnu/qt6/QtWidgets/qabstractbutton.h \
   /usr/include/x86_64-linux-gnu/qt6/QtWidgets/qabstractitemdelegate.h \
   /usr/include/x86_64-linux-gnu/qt6/QtWidgets/qabstractitemview.h \
   /usr/include/x86_64-linux-gnu/qt6/QtWidgets/qabstractscrollarea.h \
@@ -1240,6 +1248,8 @@ CMakeFiles/scriptura.dir/main.cpp.o: /home/jason/scriptura/main.cpp \
   /usr/include/x86_64-linux-gnu/qt6/QtWidgets/qtabbar.h \
   /usr/include/x86_64-linux-gnu/qt6/QtWidgets/qtabwidget.h \
   /usr/include/x86_64-linux-gnu/qt6/QtWidgets/qtextedit.h \
+  /usr/include/x86_64-linux-gnu/qt6/QtWidgets/qtoolbar.h \
+  /usr/include/x86_64-linux-gnu/qt6/QtWidgets/qtoolbutton.h \
   /usr/include/x86_64-linux-gnu/qt6/QtWidgets/qtreeview.h \
   /usr/include/x86_64-linux-gnu/qt6/QtWidgets/qtwidgets-config.h \
   /usr/include/x86_64-linux-gnu/qt6/QtWidgets/qtwidgetsexports.h \
@@ -1804,9 +1814,12 @@ CMakeFiles/scriptura.dir/mainwindow.cpp.o: /home/jason/scriptura/mainwindow.cpp 
   /usr/include/x86_64-linux-gnu/qt6/QtWidgets/QPlainTextEdit \
   /usr/include/x86_64-linux-gnu/qt6/QtWidgets/QStatusBar \
   /usr/include/x86_64-linux-gnu/qt6/QtWidgets/QTabWidget \
+  /usr/include/x86_64-linux-gnu/qt6/QtWidgets/QToolBar \
+  /usr/include/x86_64-linux-gnu/qt6/QtWidgets/QToolButton \
   /usr/include/x86_64-linux-gnu/qt6/QtWidgets/QTreeView \
   /usr/include/x86_64-linux-gnu/qt6/QtWidgets/QVBoxLayout \
   /usr/include/x86_64-linux-gnu/qt6/QtWidgets/QWidget \
+  /usr/include/x86_64-linux-gnu/qt6/QtWidgets/qabstractbutton.h \
   /usr/include/x86_64-linux-gnu/qt6/QtWidgets/qabstractitemdelegate.h \
   /usr/include/x86_64-linux-gnu/qt6/QtWidgets/qabstractitemview.h \
   /usr/include/x86_64-linux-gnu/qt6/QtWidgets/qabstractscrollarea.h \
@@ -1837,6 +1850,8 @@ CMakeFiles/scriptura.dir/mainwindow.cpp.o: /home/jason/scriptura/mainwindow.cpp 
   /usr/include/x86_64-linux-gnu/qt6/QtWidgets/qtabbar.h \
   /usr/include/x86_64-linux-gnu/qt6/QtWidgets/qtabwidget.h \
   /usr/include/x86_64-linux-gnu/qt6/QtWidgets/qtextedit.h \
+  /usr/include/x86_64-linux-gnu/qt6/QtWidgets/qtoolbar.h \
+  /usr/include/x86_64-linux-gnu/qt6/QtWidgets/qtoolbutton.h \
   /usr/include/x86_64-linux-gnu/qt6/QtWidgets/qtreeview.h \
   /usr/include/x86_64-linux-gnu/qt6/QtWidgets/qtwidgets-config.h \
   /usr/include/x86_64-linux-gnu/qt6/QtWidgets/qtwidgetsexports.h \
@@ -2389,7 +2404,10 @@ CMakeFiles/scriptura.dir/scriptura_autogen/mocs_compilation.cpp.o: scriptura_aut
   /usr/include/x86_64-linux-gnu/qt6/QtWidgets/QMainWindow \
   /usr/include/x86_64-linux-gnu/qt6/QtWidgets/QPlainTextEdit \
   /usr/include/x86_64-linux-gnu/qt6/QtWidgets/QTabWidget \
+  /usr/include/x86_64-linux-gnu/qt6/QtWidgets/QToolBar \
+  /usr/include/x86_64-linux-gnu/qt6/QtWidgets/QToolButton \
   /usr/include/x86_64-linux-gnu/qt6/QtWidgets/QTreeView \
+  /usr/include/x86_64-linux-gnu/qt6/QtWidgets/qabstractbutton.h \
   /usr/include/x86_64-linux-gnu/qt6/QtWidgets/qabstractitemdelegate.h \
   /usr/include/x86_64-linux-gnu/qt6/QtWidgets/qabstractitemview.h \
   /usr/include/x86_64-linux-gnu/qt6/QtWidgets/qabstractscrollarea.h \
@@ -2406,6 +2424,8 @@ CMakeFiles/scriptura.dir/scriptura_autogen/mocs_compilation.cpp.o: scriptura_aut
   /usr/include/x86_64-linux-gnu/qt6/QtWidgets/qtabbar.h \
   /usr/include/x86_64-linux-gnu/qt6/QtWidgets/qtabwidget.h \
   /usr/include/x86_64-linux-gnu/qt6/QtWidgets/qtextedit.h \
+  /usr/include/x86_64-linux-gnu/qt6/QtWidgets/qtoolbar.h \
+  /usr/include/x86_64-linux-gnu/qt6/QtWidgets/qtoolbutton.h \
   /usr/include/x86_64-linux-gnu/qt6/QtWidgets/qtreeview.h \
   /usr/include/x86_64-linux-gnu/qt6/QtWidgets/qtwidgets-config.h \
   /usr/include/x86_64-linux-gnu/qt6/QtWidgets/qtwidgetsexports.h \
@@ -2820,6 +2840,16 @@ scriptura_autogen/include/ui_mainwindow.h:
 
 /usr/lib/x86_64-linux-gnu/cmake/Qt6/QtPublicFinalizerHelpers.cmake:
 
+/usr/lib/x86_64-linux-gnu/cmake/Qt6/QtPublicExternalProjectHelpers.cmake:
+
+/usr/lib/x86_64-linux-gnu/cmake/Qt6/QtPublicDependencyHelpers.cmake:
+
+/usr/lib/x86_64-linux-gnu/cmake/Qt6/QtPublicCMakeVersionHelpers.cmake:
+
+/usr/lib/x86_64-linux-gnu/cmake/Qt6/QtPublicSbomSystemDepHelpers.cmake:
+
+/usr/lib/x86_64-linux-gnu/cmake/Qt6/QtPublicCMakeEarlyPolicyHelpers.cmake:
+
 /usr/lib/x86_64-linux-gnu/cmake/Qt6WidgetsTools/Qt6WidgetsToolsConfigVersion.cmake:
 
 /usr/include/x86_64-linux-gnu/bits/types/struct___jmp_buf_tag.h:
@@ -2936,6 +2966,8 @@ scriptura_autogen/mocs_compilation.cpp:
 
 /usr/include/ctype.h:
 
+/usr/include/x86_64-linux-gnu/qt6/QtWidgets/qtoolbar.h:
+
 /usr/lib/x86_64-linux-gnu/cmake/Qt6/QtPublicAndroidHelpers.cmake:
 
 /usr/include/c++/15/unordered_map:
@@ -2983,8 +3015,6 @@ scriptura_autogen/mocs_compilation.cpp:
 /usr/include/c++/15/bits/functexcept.h:
 
 /usr/include/c++/15/tr1/legendre_function.tcc:
-
-/usr/lib/x86_64-linux-gnu/cmake/Qt6/QtPublicCMakeVersionHelpers.cmake:
 
 /usr/include/time.h:
 
@@ -3141,6 +3171,10 @@ CMakeFiles/4.2.3/CMakeSystem.cmake:
 /usr/include/x86_64-linux-gnu/qt6/QtCore/qxptype_traits.h:
 
 /usr/include/c++/15/ext/type_traits.h:
+
+/usr/lib/x86_64-linux-gnu/cmake/Qt6/QtPublicCMakeHelpers.cmake:
+
+/usr/lib/x86_64-linux-gnu/cmake/Qt6/FindWrapAtomic.cmake:
 
 /usr/include/c++/15/bits/functional_hash.h:
 
@@ -3424,11 +3458,11 @@ CMakeFiles/4.2.3/CMakeCXXCompiler.cmake:
 
 /usr/include/x86_64-linux-gnu/qt6/QtCore/qdebug.h:
 
+/usr/include/x86_64-linux-gnu/qt6/QtWidgets/qtoolbutton.h:
+
 /usr/include/x86_64-linux-gnu/qt6/QtGui/qfontinfo.h:
 
 /usr/include/x86_64-linux-gnu/qt6/QtGui/qkeysequence.h:
-
-/usr/lib/x86_64-linux-gnu/cmake/Qt6/QtPublicDependencyHelpers.cmake:
 
 /usr/include/x86_64-linux-gnu/bits/wctype-wchar.h:
 
@@ -3629,8 +3663,6 @@ CMakeFiles/4.2.3/CMakeCXXCompiler.cmake:
 /usr/include/x86_64-linux-gnu/qt6/QtCore/qspan.h:
 
 /usr/include/x86_64-linux-gnu/bits/waitflags.h:
-
-/usr/lib/x86_64-linux-gnu/cmake/Qt6/QtPublicExternalProjectHelpers.cmake:
 
 /usr/include/x86_64-linux-gnu/bits/waitstatus.h:
 
@@ -3834,6 +3866,8 @@ CMakeFiles/4.2.3/CMakeCXXCompiler.cmake:
 
 /usr/include/x86_64-linux-gnu/qt6/QtCore/qmap.h:
 
+/usr/include/x86_64-linux-gnu/qt6/QtWidgets/qabstractbutton.h:
+
 /usr/include/x86_64-linux-gnu/qt6/QtCore/qmalloc.h:
 
 /usr/include/x86_64-linux-gnu/qt6/QtCore/qvarlengtharray.h:
@@ -4010,6 +4044,8 @@ scriptura_autogen/moc_predefs.h:
 
 /usr/include/x86_64-linux-gnu/bits/sched.h:
 
+/usr/include/x86_64-linux-gnu/qt6/QtWidgets/QToolBar:
+
 /usr/include/x86_64-linux-gnu/qt6/QtGui/qguiapplication.h:
 
 /usr/include/x86_64-linux-gnu/qt6/QtGui/qguiapplication_platform.h:
@@ -4059,6 +4095,8 @@ scriptura_autogen/moc_predefs.h:
 /usr/include/x86_64-linux-gnu/c++/15/bits/messages_members.h:
 
 /usr/include/x86_64-linux-gnu/qt6/QtWidgets/QTabWidget:
+
+/usr/include/x86_64-linux-gnu/qt6/QtWidgets/QToolButton:
 
 /usr/include/x86_64-linux-gnu/qt6/QtWidgets/qabstractitemdelegate.h:
 
@@ -4131,11 +4169,3 @@ CMakeFiles/scriptura.dir/mainwindow.cpp.o:
 /usr/lib/x86_64-linux-gnu/cmake/Qt6/QtInstallPaths.cmake:
 
 /usr/lib/x86_64-linux-gnu/cmake/Qt6/QtPublicAppleHelpers.cmake:
-
-/usr/lib/x86_64-linux-gnu/cmake/Qt6/QtPublicSbomSystemDepHelpers.cmake:
-
-/usr/lib/x86_64-linux-gnu/cmake/Qt6/QtPublicCMakeEarlyPolicyHelpers.cmake:
-
-/usr/lib/x86_64-linux-gnu/cmake/Qt6/FindWrapAtomic.cmake:
-
-/usr/lib/x86_64-linux-gnu/cmake/Qt6/QtPublicCMakeHelpers.cmake:

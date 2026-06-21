@@ -7,6 +7,8 @@
 #include <QTabWidget>
 #include <QTreeView>
 #include <QPlainTextEdit>
+#include <QToolBar>
+#include <QToolButton>
 
 QT_BEGIN_NAMESPACE
 namespace Ui {
@@ -39,13 +41,16 @@ private slots:
     void on_action_delete_file_directory_triggered();
     void on_fileTree_clicked(const QModelIndex &index);
     void on_tabWidget_tabCloseRequested(int index);
+    void on_goUp_triggered();
 
 private:
     Ui::MainWindow *ui;
     QString currentFile;
     QString projectDir;
+    QModelIndex rootIndex;
     QList<OpenFile> openFiles;
     QFileSystemModel *fileModel;
+    QToolButton *goUpButton;
     
     void updateCursorPosition();
     QPlainTextEdit* getCurrentEditor();

@@ -106,12 +106,12 @@
     <string>&amp;Undo</string>
    </property>
   </action>
-  <action name="action_delete_file_directory">
-   <property name="text">
-    <string>&amp;Delete File/Directory</string>
-   </property>
-  </action>
- </widget>
+<action name="action_delete_file_directory">
+    <property name="text">
+     <string>&amp;Delete File/Directory</string>
+    </property>
+   </action>
+  </widget>
  <resources/>
  <connections/>
 </ui>

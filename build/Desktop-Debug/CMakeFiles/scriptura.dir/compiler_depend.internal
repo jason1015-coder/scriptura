@@ -494,7 +494,10 @@
  /usr/include/x86_64-linux-gnu/qt6/QtWidgets/QMainWindow
  /usr/include/x86_64-linux-gnu/qt6/QtWidgets/QPlainTextEdit
  /usr/include/x86_64-linux-gnu/qt6/QtWidgets/QTabWidget
+ /usr/include/x86_64-linux-gnu/qt6/QtWidgets/QToolBar
+ /usr/include/x86_64-linux-gnu/qt6/QtWidgets/QToolButton
  /usr/include/x86_64-linux-gnu/qt6/QtWidgets/QTreeView
+ /usr/include/x86_64-linux-gnu/qt6/QtWidgets/qabstractbutton.h
  /usr/include/x86_64-linux-gnu/qt6/QtWidgets/qabstractitemdelegate.h
  /usr/include/x86_64-linux-gnu/qt6/QtWidgets/qabstractitemview.h
  /usr/include/x86_64-linux-gnu/qt6/QtWidgets/qabstractscrollarea.h
@@ -511,6 +514,8 @@
  /usr/include/x86_64-linux-gnu/qt6/QtWidgets/qtabbar.h
  /usr/include/x86_64-linux-gnu/qt6/QtWidgets/qtabwidget.h
  /usr/include/x86_64-linux-gnu/qt6/QtWidgets/qtextedit.h
+ /usr/include/x86_64-linux-gnu/qt6/QtWidgets/qtoolbar.h
+ /usr/include/x86_64-linux-gnu/qt6/QtWidgets/qtoolbutton.h
  /usr/include/x86_64-linux-gnu/qt6/QtWidgets/qtreeview.h
  /usr/include/x86_64-linux-gnu/qt6/QtWidgets/qtwidgets-config.h
  /usr/include/x86_64-linux-gnu/qt6/QtWidgets/qtwidgetsexports.h
@@ -1224,7 +1229,10 @@ CMakeFiles/scriptura.dir/main.cpp.o
  /usr/include/x86_64-linux-gnu/qt6/QtWidgets/QMainWindow
  /usr/include/x86_64-linux-gnu/qt6/QtWidgets/QPlainTextEdit
  /usr/include/x86_64-linux-gnu/qt6/QtWidgets/QTabWidget
+ /usr/include/x86_64-linux-gnu/qt6/QtWidgets/QToolBar
+ /usr/include/x86_64-linux-gnu/qt6/QtWidgets/QToolButton
  /usr/include/x86_64-linux-gnu/qt6/QtWidgets/QTreeView
+ /usr/include/x86_64-linux-gnu/qt6/QtWidgets/qabstractbutton.h
  /usr/include/x86_64-linux-gnu/qt6/QtWidgets/qabstractitemdelegate.h
  /usr/include/x86_64-linux-gnu/qt6/QtWidgets/qabstractitemview.h
  /usr/include/x86_64-linux-gnu/qt6/QtWidgets/qabstractscrollarea.h
@@ -1242,6 +1250,8 @@ CMakeFiles/scriptura.dir/main.cpp.o
  /usr/include/x86_64-linux-gnu/qt6/QtWidgets/qtabbar.h
  /usr/include/x86_64-linux-gnu/qt6/QtWidgets/qtabwidget.h
  /usr/include/x86_64-linux-gnu/qt6/QtWidgets/qtextedit.h
+ /usr/include/x86_64-linux-gnu/qt6/QtWidgets/qtoolbar.h
+ /usr/include/x86_64-linux-gnu/qt6/QtWidgets/qtoolbutton.h
  /usr/include/x86_64-linux-gnu/qt6/QtWidgets/qtreeview.h
  /usr/include/x86_64-linux-gnu/qt6/QtWidgets/qtwidgets-config.h
  /usr/include/x86_64-linux-gnu/qt6/QtWidgets/qtwidgetsexports.h
@@ -1807,9 +1817,12 @@ CMakeFiles/scriptura.dir/mainwindow.cpp.o
  /usr/include/x86_64-linux-gnu/qt6/QtWidgets/QPlainTextEdit
  /usr/include/x86_64-linux-gnu/qt6/QtWidgets/QStatusBar
  /usr/include/x86_64-linux-gnu/qt6/QtWidgets/QTabWidget
+ /usr/include/x86_64-linux-gnu/qt6/QtWidgets/QToolBar
+ /usr/include/x86_64-linux-gnu/qt6/QtWidgets/QToolButton
  /usr/include/x86_64-linux-gnu/qt6/QtWidgets/QTreeView
  /usr/include/x86_64-linux-gnu/qt6/QtWidgets/QVBoxLayout
  /usr/include/x86_64-linux-gnu/qt6/QtWidgets/QWidget
+ /usr/include/x86_64-linux-gnu/qt6/QtWidgets/qabstractbutton.h
  /usr/include/x86_64-linux-gnu/qt6/QtWidgets/qabstractitemdelegate.h
  /usr/include/x86_64-linux-gnu/qt6/QtWidgets/qabstractitemview.h
  /usr/include/x86_64-linux-gnu/qt6/QtWidgets/qabstractscrollarea.h
@@ -1840,6 +1853,8 @@ CMakeFiles/scriptura.dir/mainwindow.cpp.o
  /usr/include/x86_64-linux-gnu/qt6/QtWidgets/qtabbar.h
  /usr/include/x86_64-linux-gnu/qt6/QtWidgets/qtabwidget.h
  /usr/include/x86_64-linux-gnu/qt6/QtWidgets/qtextedit.h
+ /usr/include/x86_64-linux-gnu/qt6/QtWidgets/qtoolbar.h
+ /usr/include/x86_64-linux-gnu/qt6/QtWidgets/qtoolbutton.h
  /usr/include/x86_64-linux-gnu/qt6/QtWidgets/qtreeview.h
  /usr/include/x86_64-linux-gnu/qt6/QtWidgets/qtwidgets-config.h
  /usr/include/x86_64-linux-gnu/qt6/QtWidgets/qtwidgetsexports.h
@@ -2393,7 +2408,10 @@ CMakeFiles/scriptura.dir/scriptura_autogen/mocs_compilation.cpp.o
  /usr/include/x86_64-linux-gnu/qt6/QtWidgets/QMainWindow
  /usr/include/x86_64-linux-gnu/qt6/QtWidgets/QPlainTextEdit
  /usr/include/x86_64-linux-gnu/qt6/QtWidgets/QTabWidget
+ /usr/include/x86_64-linux-gnu/qt6/QtWidgets/QToolBar
+ /usr/include/x86_64-linux-gnu/qt6/QtWidgets/QToolButton
  /usr/include/x86_64-linux-gnu/qt6/QtWidgets/QTreeView
+ /usr/include/x86_64-linux-gnu/qt6/QtWidgets/qabstractbutton.h
  /usr/include/x86_64-linux-gnu/qt6/QtWidgets/qabstractitemdelegate.h
  /usr/include/x86_64-linux-gnu/qt6/QtWidgets/qabstractitemview.h
  /usr/include/x86_64-linux-gnu/qt6/QtWidgets/qabstractscrollarea.h
@@ -2410,6 +2428,8 @@ CMakeFiles/scriptura.dir/scriptura_autogen/mocs_compilation.cpp.o
  /usr/include/x86_64-linux-gnu/qt6/QtWidgets/qtabbar.h
  /usr/include/x86_64-linux-gnu/qt6/QtWidgets/qtabwidget.h
  /usr/include/x86_64-linux-gnu/qt6/QtWidgets/qtextedit.h
+ /usr/include/x86_64-linux-gnu/qt6/QtWidgets/qtoolbar.h
+ /usr/include/x86_64-linux-gnu/qt6/QtWidgets/qtoolbutton.h
  /usr/include/x86_64-linux-gnu/qt6/QtWidgets/qtreeview.h
  /usr/include/x86_64-linux-gnu/qt6/QtWidgets/qtwidgets-config.h
  /usr/include/x86_64-linux-gnu/qt6/QtWidgets/qtwidgetsexports.h

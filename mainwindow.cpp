@@ -19,6 +19,16 @@ MainWindow::MainWindow(QWidget *parent)
     fileModel->setRootPath(QDir::homePath());
     ui->fileTreeView->setModel(fileModel);
     
+    QToolBar *toolbar = new QToolBar(this);
+    toolbar->setObjectName("fileToolbar");
+    ui->sidebarLayout->insertWidget(0, toolbar);
+    
+    goUpButton = new QToolButton(this);
+    goUpButton->setText("Go Up");
+    goUpButton->setEnabled(false);
+    connect(goUpButton, &QToolButton::clicked, this, &MainWindow::on_goUp_triggered);
+    toolbar->addWidget(goUpButton);
+    
     connect(ui->fileTreeView, &QTreeView::clicked, this, &MainWindow::on_fileTree_clicked);
     
     ui->tabWidget->clear();
@@ -55,10 +65,12 @@ void MainWindow::on_action_open_project_triggered()
         return;
 
     projectDir = dirName;
-    ui->fileTreeView->setRootIndex(fileModel->index(projectDir));
+    rootIndex = fileModel->index(projectDir);
+    ui->fileTreeView->setRootIndex(rootIndex);
     ui->fileTreeView->hideColumn(1);
     ui->fileTreeView->hideColumn(2);
     ui->fileTreeView->hideColumn(3);
+    goUpButton->setEnabled(rootIndex.parent().isValid());
     
     setWindowTitle(QFileInfo(projectDir).fileName() + " - Scriptura");
 }
@@ -189,7 +201,9 @@ void MainWindow::on_fileTree_clicked(const QModelIndex &index)
     QFileInfo fileInfo(path);
     
     if (fileInfo.isDir()) {
+        rootIndex = index;
         ui->fileTreeView->setRootIndex(index);
+        goUpButton->setEnabled(rootIndex.parent().isValid());
     } else {
         QFile file(path);
         if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
@@ -246,5 +260,20 @@ void MainWindow::on_tabWidget_tabCloseRequested(int index)
         }
     } else {
         setWindowTitle(projectDir.isEmpty() ? "Scriptura" : QFileInfo(projectDir).fileName() + " - Scriptura");
+    }
+}
+
+void MainWindow::on_goUp_triggered()
+{
+    if (!rootIndex.isValid())
+        return;
+    
+    QModelIndex parentIndex = rootIndex.parent();
+    if (parentIndex.isValid()) {
+        rootIndex = parentIndex;
+        ui->fileTreeView->setRootIndex(parentIndex);
+        goUpButton->setEnabled(parentIndex.parent().isValid());
+    } else {
+        goUpButton->setEnabled(false);
     }
 }

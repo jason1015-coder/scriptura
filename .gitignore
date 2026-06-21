@@ -65,22 +65,32 @@ CMakeLists.txt.user*
 *.Debug
 *.Release
 
-# Python byte code
-*.pyc
-
 # Binaries
-# --------
 *.dll
 *.exe
 
 # Directories with generated files
- .moc/
- .obj/
- .pch/
- .rcc/
- .uic/
- /build*/
- 
- # IDE
- .idea/
- .vscode/
+.moc/
+.obj/
+.pch/
+.rcc/
+.uic/
+/build*/
+
+# Qt autogen
+*_autogen/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+
+# CMake API
+.cmake/
+
+# IDE
+.idea/
+.vscode/
+.kilo/
+
+# Qt Creator
+.qtc/

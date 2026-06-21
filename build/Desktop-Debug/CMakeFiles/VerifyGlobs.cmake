@@ -114,7 +114,6 @@ set(OLD_GLOB
   "/home/jason/scriptura/main.cpp"
   "/home/jason/scriptura/mainwindow.cpp"
   "/home/jason/scriptura/scriptura/build/Desktop-Debug/CMakeFiles/4.2.3/CompilerIdCXX/CMakeCXXCompilerId.cpp"
-  "/home/jason/scriptura/scriptura/build/Desktop-Debug/scriptura_autogen/EWIEGA46WW/moc_mainwindow.cpp"
   "/home/jason/scriptura/scriptura/build/Desktop-Debug/scriptura_autogen/mocs_compilation.cpp"
   )
 if(NOT "${NEW_GLOB}" STREQUAL "${OLD_GLOB}")
@@ -171,7 +170,6 @@ set(OLD_GLOB
   "/home/jason/scriptura/build/scriptura_autogen/include/ui_mainwindow.h"
   "/home/jason/scriptura/build/scriptura_autogen/moc_predefs.h"
   "/home/jason/scriptura/mainwindow.h"
-  "/home/jason/scriptura/scriptura/build/Desktop-Debug/scriptura_autogen/include/ui_mainwindow.h"
   "/home/jason/scriptura/scriptura/build/Desktop-Debug/scriptura_autogen/moc_predefs.h"
   )
 if(NOT "${NEW_GLOB}" STREQUAL "${OLD_GLOB}")

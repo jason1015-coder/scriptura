@@ -134,6 +134,7 @@ scriptura_autogen/timestamp: \
 	/usr/include/c++/15/ext/numeric_traits.h \
 	/usr/include/c++/15/ext/string_conversions.h \
 	/usr/include/c++/15/ext/type_traits.h \
+	/usr/include/c++/15/filesystem \
 	/usr/include/c++/15/functional \
 	/usr/include/c++/15/initializer_list \
 	/usr/include/c++/15/iosfwd \
@@ -280,6 +281,11 @@ scriptura_autogen/timestamp: \
 	/usr/include/x86_64-linux-gnu/c++/15/bits/os_defines.h \
 	/usr/include/x86_64-linux-gnu/gnu/stubs-64.h \
 	/usr/include/x86_64-linux-gnu/gnu/stubs.h \
+	/usr/include/x86_64-linux-gnu/qt6/QtCore/QList \
+	/usr/include/x86_64-linux-gnu/qt6/QtCore/QObject \
+	/usr/include/x86_64-linux-gnu/qt6/QtCore/QRect \
+	/usr/include/x86_64-linux-gnu/qt6/QtCore/QSize \
+	/usr/include/x86_64-linux-gnu/qt6/QtCore/QSizeF \
 	/usr/include/x86_64-linux-gnu/qt6/QtCore/QString \
 	/usr/include/x86_64-linux-gnu/qt6/QtCore/q17memory.h \
 	/usr/include/x86_64-linux-gnu/qt6/QtCore/q20functional.h \
@@ -289,6 +295,8 @@ scriptura_autogen/timestamp: \
 	/usr/include/x86_64-linux-gnu/qt6/QtCore/q20utility.h \
 	/usr/include/x86_64-linux-gnu/qt6/QtCore/q23type_traits.h \
 	/usr/include/x86_64-linux-gnu/qt6/QtCore/q23utility.h \
+	/usr/include/x86_64-linux-gnu/qt6/QtCore/qabstracteventdispatcher.h \
+	/usr/include/x86_64-linux-gnu/qt6/QtCore/qabstractitemmodel.h \
 	/usr/include/x86_64-linux-gnu/qt6/QtCore/qalgorithms.h \
 	/usr/include/x86_64-linux-gnu/qt6/QtCore/qalloc.h \
 	/usr/include/x86_64-linux-gnu/qt6/QtCore/qanystringview.h \
@@ -299,11 +307,13 @@ scriptura_autogen/timestamp: \
 	/usr/include/x86_64-linux-gnu/qt6/QtCore/qatomic.h \
 	/usr/include/x86_64-linux-gnu/qt6/QtCore/qatomic_cxx11.h \
 	/usr/include/x86_64-linux-gnu/qt6/QtCore/qbasicatomic.h \
+	/usr/include/x86_64-linux-gnu/qt6/QtCore/qbasictimer.h \
 	/usr/include/x86_64-linux-gnu/qt6/QtCore/qbindingstorage.h \
 	/usr/include/x86_64-linux-gnu/qt6/QtCore/qbytearray.h \
 	/usr/include/x86_64-linux-gnu/qt6/QtCore/qbytearrayalgorithms.h \
 	/usr/include/x86_64-linux-gnu/qt6/QtCore/qbytearraylist.h \
 	/usr/include/x86_64-linux-gnu/qt6/QtCore/qbytearrayview.h \
+	/usr/include/x86_64-linux-gnu/qt6/QtCore/qcalendar.h \
 	/usr/include/x86_64-linux-gnu/qt6/QtCore/qchar.h \
 	/usr/include/x86_64-linux-gnu/qt6/QtCore/qcheckedint_impl.h \
 	/usr/include/x86_64-linux-gnu/qt6/QtCore/qcompare.h \
@@ -316,11 +326,22 @@ scriptura_autogen/timestamp: \
 	/usr/include/x86_64-linux-gnu/qt6/QtCore/qcontainerinfo.h \
 	/usr/include/x86_64-linux-gnu/qt6/QtCore/qcontainertools_impl.h \
 	/usr/include/x86_64-linux-gnu/qt6/QtCore/qcontiguouscache.h \
+	/usr/include/x86_64-linux-gnu/qt6/QtCore/qcoreapplication.h \
+	/usr/include/x86_64-linux-gnu/qt6/QtCore/qcoreapplication_platform.h \
+	/usr/include/x86_64-linux-gnu/qt6/QtCore/qcoreevent.h \
 	/usr/include/x86_64-linux-gnu/qt6/QtCore/qdarwinhelpers.h \
 	/usr/include/x86_64-linux-gnu/qt6/QtCore/qdatastream.h \
+	/usr/include/x86_64-linux-gnu/qt6/QtCore/qdatetime.h \
+	/usr/include/x86_64-linux-gnu/qt6/QtCore/qdeadlinetimer.h \
 	/usr/include/x86_64-linux-gnu/qt6/QtCore/qdebug.h \
+	/usr/include/x86_64-linux-gnu/qt6/QtCore/qdir.h \
+	/usr/include/x86_64-linux-gnu/qt6/QtCore/qdirlisting.h \
 	/usr/include/x86_64-linux-gnu/qt6/QtCore/qendian.h \
+	/usr/include/x86_64-linux-gnu/qt6/QtCore/qeventloop.h \
 	/usr/include/x86_64-linux-gnu/qt6/QtCore/qexceptionhandling.h \
+	/usr/include/x86_64-linux-gnu/qt6/QtCore/qfile.h \
+	/usr/include/x86_64-linux-gnu/qt6/QtCore/qfiledevice.h \
+	/usr/include/x86_64-linux-gnu/qt6/QtCore/qfileinfo.h \
 	/usr/include/x86_64-linux-gnu/qt6/QtCore/qflags.h \
 	/usr/include/x86_64-linux-gnu/qt6/QtCore/qfloat16.h \
 	/usr/include/x86_64-linux-gnu/qt6/QtCore/qforeach.h \
@@ -331,12 +352,15 @@ scriptura_autogen/timestamp: \
 	/usr/include/x86_64-linux-gnu/qt6/QtCore/qglobalstatic.h \
 	/usr/include/x86_64-linux-gnu/qt6/QtCore/qhash.h \
 	/usr/include/x86_64-linux-gnu/qt6/QtCore/qhashfunctions.h \
+	/usr/include/x86_64-linux-gnu/qt6/QtCore/qiodevice.h \
 	/usr/include/x86_64-linux-gnu/qt6/QtCore/qiodevicebase.h \
+	/usr/include/x86_64-linux-gnu/qt6/QtCore/qitemselectionmodel.h \
 	/usr/include/x86_64-linux-gnu/qt6/QtCore/qiterable.h \
 	/usr/include/x86_64-linux-gnu/qt6/QtCore/qiterator.h \
 	/usr/include/x86_64-linux-gnu/qt6/QtCore/qlatin1stringview.h \
 	/usr/include/x86_64-linux-gnu/qt6/QtCore/qline.h \
 	/usr/include/x86_64-linux-gnu/qt6/QtCore/qlist.h \
+	/usr/include/x86_64-linux-gnu/qt6/QtCore/qlocale.h \
 	/usr/include/x86_64-linux-gnu/qt6/QtCore/qlogging.h \
 	/usr/include/x86_64-linux-gnu/qt6/QtCore/qmalloc.h \
 	/usr/include/x86_64-linux-gnu/qt6/QtCore/qmap.h \
@@ -346,6 +370,7 @@ scriptura_autogen/timestamp: \
 	/usr/include/x86_64-linux-gnu/qt6/QtCore/qmetatype.h \
 	/usr/include/x86_64-linux-gnu/qt6/QtCore/qminmax.h \
 	/usr/include/x86_64-linux-gnu/qt6/QtCore/qnamespace.h \
+	/usr/include/x86_64-linux-gnu/qt6/QtCore/qnativeinterface.h \
 	/usr/include/x86_64-linux-gnu/qt6/QtCore/qnumeric.h \
 	/usr/include/x86_64-linux-gnu/qt6/QtCore/qobject.h \
 	/usr/include/x86_64-linux-gnu/qt6/QtCore/qobject_impl.h \
@@ -357,6 +382,7 @@ scriptura_autogen/timestamp: \
 	/usr/include/x86_64-linux-gnu/qt6/QtCore/qprocessordetection.h \
 	/usr/include/x86_64-linux-gnu/qt6/QtCore/qrect.h \
 	/usr/include/x86_64-linux-gnu/qt6/QtCore/qrefcount.h \
+	/usr/include/x86_64-linux-gnu/qt6/QtCore/qregularexpression.h \
 	/usr/include/x86_64-linux-gnu/qt6/QtCore/qscopedpointer.h \
 	/usr/include/x86_64-linux-gnu/qt6/QtCore/qscopeguard.h \
 	/usr/include/x86_64-linux-gnu/qt6/QtCore/qset.h \
@@ -392,6 +418,7 @@ scriptura_autogen/timestamp: \
 	/usr/include/x86_64-linux-gnu/qt6/QtCore/qtenvironmentvariables.h \
 	/usr/include/x86_64-linux-gnu/qt6/QtCore/qtextstream.h \
 	/usr/include/x86_64-linux-gnu/qt6/QtCore/qtformat_impl.h \
+	/usr/include/x86_64-linux-gnu/qt6/QtCore/qtimezone.h \
 	/usr/include/x86_64-linux-gnu/qt6/QtCore/qtmetamacros.h \
 	/usr/include/x86_64-linux-gnu/qt6/QtCore/qtnoop.h \
 	/usr/include/x86_64-linux-gnu/qt6/QtCore/qtpreprocessorsupport.h \
@@ -402,41 +429,89 @@ scriptura_autogen/timestamp: \
 	/usr/include/x86_64-linux-gnu/qt6/QtCore/qtversionchecks.h \
 	/usr/include/x86_64-linux-gnu/qt6/QtCore/qtypeinfo.h \
 	/usr/include/x86_64-linux-gnu/qt6/QtCore/qtypes.h \
+	/usr/include/x86_64-linux-gnu/qt6/QtCore/qurl.h \
 	/usr/include/x86_64-linux-gnu/qt6/QtCore/qutf8stringview.h \
 	/usr/include/x86_64-linux-gnu/qt6/QtCore/qvariant.h \
 	/usr/include/x86_64-linux-gnu/qt6/QtCore/qvarlengtharray.h \
 	/usr/include/x86_64-linux-gnu/qt6/QtCore/qversiontagging.h \
 	/usr/include/x86_64-linux-gnu/qt6/QtCore/qxptype_traits.h \
 	/usr/include/x86_64-linux-gnu/qt6/QtCore/qyieldcpu.h \
+	/usr/include/x86_64-linux-gnu/qt6/QtGui/QFileSystemModel \
+	/usr/include/x86_64-linux-gnu/qt6/QtGui/QTransform \
+	/usr/include/x86_64-linux-gnu/qt6/QtGui/qabstracttextdocumentlayout.h \
 	/usr/include/x86_64-linux-gnu/qt6/QtGui/qaction.h \
 	/usr/include/x86_64-linux-gnu/qt6/QtGui/qbitmap.h \
 	/usr/include/x86_64-linux-gnu/qt6/QtGui/qbrush.h \
 	/usr/include/x86_64-linux-gnu/qt6/QtGui/qcolor.h \
 	/usr/include/x86_64-linux-gnu/qt6/QtGui/qcursor.h \
+	/usr/include/x86_64-linux-gnu/qt6/QtGui/qevent.h \
+	/usr/include/x86_64-linux-gnu/qt6/QtGui/qeventpoint.h \
+	/usr/include/x86_64-linux-gnu/qt6/QtGui/qfilesystemmodel.h \
 	/usr/include/x86_64-linux-gnu/qt6/QtGui/qfont.h \
+	/usr/include/x86_64-linux-gnu/qt6/QtGui/qfontdatabase.h \
 	/usr/include/x86_64-linux-gnu/qt6/QtGui/qfontinfo.h \
 	/usr/include/x86_64-linux-gnu/qt6/QtGui/qfontmetrics.h \
 	/usr/include/x86_64-linux-gnu/qt6/QtGui/qfontvariableaxis.h \
+	/usr/include/x86_64-linux-gnu/qt6/QtGui/qglyphrun.h \
+	/usr/include/x86_64-linux-gnu/qt6/QtGui/qguiapplication.h \
+	/usr/include/x86_64-linux-gnu/qt6/QtGui/qguiapplication_platform.h \
 	/usr/include/x86_64-linux-gnu/qt6/QtGui/qicon.h \
 	/usr/include/x86_64-linux-gnu/qt6/QtGui/qimage.h \
+	/usr/include/x86_64-linux-gnu/qt6/QtGui/qinputdevice.h \
+	/usr/include/x86_64-linux-gnu/qt6/QtGui/qinputmethod.h \
 	/usr/include/x86_64-linux-gnu/qt6/QtGui/qkeysequence.h \
 	/usr/include/x86_64-linux-gnu/qt6/QtGui/qpaintdevice.h \
 	/usr/include/x86_64-linux-gnu/qt6/QtGui/qpalette.h \
+	/usr/include/x86_64-linux-gnu/qt6/QtGui/qpen.h \
 	/usr/include/x86_64-linux-gnu/qt6/QtGui/qpixelformat.h \
 	/usr/include/x86_64-linux-gnu/qt6/QtGui/qpixmap.h \
+	/usr/include/x86_64-linux-gnu/qt6/QtGui/qpointingdevice.h \
 	/usr/include/x86_64-linux-gnu/qt6/QtGui/qpolygon.h \
+	/usr/include/x86_64-linux-gnu/qt6/QtGui/qrawfont.h \
 	/usr/include/x86_64-linux-gnu/qt6/QtGui/qregion.h \
 	/usr/include/x86_64-linux-gnu/qt6/QtGui/qrgb.h \
 	/usr/include/x86_64-linux-gnu/qt6/QtGui/qrgba64.h \
+	/usr/include/x86_64-linux-gnu/qt6/QtGui/qscreen.h \
+	/usr/include/x86_64-linux-gnu/qt6/QtGui/qscreen_platform.h \
+	/usr/include/x86_64-linux-gnu/qt6/QtGui/qtextcursor.h \
+	/usr/include/x86_64-linux-gnu/qt6/QtGui/qtextdocument.h \
+	/usr/include/x86_64-linux-gnu/qt6/QtGui/qtextformat.h \
+	/usr/include/x86_64-linux-gnu/qt6/QtGui/qtextlayout.h \
+	/usr/include/x86_64-linux-gnu/qt6/QtGui/qtextoption.h \
 	/usr/include/x86_64-linux-gnu/qt6/QtGui/qtgui-config.h \
 	/usr/include/x86_64-linux-gnu/qt6/QtGui/qtguiexports.h \
 	/usr/include/x86_64-linux-gnu/qt6/QtGui/qtguiglobal.h \
 	/usr/include/x86_64-linux-gnu/qt6/QtGui/qtransform.h \
+	/usr/include/x86_64-linux-gnu/qt6/QtGui/qvalidator.h \
+	/usr/include/x86_64-linux-gnu/qt6/QtGui/qvector2d.h \
+	/usr/include/x86_64-linux-gnu/qt6/QtGui/qvectornd.h \
 	/usr/include/x86_64-linux-gnu/qt6/QtGui/qwindowdefs.h \
 	/usr/include/x86_64-linux-gnu/qt6/QtWidgets/QMainWindow \
+	/usr/include/x86_64-linux-gnu/qt6/QtWidgets/QPlainTextEdit \
+	/usr/include/x86_64-linux-gnu/qt6/QtWidgets/QTabWidget \
+	/usr/include/x86_64-linux-gnu/qt6/QtWidgets/QToolBar \
+	/usr/include/x86_64-linux-gnu/qt6/QtWidgets/QToolButton \
+	/usr/include/x86_64-linux-gnu/qt6/QtWidgets/QTreeView \
+	/usr/include/x86_64-linux-gnu/qt6/QtWidgets/qabstractbutton.h \
+	/usr/include/x86_64-linux-gnu/qt6/QtWidgets/qabstractitemdelegate.h \
+	/usr/include/x86_64-linux-gnu/qt6/QtWidgets/qabstractitemview.h \
+	/usr/include/x86_64-linux-gnu/qt6/QtWidgets/qabstractscrollarea.h \
+	/usr/include/x86_64-linux-gnu/qt6/QtWidgets/qabstractslider.h \
+	/usr/include/x86_64-linux-gnu/qt6/QtWidgets/qabstractspinbox.h \
+	/usr/include/x86_64-linux-gnu/qt6/QtWidgets/qframe.h \
 	/usr/include/x86_64-linux-gnu/qt6/QtWidgets/qmainwindow.h \
+	/usr/include/x86_64-linux-gnu/qt6/QtWidgets/qplaintextedit.h \
+	/usr/include/x86_64-linux-gnu/qt6/QtWidgets/qrubberband.h \
 	/usr/include/x86_64-linux-gnu/qt6/QtWidgets/qsizepolicy.h \
+	/usr/include/x86_64-linux-gnu/qt6/QtWidgets/qslider.h \
+	/usr/include/x86_64-linux-gnu/qt6/QtWidgets/qstyle.h \
+	/usr/include/x86_64-linux-gnu/qt6/QtWidgets/qstyleoption.h \
+	/usr/include/x86_64-linux-gnu/qt6/QtWidgets/qtabbar.h \
 	/usr/include/x86_64-linux-gnu/qt6/QtWidgets/qtabwidget.h \
+	/usr/include/x86_64-linux-gnu/qt6/QtWidgets/qtextedit.h \
+	/usr/include/x86_64-linux-gnu/qt6/QtWidgets/qtoolbar.h \
+	/usr/include/x86_64-linux-gnu/qt6/QtWidgets/qtoolbutton.h \
+	/usr/include/x86_64-linux-gnu/qt6/QtWidgets/qtreeview.h \
 	/usr/include/x86_64-linux-gnu/qt6/QtWidgets/qtwidgets-config.h \
 	/usr/include/x86_64-linux-gnu/qt6/QtWidgets/qtwidgetsexports.h \
 	/usr/include/x86_64-linux-gnu/qt6/QtWidgets/qtwidgetsglobal.h \
@@ -572,82 +647,23 @@ scriptura_autogen/timestamp: \
 	/usr/lib/x86_64-linux-gnu/cmake/Qt6WidgetsTools/Qt6WidgetsToolsTargets-none.cmake \
 	/usr/lib/x86_64-linux-gnu/cmake/Qt6WidgetsTools/Qt6WidgetsToolsTargets.cmake \
 	/usr/lib/x86_64-linux-gnu/cmake/Qt6WidgetsTools/Qt6WidgetsToolsVersionlessTargets.cmake \
-	/usr/share/cmake-4.2/Modules/CMakeCXXCompiler.cmake.in \
-	/usr/share/cmake-4.2/Modules/CMakeCXXCompilerABI.cpp \
 	/usr/share/cmake-4.2/Modules/CMakeCXXInformation.cmake \
 	/usr/share/cmake-4.2/Modules/CMakeCheckCompilerFlagCommonPatterns.cmake \
 	/usr/share/cmake-4.2/Modules/CMakeCommonLanguageInclude.cmake \
-	/usr/share/cmake-4.2/Modules/CMakeCompilerIdDetection.cmake \
-	/usr/share/cmake-4.2/Modules/CMakeDetermineCXXCompiler.cmake \
-	/usr/share/cmake-4.2/Modules/CMakeDetermineCompiler.cmake \
-	/usr/share/cmake-4.2/Modules/CMakeDetermineCompilerABI.cmake \
-	/usr/share/cmake-4.2/Modules/CMakeDetermineCompilerId.cmake \
-	/usr/share/cmake-4.2/Modules/CMakeDetermineCompilerSupport.cmake \
-	/usr/share/cmake-4.2/Modules/CMakeDetermineSystem.cmake \
-	/usr/share/cmake-4.2/Modules/CMakeFindBinUtils.cmake \
 	/usr/share/cmake-4.2/Modules/CMakeFindDependencyMacro.cmake \
 	/usr/share/cmake-4.2/Modules/CMakeGenericSystem.cmake \
 	/usr/share/cmake-4.2/Modules/CMakeInitializeConfigs.cmake \
 	/usr/share/cmake-4.2/Modules/CMakeLanguageInformation.cmake \
 	/usr/share/cmake-4.2/Modules/CMakeParseArguments.cmake \
-	/usr/share/cmake-4.2/Modules/CMakeParseImplicitIncludeInfo.cmake \
-	/usr/share/cmake-4.2/Modules/CMakeParseImplicitLinkInfo.cmake \
-	/usr/share/cmake-4.2/Modules/CMakeParseLibraryArchitecture.cmake \
-	/usr/share/cmake-4.2/Modules/CMakeSystem.cmake.in \
 	/usr/share/cmake-4.2/Modules/CMakeSystemSpecificInformation.cmake \
 	/usr/share/cmake-4.2/Modules/CMakeSystemSpecificInitialize.cmake \
-	/usr/share/cmake-4.2/Modules/CMakeTestCXXCompiler.cmake \
-	/usr/share/cmake-4.2/Modules/CMakeTestCompilerCommon.cmake \
-	/usr/share/cmake-4.2/Modules/CMakeUnixFindMake.cmake \
 	/usr/share/cmake-4.2/Modules/CheckCXXCompilerFlag.cmake \
 	/usr/share/cmake-4.2/Modules/CheckCXXSourceCompiles.cmake \
 	/usr/share/cmake-4.2/Modules/CheckIncludeFileCXX.cmake \
 	/usr/share/cmake-4.2/Modules/CheckLibraryExists.cmake \
-	/usr/share/cmake-4.2/Modules/Compiler/ADSP-DetermineCompiler.cmake \
-	/usr/share/cmake-4.2/Modules/Compiler/ARMCC-DetermineCompiler.cmake \
-	/usr/share/cmake-4.2/Modules/Compiler/ARMClang-DetermineCompiler.cmake \
-	/usr/share/cmake-4.2/Modules/Compiler/AppleClang-DetermineCompiler.cmake \
-	/usr/share/cmake-4.2/Modules/Compiler/Borland-DetermineCompiler.cmake \
 	/usr/share/cmake-4.2/Modules/Compiler/CMakeCommonCompilerMacros.cmake \
-	/usr/share/cmake-4.2/Modules/Compiler/Clang-DetermineCompiler.cmake \
-	/usr/share/cmake-4.2/Modules/Compiler/Clang-DetermineCompilerInternal.cmake \
-	/usr/share/cmake-4.2/Modules/Compiler/Compaq-CXX-DetermineCompiler.cmake \
-	/usr/share/cmake-4.2/Modules/Compiler/Cray-DetermineCompiler.cmake \
-	/usr/share/cmake-4.2/Modules/Compiler/CrayClang-DetermineCompiler.cmake \
-	/usr/share/cmake-4.2/Modules/Compiler/Diab-DetermineCompiler.cmake \
-	/usr/share/cmake-4.2/Modules/Compiler/Embarcadero-DetermineCompiler.cmake \
-	/usr/share/cmake-4.2/Modules/Compiler/Fujitsu-DetermineCompiler.cmake \
-	/usr/share/cmake-4.2/Modules/Compiler/FujitsuClang-DetermineCompiler.cmake \
-	/usr/share/cmake-4.2/Modules/Compiler/GHS-DetermineCompiler.cmake \
-	/usr/share/cmake-4.2/Modules/Compiler/GNU-CXX-DetermineCompiler.cmake \
 	/usr/share/cmake-4.2/Modules/Compiler/GNU-CXX.cmake \
-	/usr/share/cmake-4.2/Modules/Compiler/GNU-FindBinUtils.cmake \
 	/usr/share/cmake-4.2/Modules/Compiler/GNU.cmake \
-	/usr/share/cmake-4.2/Modules/Compiler/HP-CXX-DetermineCompiler.cmake \
-	/usr/share/cmake-4.2/Modules/Compiler/IAR-DetermineCompiler.cmake \
-	/usr/share/cmake-4.2/Modules/Compiler/IBMCPP-CXX-DetermineVersionInternal.cmake \
-	/usr/share/cmake-4.2/Modules/Compiler/IBMClang-CXX-DetermineCompiler.cmake \
-	/usr/share/cmake-4.2/Modules/Compiler/Intel-DetermineCompiler.cmake \
-	/usr/share/cmake-4.2/Modules/Compiler/IntelLLVM-DetermineCompiler.cmake \
-	/usr/share/cmake-4.2/Modules/Compiler/LCC-CXX-DetermineCompiler.cmake \
-	/usr/share/cmake-4.2/Modules/Compiler/MSVC-DetermineCompiler.cmake \
-	/usr/share/cmake-4.2/Modules/Compiler/NVHPC-DetermineCompiler.cmake \
-	/usr/share/cmake-4.2/Modules/Compiler/NVIDIA-DetermineCompiler.cmake \
-	/usr/share/cmake-4.2/Modules/Compiler/OpenWatcom-DetermineCompiler.cmake \
-	/usr/share/cmake-4.2/Modules/Compiler/OrangeC-DetermineCompiler.cmake \
-	/usr/share/cmake-4.2/Modules/Compiler/PGI-DetermineCompiler.cmake \
-	/usr/share/cmake-4.2/Modules/Compiler/PathScale-DetermineCompiler.cmake \
-	/usr/share/cmake-4.2/Modules/Compiler/Renesas-DetermineCompiler.cmake \
-	/usr/share/cmake-4.2/Modules/Compiler/SCO-DetermineCompiler.cmake \
-	/usr/share/cmake-4.2/Modules/Compiler/SunPro-CXX-DetermineCompiler.cmake \
-	/usr/share/cmake-4.2/Modules/Compiler/TI-DetermineCompiler.cmake \
-	/usr/share/cmake-4.2/Modules/Compiler/TIClang-DetermineCompiler.cmake \
-	/usr/share/cmake-4.2/Modules/Compiler/Tasking-DetermineCompiler.cmake \
-	/usr/share/cmake-4.2/Modules/Compiler/VisualAge-CXX-DetermineCompiler.cmake \
-	/usr/share/cmake-4.2/Modules/Compiler/Watcom-DetermineCompiler.cmake \
-	/usr/share/cmake-4.2/Modules/Compiler/XL-CXX-DetermineCompiler.cmake \
-	/usr/share/cmake-4.2/Modules/Compiler/XLClang-CXX-DetermineCompiler.cmake \
-	/usr/share/cmake-4.2/Modules/Compiler/zOS-CXX-DetermineCompiler.cmake \
 	/usr/share/cmake-4.2/Modules/FindOpenGL.cmake \
 	/usr/share/cmake-4.2/Modules/FindPackageHandleStandardArgs.cmake \
 	/usr/share/cmake-4.2/Modules/FindPackageMessage.cmake \
@@ -656,19 +672,15 @@ scriptura_autogen/timestamp: \
 	/usr/share/cmake-4.2/Modules/GNUInstallDirs.cmake \
 	/usr/share/cmake-4.2/Modules/Internal/CMakeCXXLinkerInformation.cmake \
 	/usr/share/cmake-4.2/Modules/Internal/CMakeCommonLinkerInformation.cmake \
-	/usr/share/cmake-4.2/Modules/Internal/CMakeDetermineLinkerId.cmake \
-	/usr/share/cmake-4.2/Modules/Internal/CMakeInspectCXXLinker.cmake \
 	/usr/share/cmake-4.2/Modules/Internal/CheckCompilerFlag.cmake \
 	/usr/share/cmake-4.2/Modules/Internal/CheckFlagCommonConfig.cmake \
 	/usr/share/cmake-4.2/Modules/Internal/CheckSourceCompiles.cmake \
-	/usr/share/cmake-4.2/Modules/Internal/FeatureTesting.cmake \
 	/usr/share/cmake-4.2/Modules/Linker/GNU-CXX.cmake \
 	/usr/share/cmake-4.2/Modules/Linker/GNU.cmake \
 	/usr/share/cmake-4.2/Modules/MacroAddFileDependencies.cmake \
 	/usr/share/cmake-4.2/Modules/Platform/Linker/GNU.cmake \
 	/usr/share/cmake-4.2/Modules/Platform/Linker/Linux-GNU-CXX.cmake \
 	/usr/share/cmake-4.2/Modules/Platform/Linker/Linux-GNU.cmake \
-	/usr/share/cmake-4.2/Modules/Platform/Linux-Determine-CXX.cmake \
 	/usr/share/cmake-4.2/Modules/Platform/Linux-GNU-CXX.cmake \
 	/usr/share/cmake-4.2/Modules/Platform/Linux-GNU.cmake \
 	/usr/share/cmake-4.2/Modules/Platform/Linux-Initialize.cmake \
