@@ -1,5 +1,6 @@
 #include "mainwindow.h"
 #include "./ui_mainwindow.h"
+#include "codeeditor.h"
 
 #include <QFileDialog>
 #include <QFile>
@@ -8,12 +9,22 @@
 #include <QFileSystemModel>
 #include <QDir>
 #include <QTextCursor>
+#include <QApplication>
+#include <QScreen>
+#include <QRect>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
     , ui(new Ui::MainWindow)
 {
     ui->setupUi(this);
+    
+    QScreen *screen = QApplication::primaryScreen();
+    if (screen) {
+        QRect available = screen->availableGeometry();
+        resize(qMin(available.width() * 7 / 10, 900), 
+               qMin(available.height() * 7 / 10, 800));
+    }
     
     fileModel = new QFileSystemModel(this);
     fileModel->setRootPath(QDir::homePath());
@@ -222,7 +233,7 @@ void MainWindow::on_fileTree_clicked(const QModelIndex &index)
             }
         }
         
-        QPlainTextEdit *editor = new QPlainTextEdit(this);
+        CodeEditor *editor = new CodeEditor(this);
         editor->setPlainText(content);
         connect(editor, &QPlainTextEdit::cursorPositionChanged, this, &MainWindow::updateCursorPosition);
         

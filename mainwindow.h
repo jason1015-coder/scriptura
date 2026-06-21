@@ -9,6 +9,7 @@
 #include <QPlainTextEdit>
 #include <QToolBar>
 #include <QToolButton>
+#include "codeeditor.h"
 
 QT_BEGIN_NAMESPACE
 namespace Ui {
