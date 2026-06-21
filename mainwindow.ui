@@ -3,13 +3,13 @@
  <class>MainWindow</class>
  <widget class="QMainWindow" name="MainWindow">
   <property name="geometry">
-      <rect>
-       <x>0</x>
-       <y>0</y>
-       <width>900</width>
-       <height>800</height>
-      </rect>
-    </property>
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>900</width>
+    <height>800</height>
+   </rect>
+  </property>
   <property name="windowTitle">
    <string>MainWindow</string>
   </property>
@@ -45,7 +45,7 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>1200</width>
+     <width>900</width>
      <height>30</height>
     </rect>
    </property>
@@ -67,8 +67,27 @@
     <addaction name="action_Paste"/>
     <addaction name="action_Undo"/>
    </widget>
+   <widget class="QMenu" name="menu_terminal">
+    <property name="title">
+     <string>&amp;terminal</string>
+    </property>
+    <addaction name="action_new_window"/>
+    <addaction name="action_clone_window"/>
+   </widget>
+   <widget class="QMenu" name="menu_settings">
+    <property name="title">
+     <string>&amp;settings</string>
+    </property>
+    <addaction name="action_about"/>
+    <addaction name="separator"/>
+    <addaction name="action_editor_settings"/>
+    <addaction name="action_theme"/>
+    <addaction name="action_license"/>
+   </widget>
    <addaction name="menu_File"/>
    <addaction name="menu_edit"/>
+   <addaction name="menu_terminal"/>
+   <addaction name="menu_settings"/>
   </widget>
   <widget class="QStatusBar" name="statusbar"/>
   <action name="action_open_project">
@@ -106,12 +125,42 @@
     <string>&amp;Undo</string>
    </property>
   </action>
-<action name="action_delete_file_directory">
-    <property name="text">
-     <string>&amp;Delete File/Directory</string>
-    </property>
-   </action>
-  </widget>
+  <action name="action_delete_file_directory">
+   <property name="text">
+    <string>&amp;Delete File/Directory</string>
+   </property>
+  </action>
+  <action name="action_new_window">
+   <property name="text">
+    <string>&amp;new window</string>
+   </property>
+  </action>
+  <action name="action_clone_window">
+   <property name="text">
+    <string>&amp;clone window</string>
+   </property>
+  </action>
+  <action name="action_about">
+   <property name="text">
+    <string>&amp;about</string>
+   </property>
+  </action>
+  <action name="action_editor_settings">
+   <property name="text">
+    <string>&amp;editor settings</string>
+   </property>
+  </action>
+  <action name="action_license">
+   <property name="text">
+    <string>&amp;license</string>
+   </property>
+  </action>
+  <action name="action_theme">
+   <property name="text">
+    <string>&amp;theme</string>
+   </property>
+  </action>
+ </widget>
  <resources/>
  <connections/>
 </ui>

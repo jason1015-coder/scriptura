@@ -40,6 +40,12 @@ private slots:
     void on_action_Undo_triggered();
     void on_action_add_file_directory_triggered();
     void on_action_delete_file_directory_triggered();
+    void on_action_new_window_triggered();
+    void on_action_clone_window_triggered();
+    void on_action_about_triggered();
+    void on_action_editor_settings_triggered();
+    void on_action_theme_triggered();
+    void on_action_license_triggered();
     void on_fileTree_clicked(const QModelIndex &index);
     void on_tabWidget_tabCloseRequested(int index);
     void on_goUp_triggered();

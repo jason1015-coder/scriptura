@@ -12,6 +12,12 @@
 #include <QApplication>
 #include <QScreen>
 #include <QRect>
+#include <QProcess>
+#include <QInputDialog>
+#include <QLineEdit>
+#include <QFontDialog>
+#include <QSettings>
+#include <QFileInfo>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -287,4 +293,93 @@ void MainWindow::on_goUp_triggered()
     } else {
         goUpButton->setEnabled(false);
     }
+}
+
+void MainWindow::on_action_new_window_triggered()
+{
+    QProcess::startDetached("konsole", QStringList());
+}
+
+void MainWindow::on_action_clone_window_triggered()
+{
+    bool ok;
+    QString defaultDir = !projectDir.isEmpty() ? projectDir : QDir::homePath();
+    QString targetDir = QInputDialog::getText(this, tr("Clone Terminal"), tr("Working directory:"), QLineEdit::Normal, defaultDir, &ok);
+    if (!ok || targetDir.isEmpty())
+        return;
+
+    QDir dir(targetDir);
+    if (!dir.exists())
+        return;
+
+    QProcess::startDetached("konsole", QStringList() << "--workdir" << targetDir);
+}
+
+void MainWindow::on_action_about_triggered()
+{
+    QMessageBox::about(this, tr("About Scriptura"), 
+        tr("Scriptura\nA simple Qt-based text editor with project file browsing.\n\n"
+           "Built with C++17 and Qt Widgets."));
+}
+
+void MainWindow::on_action_editor_settings_triggered()
+{
+    CodeEditor *editor = qobject_cast<CodeEditor*>(ui->tabWidget->currentWidget());
+    if (!editor)
+        return;
+
+    bool ok;
+    QFont font = QFontDialog::getFont(&ok, editor->font(), this, tr("Editor Settings"));
+    if (ok) {
+        editor->setFont(font);
+        QSettings settings;
+        settings.setValue("editor/font", font);
+    }
+}
+
+void MainWindow::on_action_theme_triggered()
+{
+    static bool darkMode = false;
+    darkMode = !darkMode;
+
+    QPalette palette;
+    if (darkMode) {
+        palette.setColor(QPalette::Window, QColor(53, 53, 53));
+        palette.setColor(QPalette::WindowText, Qt::white);
+        palette.setColor(QPalette::Base, QColor(25, 25, 25));
+        palette.setColor(QPalette::AlternateBase, QColor(53, 53, 53));
+        palette.setColor(QPalette::ToolTipBase, Qt::white);
+        palette.setColor(QPalette::ToolTipText, Qt::white);
+        palette.setColor(QPalette::Text, Qt::white);
+        palette.setColor(QPalette::Button, QColor(53, 53, 53));
+        palette.setColor(QPalette::ButtonText, Qt::white);
+        palette.setColor(QPalette::BrightText, Qt::red);
+        palette.setColor(QPalette::Link, QColor(42, 130, 218));
+        palette.setColor(QPalette::Highlight, QColor(42, 130, 218));
+        palette.setColor(QPalette::HighlightedText, Qt::black);
+    } else {
+        palette = QApplication::style()->standardPalette();
+    }
+    QApplication::setPalette(palette);
+}
+
+void MainWindow::on_action_license_triggered()
+{
+    QMessageBox::about(this, tr("License"), tr("MIT License\n\n"
+        "Copyright (c) 2026 Scriptura\n\n"
+        "Permission is hereby granted, free of charge, to any person obtaining a copy\n"
+        "of this software and associated documentation files (the \"Software\"), to deal\n"
+        "in the Software without restriction, including without limitation the rights\n"
+        "to use, copy, modify, merge, publish, distribute, sublicense, and/or sell\n"
+        "copies of the Software, and to permit persons to whom the Software is\n"
+        "furnished to do so, subject to the following conditions:\n\n"
+        "The above copyright notice and this permission notice shall be included in all\n"
+        "copies or substantial portions of the Software.\n\n"
+        "THE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\n"
+        "IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\n"
+        "FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\n"
+        "AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\n"
+        "LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\n"
+        "OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\n"
+        "SOFTWARE."));
 }
