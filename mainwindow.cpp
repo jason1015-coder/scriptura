@@ -18,6 +18,12 @@
 #include <QFontDialog>
 #include <QSettings>
 #include <QFileInfo>
+#include <QStackedWidget>
+#include <QLabel>
+#include <QPushButton>
+#include <QVBoxLayout>
+#include <QHBoxLayout>
+#include <QSpacerItem>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -49,8 +55,17 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->fileTreeView, &QTreeView::clicked, this, &MainWindow::on_fileTree_clicked);
     
     ui->tabWidget->clear();
+    ui->tabWidget->setTabsClosable(true);
     
     connect(ui->tabWidget, &QTabWidget::tabCloseRequested, this, &MainWindow::on_tabWidget_tabCloseRequested);
+
+    ui->editorLayout->removeWidget(ui->tabWidget);
+    editorStack = new QStackedWidget(this);
+    welcomeWidget = createWelcomeWidget();
+    editorStack->addWidget(welcomeWidget);
+    editorStack->addWidget(ui->tabWidget);
+    ui->editorLayout->addWidget(editorStack);
+    showWelcomeScreen();
 }
 
 MainWindow::~MainWindow()
@@ -61,6 +76,52 @@ MainWindow::~MainWindow()
 QPlainTextEdit* MainWindow::getCurrentEditor()
 {
     return qobject_cast<QPlainTextEdit*>(ui->tabWidget->currentWidget());
+}
+
+QWidget* MainWindow::createWelcomeWidget()
+{
+    QWidget *widget = new QWidget(this);
+
+    QLabel *titleLabel = new QLabel(tr("Welcome to Scriptura"), widget);
+    titleLabel->setObjectName("welcomeTitle");
+    titleLabel->setAlignment(Qt::AlignCenter);
+
+    QLabel *descriptionLabel = new QLabel(tr("Open a project or create a new file to start editing."), widget);
+    descriptionLabel->setAlignment(Qt::AlignCenter);
+
+    QPushButton *openProjectButton = new QPushButton(tr("Open Project"), widget);
+    QPushButton *newFileButton = new QPushButton(tr("New File"), widget);
+
+    QHBoxLayout *buttonLayout = new QHBoxLayout();
+    buttonLayout->addStretch();
+    buttonLayout->addWidget(openProjectButton);
+    buttonLayout->addWidget(newFileButton);
+    buttonLayout->addStretch();
+
+    QVBoxLayout *layout = new QVBoxLayout(widget);
+    layout->addStretch();
+    layout->addWidget(titleLabel);
+    layout->addWidget(descriptionLabel);
+    layout->addStretch();
+    layout->addLayout(buttonLayout);
+    layout->addStretch();
+
+    connect(openProjectButton, &QPushButton::clicked, this, &MainWindow::on_action_open_project_triggered);
+    connect(newFileButton, &QPushButton::clicked, this, [this]() {
+        on_action_add_file_directory_triggered();
+    });
+
+    return widget;
+}
+
+void MainWindow::showWelcomeScreen()
+{
+    editorStack->setCurrentWidget(welcomeWidget);
+}
+
+void MainWindow::showEditorInterface()
+{
+    editorStack->setCurrentWidget(ui->tabWidget);
 }
 
 void MainWindow::updateCursorPosition()
@@ -234,6 +295,7 @@ void MainWindow::on_fileTree_clicked(const QModelIndex &index)
         
         for (int i = 0; i < openFiles.size(); i++) {
             if (openFiles[i].filePath == path) {
+                showEditorInterface();
                 ui->tabWidget->setCurrentIndex(i);
                 return;
             }
@@ -248,6 +310,7 @@ void MainWindow::on_fileTree_clicked(const QModelIndex &index)
         openFile.fileName = fileInfo.fileName();
         openFiles.append(openFile);
         
+        showEditorInterface();
         ui->tabWidget->addTab(editor, openFile.fileName);
         ui->tabWidget->setCurrentWidget(editor);
         
@@ -270,12 +333,14 @@ void MainWindow::on_tabWidget_tabCloseRequested(int index)
     delete widget;
     
     if (ui->tabWidget->count() > 0) {
+        showEditorInterface();
         QPlainTextEdit *editor = getCurrentEditor();
         if (editor) {
             currentFile = openFiles[ui->tabWidget->currentIndex()].filePath;
             setWindowTitle(QFileInfo(currentFile).fileName() + " - Scriptura");
         }
     } else {
+        showWelcomeScreen();
         setWindowTitle(projectDir.isEmpty() ? "Scriptura" : QFileInfo(projectDir).fileName() + " - Scriptura");
     }
 }

@@ -9,6 +9,7 @@
 #include <QPlainTextEdit>
 #include <QToolBar>
 #include <QToolButton>
+#include <QStackedWidget>
 #include "codeeditor.h"
 
 QT_BEGIN_NAMESPACE
@@ -58,9 +59,14 @@ private:
     QList<OpenFile> openFiles;
     QFileSystemModel *fileModel;
     QToolButton *goUpButton;
+    QWidget *welcomeWidget;
+    QStackedWidget *editorStack;
     
     void updateCursorPosition();
     QPlainTextEdit* getCurrentEditor();
+    QWidget* createWelcomeWidget();
+    void showWelcomeScreen();
+    void showEditorInterface();
 };
 
 #endif // MAINWINDOW_H
