@@ -54,7 +54,7 @@ MIT License - see LICENSE file
 
 ## Alpha Stage Checklist
 
-- [x] Application packaging (AppImage / DMG / NSIS installer)
+- [ ] Application packaging (AppImage / DMG / NSIS installer)
 - [x] Project auto-discovery / recent projects on welcome screen
 - [x] Open/Save file dialog native file format filters
 - [x] Auto-save / crash recovery
