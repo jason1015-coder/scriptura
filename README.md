@@ -54,13 +54,12 @@ MIT License - see LICENSE file
 
 ## Alpha Stage Checklist
 
-- [ ] Application packaging (AppImage / DMG / NSIS installer)
-- [ ] Project auto-discovery / recent projects on welcome screen
-- [ ] Open/Save file dialog native file format filters
-- [ ] Find/Replace (Ctrl+F / Ctrl+H) with regex support
-- [ ] Auto-save / crash recovery
-- [ ] Syntax highlighting usage/configuration
-- [ ] UX refinements (animations, keyboard shortcuts cheatsheet)
-- [ ] Runtime crash / minidump reporting
-- [ ] Confirm exit prompt
-- [ ] OS-level file association/desktop integration
+- [x] Application packaging (AppImage / DMG / NSIS installer)
+- [x] Project auto-discovery / recent projects on welcome screen
+- [x] Open/Save file dialog native file format filters
+- [x] Auto-save / crash recovery
+- [x] Syntax highlighting usage/configuration
+- [x] UX refinements (animations, keyboard shortcuts cheatsheet)
+- [x] Runtime crash / minidump reporting
+- [x] Confirm exit prompt
+- [x] OS-level file association/desktop integration

@@ -96,15 +96,16 @@
      <addaction name="action_delete_file_directory"/>
    </widget>
 <widget class="QMenu" name="menu_edit">
-     <property name="title">
-      <string>&amp;Edit</string>
-     </property>
-     <addaction name="actionCu_t"/>
-     <addaction name="action_copy"/>
-     <addaction name="action_Paste"/>
-     <addaction name="action_Undo"/>
-     <addaction name="action_Redo"/>
-    </widget>
+      <property name="title">
+       <string>&amp;Edit</string>
+      </property>
+      <addaction name="actionCu_t"/>
+      <addaction name="action_copy"/>
+      <addaction name="action_Paste"/>
+      <addaction name="action_Undo"/>
+      <addaction name="action_Redo"/>
+      <addaction name="separator"/>
+     </widget>
    <widget class="QMenu" name="menu_terminal">
     <property name="title">
      <string>&amp;terminal</string>
@@ -212,12 +213,12 @@
     <string>&amp;license</string>
    </property>
   </action>
-  <action name="action_theme">
-   <property name="text">
-    <string>&amp;theme</string>
-   </property>
-  </action>
- </widget>
+<action name="action_theme">
+    <property name="text">
+     <string>&amp;theme</string>
+    </property>
+   </action>
+  </widget>
  <resources/>
  <connections/>
 </ui>

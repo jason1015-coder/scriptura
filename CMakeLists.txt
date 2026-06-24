@@ -73,6 +73,13 @@ install(TARGETS scriptura
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 )
 
+# Desktop file for Linux
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/scriptura.desktop")
+    install(FILES scriptura.desktop
+            DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/applications
+    )
+endif()
+
 if(QT_VERSION_MAJOR EQUAL 6)
     qt_finalize_executable(scriptura)
 endif()

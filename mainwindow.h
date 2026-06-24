@@ -11,6 +11,14 @@
 #include <QToolButton>
 #include <QStackedWidget>
 #include <QMenu>
+#include <QLineEdit>
+#include <QLabel>
+#include <QPushButton>
+#include <QWidget>
+#include <QTimer>
+#include <QCloseEvent>
+#include <QVBoxLayout>
+#include <QShortcut>
 #include "codeeditor.h"
 
 enum ThemeType {
@@ -44,6 +52,9 @@ public:
     MainWindow(QWidget *parent = nullptr);
     ~MainWindow();
 
+protected:
+    void closeEvent(QCloseEvent *event) override;
+
 private slots:
     void on_action_open_project_triggered();
     void on_action_save_triggered();
@@ -65,6 +76,12 @@ private slots:
     void on_tabWidget_tabCloseRequested(int index);
     void goUpClicked();
     void on_action_open_file_triggered();
+    void onSearchTextChanged(const QString &text);
+    void onSearchNext();
+    void onSearchPrev();
+    void showSearchBar(bool show);
+    void performSearch(const QString &text, bool forward);
+    void showKeyboardShortcuts();
 
 private:
     Ui::MainWindow *ui;
@@ -76,21 +93,38 @@ private:
     QToolButton *goUpButton;
     QToolButton *fileTreeToggleButton;
     QToolButton *terminalButton;
-    QWidget *welcomeWidget;
+    QLineEdit   *searchLineEdit;
+    QPushButton *searchPrevBtn;
+    QPushButton *searchNextBtn;
+    QLabel      *searchCountLabel;
+    QWidget     *searchBarWidget;
+    QWidget     *welcomeWidget;
+    QVBoxLayout *recentProjectsLayout;
     QStackedWidget *editorStack;
     bool darkMode;
     ThemeType selectedTheme;
+
+    QTimer *autoSaveTimer;
+    QStringList recentProjects;
+    int maxRecentProjects = 10;
 
     void updateCursorPosition();
     void updateStatusBar();
     void updateTabModified(int index, bool modified);
     QString findTerminal();
     QPlainTextEdit* getCurrentEditor();
+    CodeEditor* getCurrentCodeEditor();
     QWidget* createWelcomeWidget();
+    QWidget* createKeyboardShortcutsWidget();
     void showWelcomeScreen();
     void showEditorInterface();
     void applyTheme(ThemeType theme);
     void setSidebarCollapsed(bool collapsed);
+    void loadRecentProjects();
+    void saveRecentProjects();
+    void updateRecentProjectsOnWelcome();
+    void autoSave();
+    bool checkUnsavedChanges();
 };
 
 #endif // MAINWINDOW_H

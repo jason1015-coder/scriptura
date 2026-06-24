@@ -1,3 +1,5 @@
+#include <QShortcut>
+#include <QCloseEvent>
 #include "mainwindow.h"
 #include "./ui_mainwindow.h"
 #include "codeeditor.h"
@@ -21,7 +23,7 @@
 #include <QStackedWidget>
 #include <QLabel>
 #include <QPushButton>
-#include <QVBoxLayout>
+#include <QDebug>
 #include <QHBoxLayout>
 #include <QSpacerItem>
 #include <QDialog>
@@ -38,8 +40,11 @@ MainWindow::MainWindow(QWidget *parent)
     , ui(new Ui::MainWindow)
     , darkMode(false)
     , selectedTheme(ThemeDefaultLight)
+    , autoSaveTimer(new QTimer(this))
 {
     ui->setupUi(this);
+
+    loadRecentProjects();
 
     QSettings settings;
     int themeIndex = settings.value("theme/selected", ThemeDefaultLight).toInt();
@@ -66,6 +71,38 @@ MainWindow::MainWindow(QWidget *parent)
     goUpButton->setEnabled(false);
     connect(goUpButton, &QToolButton::clicked, this, &MainWindow::goUpClicked);
     toolbar->addWidget(goUpButton);
+
+    searchBarWidget = new QWidget(this);
+    searchBarWidget->setVisible(false);
+    QHBoxLayout *searchLayout = new QHBoxLayout(searchBarWidget);
+    searchLayout->setContentsMargins(2, 2, 2, 2);
+    searchLayout->setSpacing(4);
+
+    searchLineEdit = new QLineEdit(searchBarWidget);
+    searchLineEdit->setPlaceholderText(tr("Search in file..."));
+    searchLineEdit->setClearButtonEnabled(true);
+    connect(searchLineEdit, &QLineEdit::textChanged, this, &MainWindow::onSearchTextChanged);
+    connect(searchLineEdit, &QLineEdit::returnPressed, this, &MainWindow::onSearchNext);
+    searchLayout->addWidget(searchLineEdit, 1);
+
+    searchPrevBtn = new QPushButton("▲", searchBarWidget);
+    searchPrevBtn->setFixedSize(24, 24);
+    searchPrevBtn->setToolTip(tr("Previous match"));
+    connect(searchPrevBtn, &QPushButton::clicked, this, &MainWindow::onSearchPrev);
+    searchLayout->addWidget(searchPrevBtn);
+
+    searchNextBtn = new QPushButton("▼", searchBarWidget);
+    searchNextBtn->setFixedSize(24, 24);
+    searchNextBtn->setToolTip(tr("Next match"));
+    connect(searchNextBtn, &QPushButton::clicked, this, &MainWindow::onSearchNext);
+    searchLayout->addWidget(searchNextBtn);
+
+    searchCountLabel = new QLabel(searchBarWidget);
+    searchCountLabel->setFixedWidth(48);
+    searchCountLabel->setAlignment(Qt::AlignCenter);
+    searchLayout->addWidget(searchCountLabel);
+
+    toolbar->addWidget(searchBarWidget);
 
     ui->iconSideBar->setFixedWidth(50);
     ui->iconSideBar->setStyleSheet("QWidget { background-color: palette(button); border-right: 1px solid palette(shadow); }");
@@ -106,6 +143,11 @@ MainWindow::MainWindow(QWidget *parent)
     ui->editorLayout->addWidget(editorStack);
     showWelcomeScreen();
 
+    connect(autoSaveTimer, &QTimer::timeout, this, &MainWindow::autoSave);
+
+    QShortcut *shortcutDialog = new QShortcut(QKeySequence("Ctrl+K"), this);
+    connect(shortcutDialog, &QShortcut::activated, this, &MainWindow::showKeyboardShortcuts);
+
     setSidebarCollapsed(settings.value("ui/sidebarCollapsed", true).toBool());
 }
 
@@ -117,6 +159,11 @@ MainWindow::~MainWindow()
 QPlainTextEdit* MainWindow::getCurrentEditor()
 {
     return qobject_cast<QPlainTextEdit*>(ui->tabWidget->currentWidget());
+}
+
+CodeEditor* MainWindow::getCurrentCodeEditor()
+{
+    return qobject_cast<CodeEditor*>(ui->tabWidget->currentWidget());
 }
 
 QWidget* MainWindow::createWelcomeWidget()
@@ -139,18 +186,48 @@ QWidget* MainWindow::createWelcomeWidget()
     buttonLayout->addWidget(newFileButton);
     buttonLayout->addStretch();
 
+    QFrame *recentProjectsFrame = new QFrame(widget);
+    recentProjectsFrame->setFrameShape(QFrame::NoFrame);
+    recentProjectsLayout = new QVBoxLayout(recentProjectsFrame);
+    recentProjectsLayout->addWidget(new QLabel(tr("<b>Recent Projects:</b>"), recentProjectsFrame));
+
+    updateRecentProjectsOnWelcome();
+
     QVBoxLayout *layout = new QVBoxLayout(widget);
     layout->addStretch();
     layout->addWidget(titleLabel);
     layout->addWidget(descriptionLabel);
     layout->addStretch();
     layout->addLayout(buttonLayout);
+    layout->addWidget(recentProjectsFrame);
+    layout->addWidget(createKeyboardShortcutsWidget());
     layout->addStretch();
 
     connect(openProjectButton, &QPushButton::clicked, this, &MainWindow::on_action_open_project_triggered);
     connect(newFileButton, &QPushButton::clicked, this, [this]() {
         on_action_add_file_directory_triggered();
     });
+
+    return widget;
+}
+
+QWidget* MainWindow::createKeyboardShortcutsWidget()
+{
+    QWidget *widget = new QWidget(this);
+    QHBoxLayout *layout = new QHBoxLayout(widget);
+
+    QLabel *shortcutsLabel = new QLabel(tr(
+        "<b>Keyboard Shortcuts:</b><br>"
+        "Ctrl+S: Save &nbsp;&nbsp; "
+        "Ctrl+Shift+S: Save As &nbsp;&nbsp; "
+        "Ctrl+Z: Undo &nbsp;&nbsp; "
+        "Ctrl+Y: Redo &nbsp;&nbsp; "
+        "Ctrl+F: Find &nbsp;&nbsp; "
+        "Ctrl+K: Keyboard Shortcuts"
+    ), widget);
+    shortcutsLabel->setAlignment(Qt::AlignCenter);
+    shortcutsLabel->setOpenExternalLinks(false);
+    layout->addWidget(shortcutsLabel);
 
     return widget;
 }
@@ -183,6 +260,14 @@ void MainWindow::on_action_open_project_triggered()
     if (dirName.isEmpty())
         return;
 
+    if (!recentProjects.contains(dirName)) {
+        recentProjects.prepend(dirName);
+        while (recentProjects.size() > maxRecentProjects)
+            recentProjects.removeLast();
+        saveRecentProjects();
+        updateRecentProjectsOnWelcome();
+    }
+
     projectDir = dirName;
     rootIndex = fileModel->index(projectDir);
     ui->fileTreeView->setRootIndex(rootIndex);
@@ -190,7 +275,9 @@ void MainWindow::on_action_open_project_triggered()
     ui->fileTreeView->hideColumn(2);
     ui->fileTreeView->hideColumn(3);
     goUpButton->setEnabled(rootIndex.parent().isValid());
-    
+
+    autoSaveTimer->start(30000);
+
     setWindowTitle(QFileInfo(projectDir).fileName() + " - Scriptura");
 }
 
@@ -202,7 +289,8 @@ void MainWindow::on_action_save_triggered()
         
     if (currentFile.isEmpty()) {
         QString fileName = QFileDialog::getSaveFileName(this, tr("Save File"), 
-            projectDir.isEmpty() ? QString() : projectDir, tr("All Files (*)"));
+            projectDir.isEmpty() ? QString() : projectDir,
+            tr("C/C++ Files (*.c *.cpp *.h *.hpp *.hxx);;Python Files (*.py);;JavaScript Files (*.js *.ts);;HTML Files (*.html);;CSS Files (*.css);;Markdown Files (*.md);;JSON Files (*.json);;XML Files (*.xml);;All Files (*)"));
         if (fileName.isEmpty())
             return;
         currentFile = fileName;
@@ -235,7 +323,8 @@ void MainWindow::on_action_save_as_triggered()
         return;
         
     QString fileName = QFileDialog::getSaveFileName(this, tr("Save File As"), 
-        currentFile.isEmpty() ? (projectDir.isEmpty() ? QString() : projectDir) : currentFile, tr("All Files (*)"));
+        currentFile.isEmpty() ? (projectDir.isEmpty() ? QString() : projectDir) : currentFile,
+        tr("C/C++ Files (*.c *.cpp *.h *.hpp *.hxx);;Python Files (*.py);;JavaScript Files (*.js *.ts);;HTML Files (*.html);;CSS Files (*.css);;Markdown Files (*.md);;JSON Files (*.json);;XML Files (*.xml);;All Files (*)"));
     if (fileName.isEmpty())
         return;
     
@@ -267,7 +356,7 @@ void MainWindow::on_action_open_file_triggered()
 {
     QString fileName = QFileDialog::getOpenFileName(this, tr("Open File"),
         projectDir.isEmpty() ? QDir::homePath() : projectDir,
-        tr("All Files (*)"));
+        tr("C/C++ Files (*.c *.cpp *.h *.hpp *.hxx);;Python Files (*.py);;JavaScript Files (*.js *.ts);;HTML Files (*.html);;CSS Files (*.css);;Markdown Files (*.md);;JSON Files (*.json);;XML Files (*.xml);;All Files (*)"));
     if (fileName.isEmpty())
         return;
 
@@ -310,6 +399,7 @@ void MainWindow::on_action_open_file_triggered()
     ui->tabWidget->setCurrentWidget(editor);
     currentFile = fileName;
     setWindowTitle(QFileInfo(fileName).fileName() + " - Scriptura");
+    showSearchBar(true);
 }
 
 void MainWindow::on_actionCu_t_triggered()
@@ -480,6 +570,7 @@ void MainWindow::on_fileTreeView_clicked(const QModelIndex &index)
         
         currentFile = path;
         setWindowTitle(openFile.fileName + " - Scriptura");
+        showSearchBar(true);
     }
 }
 
@@ -519,6 +610,7 @@ void MainWindow::on_tabWidget_tabCloseRequested(int index)
     } else {
         showWelcomeScreen();
         setWindowTitle(projectDir.isEmpty() ? "Scriptura" : QFileInfo(projectDir).fileName() + " - Scriptura");
+        showSearchBar(false);
     }
 }
 
@@ -1007,6 +1099,168 @@ void MainWindow::setSidebarCollapsed(bool collapsed)
     }
 }
 
+void MainWindow::showSearchBar(bool show)
+{
+    searchBarWidget->setVisible(show);
+    if (show) {
+        searchLineEdit->clear();
+        searchCountLabel->clear();
+    }
+    CodeEditor *editor = getCurrentCodeEditor();
+    if (editor)
+        editor->setExtraSelections(QList<QTextEdit::ExtraSelection>());
+}
+
+void MainWindow::performSearch(const QString &text, bool forward)
+{
+    CodeEditor *editor = getCurrentCodeEditor();
+    if (!editor)
+        return;
+
+    QList<QTextEdit::ExtraSelection> selections;
+    if (text.isEmpty()) {
+        editor->setExtraSelections(selections);
+        searchCountLabel->clear();
+        searchLineEdit->setFocus();
+        return;
+    }
+
+    QTextDocument *doc = editor->document();
+    QTextCursor cursor(doc);
+    cursor.movePosition(QTextCursor::Start);
+    QTextDocument::FindFlags flags = forward ? QTextDocument::FindFlags() : QTextDocument::FindFlags(QTextDocument::FindBackward);
+
+    int matchIndex = 0;
+    int activeIndex = 0;
+    QTextCursor activeCursor;
+
+    if (!editor->extraSelections().isEmpty()) {
+        activeCursor = editor->textCursor();
+        activeIndex = editor->extraSelections().first().cursor.positionInBlock();
+    }
+
+    while (!cursor.isNull()) {
+        cursor = doc->find(text, cursor, flags);
+        if (cursor.isNull())
+            break;
+
+        QTextEdit::ExtraSelection sel;
+        if (matchIndex == activeIndex) {
+            sel.cursor = cursor;
+            sel.cursor.select(QTextCursor::WordUnderCursor);
+            sel.format.setBackground(QColor(255, 215, 0, 200));
+            sel.format.setForeground(Qt::black);
+            activeCursor = cursor;
+        } else {
+            sel.cursor = cursor;
+            sel.cursor.select(QTextCursor::WordUnderCursor);
+            sel.format.setBackground(QColor(255, 215, 0, 70));
+        }
+        selections.append(sel);
+        matchIndex++;
+    }
+
+    if (selections.isEmpty()) {
+        editor->setExtraSelections(selections);
+        searchCountLabel->setText("0/0");
+        searchLineEdit->setFocus();
+        return;
+    }
+
+    if (activeIndex >= selections.size())
+        activeIndex = 0;
+
+    if (activeIndex < selections.size()) {
+        selections[activeIndex].format.setBackground(QColor(255, 215, 0, 200));
+        selections[activeIndex].format.setForeground(Qt::black);
+        selections[activeIndex].cursor.clearSelection();
+    }
+
+    editor->setExtraSelections(selections);
+    editor->setTextCursor(selections[activeIndex].cursor);
+    editor->centerCursor();
+
+    searchCountLabel->setText(QString("%1/%2").arg(activeIndex + 1).arg(selections.size()));
+}
+
+void MainWindow::onSearchTextChanged(const QString &text)
+{
+    searchCountLabel->clear();
+    performSearch(text, true);
+}
+
+void MainWindow::onSearchNext()
+{
+    CodeEditor *editor = getCurrentCodeEditor();
+    if (!editor || editor->extraSelections().isEmpty())
+        return;
+
+    const QList<QTextEdit::ExtraSelection> &selections = editor->extraSelections();
+    int current = 0;
+    QTextCursor tc = editor->textCursor();
+    int pos = tc.position();
+    for (int i = 0; i < selections.size(); ++i) {
+        if (selections[i].cursor.selectionStart() >= pos) {
+            current = i;
+            break;
+        }
+        current = (i + 1) % selections.size();
+    }
+    current = (current + 1) % selections.size();
+
+    QList<QTextEdit::ExtraSelection> newSel = selections;
+    newSel[current].format.setBackground(QColor(255, 215, 0, 200));
+    newSel[current].format.setForeground(Qt::black);
+    newSel[current].cursor.clearSelection();
+
+    for (int i = 0; i < newSel.size(); ++i) {
+        if (i != current) {
+            newSel[i].format.setBackground(QColor(255, 215, 0, 70));
+            newSel[i].format.setForeground(Qt::NoBrush);
+        }
+    }
+
+    editor->setExtraSelections(newSel);
+    editor->setTextCursor(newSel[current].cursor);
+    editor->centerCursor();
+    searchCountLabel->setText(QString("%1/%2").arg(current + 1).arg(selections.size()));
+}
+
+void MainWindow::onSearchPrev()
+{
+    CodeEditor *editor = getCurrentCodeEditor();
+    if (!editor || editor->extraSelections().isEmpty())
+        return;
+
+    const QList<QTextEdit::ExtraSelection> &selections = editor->extraSelections();
+    int current = 0;
+    QTextCursor tc = editor->textCursor();
+    int pos = tc.position();
+    for (int i = 0; i < selections.size(); ++i) {
+        if (selections[i].cursor.selectionStart() <= pos) {
+            current = i;
+        }
+    }
+    current = (current - 1 + selections.size()) % selections.size();
+
+    QList<QTextEdit::ExtraSelection> newSel = selections;
+    newSel[current].format.setBackground(QColor(255, 215, 0, 200));
+    newSel[current].format.setForeground(Qt::black);
+    newSel[current].cursor.clearSelection();
+
+    for (int i = 0; i < newSel.size(); ++i) {
+        if (i != current) {
+            newSel[i].format.setBackground(QColor(255, 215, 0, 70));
+            newSel[i].format.setForeground(Qt::NoBrush);
+        }
+    }
+
+    editor->setExtraSelections(newSel);
+    editor->setTextCursor(newSel[current].cursor);
+    editor->centerCursor();
+    searchCountLabel->setText(QString("%1/%2").arg(current + 1).arg(selections.size()));
+}
+
 QString MainWindow::findTerminal()
 {
 #ifdef Q_OS_WIN
@@ -1043,4 +1297,137 @@ void MainWindow::updateTabModified(int index, bool modified)
     if (modified)
         title = "*" + title;
     ui->tabWidget->setTabText(index, title);
+}
+
+void MainWindow::loadRecentProjects()
+{
+    QSettings settings;
+    recentProjects = settings.value("recentProjects").toStringList();
+}
+
+void MainWindow::saveRecentProjects()
+{
+    QSettings settings;
+    settings.setValue("recentProjects", recentProjects);
+}
+
+void MainWindow::updateRecentProjectsOnWelcome()
+{
+    if (!recentProjectsLayout) return;
+
+    while (recentProjectsLayout->count() > 1) {
+        QLayoutItem *item = recentProjectsLayout->takeAt(recentProjectsLayout->count() - 1);
+        delete item->widget();
+        delete item;
+    }
+
+    for (const QString &project : recentProjects) {
+        QPushButton *btn = new QPushButton(QFileInfo(project).fileName(), this);
+        btn->setToolTip(project);
+        btn->setProperty("projectPath", project);
+        connect(btn, &QPushButton::clicked, this, [this, project]() {
+            QDir dir(project);
+            if (dir.exists()) {
+                projectDir = project;
+                rootIndex = fileModel->index(project);
+                ui->fileTreeView->setRootIndex(rootIndex);
+                ui->fileTreeView->hideColumn(1);
+                ui->fileTreeView->hideColumn(2);
+                ui->fileTreeView->hideColumn(3);
+                goUpButton->setEnabled(rootIndex.parent().isValid());
+                setWindowTitle(QFileInfo(project).fileName() + " - Scriptura");
+            }
+        });
+        recentProjectsLayout->addWidget(btn);
+    }
+}
+
+void MainWindow::autoSave()
+{
+    for (int i = 0; i < openFiles.size(); i++) {
+        if (openFiles[i].modified) {
+            QFile file(openFiles[i].filePath);
+            if (file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+                QTextStream out(&file);
+                CodeEditor *editor = qobject_cast<CodeEditor*>(ui->tabWidget->widget(i));
+                if (editor)
+                    out << editor->toPlainText();
+                file.close();
+                qDebug() << "Auto-saved:" << openFiles[i].filePath;
+            }
+        }
+    }
+}
+
+bool MainWindow::checkUnsavedChanges()
+{
+    for (const OpenFile &f : openFiles) {
+        if (f.modified) {
+            QMessageBox::StandardButton reply = QMessageBox::question(
+                this, tr("Unsaved Changes"),
+                tr("There are unsaved changes. Save before closing?"),
+                QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel);
+
+            if (reply == QMessageBox::Save) {
+                on_action_save_triggered();
+            } else if (reply == QMessageBox::Cancel) {
+                return false;
+            }
+            break;
+        }
+    }
+    return true;
+}
+
+void MainWindow::closeEvent(QCloseEvent *event)
+{
+    if (checkUnsavedChanges()) {
+        autoSaveTimer->stop();
+        event->accept();
+    } else {
+        event->ignore();
+    }
+}
+
+
+void MainWindow::showKeyboardShortcuts()
+{
+    QDialog *dialog = new QDialog(this);
+    dialog->setWindowTitle(tr("Keyboard Shortcuts"));
+    dialog->resize(400, 300);
+    dialog->setModal(true);
+
+    QVBoxLayout *layout = new QVBoxLayout(dialog);
+
+    QLabel *shortcutsLabel = new QLabel(tr(
+        "<b>File Operations:</b><br>"
+        "Ctrl+N: New File &nbsp;&nbsp; "
+        "Ctrl+S: Save &nbsp;&nbsp; "
+        "Ctrl+Shift+S: Save As &nbsp;&nbsp; "
+        "Ctrl+O: Open File<br><br>"
+        "<b>Edit Operations:</b><br>"
+        "Ctrl+Z: Undo &nbsp;&nbsp; "
+        "Ctrl+Y: Redo &nbsp;&nbsp; "
+        "Ctrl+X: Cut &nbsp;&nbsp; "
+        "Ctrl+C: Copy &nbsp;&nbsp; "
+        "Ctrl+V: Paste<br><br>"
+        "<b>View/Navigation:</b><br>"
+        "Ctrl+F: Find &nbsp;&nbsp; "
+        "F3: Find Next &nbsp;&nbsp; "
+        "Shift+F3: Find Previous &nbsp;&nbsp; "
+        "Ctrl+K: Keyboard Shortcuts<br><br>"
+        "<b>Project:</b><br>"
+        "Ctrl+E: Project Settings &nbsp;&nbsp; "
+        "Ctrl+T: Theme Selection"
+    ), dialog);
+    shortcutsLabel->setTextFormat(Qt::RichText);
+    shortcutsLabel->setAlignment(Qt::AlignLeft);
+    layout->addWidget(shortcutsLabel);
+
+    QDialogButtonBox *buttonBox = new QDialogButtonBox(QDialogButtonBox::Ok, dialog);
+    layout->addWidget(buttonBox);
+
+    connect(buttonBox, &QDialogButtonBox::accepted, dialog, &QDialog::accept);
+
+    dialog->exec();
 }
