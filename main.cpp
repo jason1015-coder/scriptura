@@ -1,4 +1,5 @@
 #include "mainwindow.h"
+#include "crashhandler.h"
 
 #include <QApplication>
 #include <QLocale>
@@ -6,6 +7,8 @@
 
 int main(int argc, char *argv[])
 {
+    CrashHandler::install();
+    
     QApplication a(argc, argv);
 
     a.setStyleSheet(R"(

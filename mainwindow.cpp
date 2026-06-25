@@ -34,6 +34,7 @@
 #include <QSpinBox>
 #include <QFontComboBox>
 #include <QStandardPaths>
+#include <QStorageInfo>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -297,8 +298,27 @@ void MainWindow::on_action_save_triggered()
 
     QFile file(currentFile);
     if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
-        QMessageBox::warning(this, tr("Error"), tr("Cannot open file for writing: %1").arg(file.errorString()));
+        QString errorMsg;
+        QString errorStr = file.errorString();
+        if (errorStr.contains("Permission", Qt::CaseInsensitive)) {
+            errorMsg = tr("Permission denied. Please check file permissions.");
+        } else if (errorStr.contains("disk", Qt::CaseInsensitive) || errorStr.contains("space", Qt::CaseInsensitive)) {
+            errorMsg = tr("Disk full. Cannot save file.");
+        } else if (currentFile.startsWith("//") || currentFile.contains(":/")) {
+            errorMsg = tr("Network path unavailable. Please check connection.");
+        } else {
+            errorMsg = tr("Cannot open file for writing: %1").arg(errorStr);
+        }
+        QMessageBox::warning(this, tr("Error"), errorMsg);
         return;
+    }
+
+    // Check disk space before writing
+    QStorageInfo storage(QFileInfo(currentFile).absolutePath());
+    qint64 contentSize = editor->toPlainText().toUtf8().size();
+    if (storage.bytesAvailable() < contentSize * 2) {
+        QMessageBox::warning(this, tr("Warning"), 
+            tr("Low disk space. Available: %1 MB").arg(storage.bytesAvailable() / (1024 * 1024)));
     }
 
     QTextStream out(&file);
@@ -361,9 +381,24 @@ void MainWindow::on_action_open_file_triggered()
 
     QFile file(fileName);
     if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
-        QMessageBox::warning(this, tr("Error"),
-            tr("Cannot open file: %1").arg(file.errorString()));
+        QString errorMsg;
+        QString errorStr = file.errorString();
+        if (errorStr.contains("Permission", Qt::CaseInsensitive)) {
+            errorMsg = tr("Permission denied. Please check file permissions.");
+        } else if (fileName.startsWith("//") || fileName.contains(":/")) {
+            errorMsg = tr("Network path unavailable. Please check connection.");
+        } else {
+            errorMsg = tr("Cannot open file: %1").arg(errorStr);
+        }
+        QMessageBox::warning(this, tr("Error"), errorMsg);
         return;
+    }
+
+    // Check file size and warn for large files
+    qint64 fileSize = file.size();
+    if (fileSize > 10 * 1024 * 1024) { // 10MB
+        QMessageBox::warning(this, tr("Large File"),
+            tr("This file is %1 MB. Opening large files may impact performance.").arg(fileSize / (1024 * 1024)));
     }
 
     QTextStream in(&file);

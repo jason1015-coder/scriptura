@@ -138,6 +138,11 @@ void CodeHighlighter::setThemeColors(const QColor &keyword, const QColor &string
 
 void CodeHighlighter::highlightBlock(const QString &text)
 {
+    // Performance optimization: skip highlighting for very long lines
+    if (text.length() > 10000) {
+        return;
+    }
+
     if (language == "c" || language == "cpp" || language == "java" || language == "javascript" || language == "typescript" || language == "rust" || language == "go" || language == "css") {
         handleCStyleBlockComment(text);
         if (inBlockComment)

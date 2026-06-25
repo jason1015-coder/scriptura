@@ -21,6 +21,8 @@ set(PROJECT_SOURCES
         mainwindow.ui
         codeeditor.cpp
         codeeditor.h
+        crashhandler.h
+        crashhandler.cpp
 )
 
 if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
@@ -79,6 +81,32 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/scriptura.desktop")
             DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/applications
     )
 endif()
+
+# Packaging support
+set(CPACK_PACKAGE_NAME "scriptura")
+set(CPACK_PACKAGE_VERSION ${PROJECT_VERSION})
+set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "A simple Qt-based text editor with project file browsing")
+set(CPACK_PACKAGE_VENDOR "Scriptura")
+set(CPACK_PACKAGE_CONTACT "maintainer@example.com")
+
+# Linux AppImage packaging
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/snap/snapcraft.yaml")
+    set(CPACK_GENERATOR "TGZ")
+endif()
+
+# macOS DMG packaging
+if(APPLE)
+    set(CPACK_GENERATOR "DragNDrop")
+    set(CPACK_DMG_VOLUME_NAME "Scriptura")
+    set(CPACK_DMG_FORMAT "UDBZ")
+endif()
+
+# Windows NSIS packaging
+if(WIN32)
+    set(CPACK_GENERATOR "ZIP")
+endif()
+
+include(CPack)
 
 if(QT_VERSION_MAJOR EQUAL 6)
     qt_finalize_executable(scriptura)
