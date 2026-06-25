@@ -1,0 +1,128 @@
+name: Release Scriptura
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-linux-appimage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v3
+        with:
+          version: "6.10.2"
+          host: linux
+          target: desktop
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake g++ linuxdeployqt
+      - name: Configure
+        run: cmake -B build -S . -DCMAKE_BUILD_TYPE=Release
+      - name: Build
+        run: cmake --build build --config Release
+      - name: Create AppImage
+        run: |
+          linuxdeployqt build/scriptura -appimage -no-translations
+          mv Scriptura-*.AppImage scriptura-${{ github.ref_name }}-x86_64.AppImage || true
+      - name: Upload AppImage
+        uses: actions/upload-artifact@v4
+        with:
+          name: scriptura-appimage
+          path: scriptura-*.AppImage
+
+  build-snap:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v3
+        with:
+          version: "6.10.2"
+          host: linux
+          target: desktop
+      - name: Install snapcraft
+        run: sudo apt-get install -y snapcraft
+      - name: Build snap
+        run: |
+          cd snap
+          snapcraft
+      - name: Upload snap
+        uses: actions/upload-artifact@v4
+        with:
+          name: scriptura-snap
+          path: snap/*.snap
+
+  build-macos-dmg:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v3
+        with:
+          version: "6.10.2"
+          host: mac
+          target: desktop
+      - name: Configure
+        run: cmake -B build -S . -DCMAKE_BUILD_TYPE=Release
+      - name: Build
+        run: cmake --build build --config Release
+      - name: Create DMG
+        run: |
+          macdeployqt build/scriptura.app -dmg
+          mv scriptura.dmg scriptura-${{ github.ref_name }}-mac.dmg || true
+      - name: Upload DMG
+        uses: actions/upload-artifact@v4
+        with:
+          name: scriptura-dmg
+          path: scriptura-*.dmg
+
+  build-windows-installer:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: "6.10.2"
+          host: windows
+          target: desktop
+          arch: win64_msvc2022_64
+      - name: Configure
+        run: cmake -B build -S . -DCMAKE_BUILD_TYPE=Release -A x64
+      - name: Build
+        run: cmake --build build --config Release
+      - name: Deploy Qt dependencies
+        run: |
+          windeployqt --no-translations --compiler-runtime build/Release/scriptura.exe
+      - name: Create ZIP
+        run: |
+          7z a scriptura-${{ github.ref_name }}-win64.zip build/Release/scriptura.exe build/Release/*.dll
+      - name: Upload ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: scriptura-windows
+          path: scriptura-*.zip
+
+  release:
+    needs: [build-linux-appimage, build-snap, build-macos-dmg, build-windows-installer]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            artifacts/scriptura-appimage/*
+            artifacts/scriptura-snap/*
+            artifacts/scriptura-dmg/*
+            artifacts/scriptura-windows/*
+          token: ${{ secrets.GITHUB_TOKEN }}

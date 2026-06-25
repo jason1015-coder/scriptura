@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=Scriptura
+Comment=A simple Qt-based text editor with project file browsing
+Exec=scriptura
+Icon=scriptura
+Terminal=false
+Type=Application
+Categories=Development;TextEditor;
+Keywords=text;editor;code;ide;
+StartupNotify=true

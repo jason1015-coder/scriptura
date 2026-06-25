@@ -1,0 +1,44 @@
+name: scriptura
+version: '0.1'
+summary: A simple Qt-based text editor with project file browsing
+description: |
+  Scriptura is a lightweight text editor built with Qt, featuring project-based
+  workflow, file tree sidebar, tabbed editing, and syntax highlighting support
+  for multiple programming languages.
+
+icon: ../icon.png
+
+base: core22
+confinement: strict
+
+apps:
+  scriptura:
+    command: scriptura
+    plugs:
+      - desktop
+      - desktop-legacy
+      - home
+      - network
+      - network-bind
+      - x11
+      - wayland
+      - opengl
+      - pulseaudio
+      - unity7
+
+parts:
+  scriptura:
+    plugin: cmake
+    source: ..
+    build-packages:
+      - qt6-base-dev
+      - qt6-tools-dev
+    stage-packages:
+      - qt6-base
+      - qt6-tools
+      - libgl1
+      - libglib2.0-0
+    cmake-parameters:
+      - -DCMAKE_BUILD_TYPE=Release
+    build-snaps:
+      - qt6-core22-sdk
