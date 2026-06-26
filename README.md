@@ -52,48 +52,4 @@ Automated builds are available for Linux, macOS, and Windows via GitHub Actions.
 
 MIT License - see LICENSE file
 
-## Alpha Stage Checklist
 
-- [x] Application packaging (AppImage / DMG / NSIS installer / Snap)
-- [x] Project auto-discovery / recent projects on welcome screen
-- [x] Open/Save file dialog native file format filters
-- [x] Auto-save / crash recovery
-- [x] Syntax highlighting usage/configuration
-- [x] UX refinements (animations, keyboard shortcuts cheatsheet)
-- [x] Runtime crash / minidump reporting
-- [x] Confirm exit prompt
-- [x] OS-level file association/desktop integration
-
-## Packaging
-
-### Linux (AppImage)
-```bash
-# Build and create AppImage
-./build.sh
-linuxdeployqt build/Desktop-Release/scriptura -appimage
-```
-
-### Linux (Snap)
-```bash
-# Build snap package
-cd snap
-snapcraft
-```
-
-### macOS (DMG)
-```bash
-# Build and create DMG
-cmake -B build -S . -DCMAKE_BUILD_TYPE=Release
-cmake --build build
-macdeployqt build/scriptura.app -dmg
-```
-
-### Windows (Installer)
-```cmd
-# Build and deploy
-cmake -B build -S . -DCMAKE_BUILD_TYPE=Release -A x64
-cmake --build build --config Release
-windeployqt --no-translations --compiler-runtime build/Release/scriptura.exe
-```
-
-Automated releases are created via GitHub Actions when pushing tags (e.g., `git tag v0.1.0 && git push --tags`).
