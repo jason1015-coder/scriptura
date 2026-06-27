@@ -31,6 +31,8 @@
 #include "todopanel.h"
 #include "gitpanel.h"
 #include "terminalpanel.h"
+#include "updater.h"
+#include "configvalidator.h"
 
 enum class ThemeColorFamily {
     Default = 0,
@@ -159,6 +161,8 @@ private:
     QStringList recentProjects;
     int maxRecentProjects = 10;
     QStringList m_languageServers; // Configured language servers
+    Updater *updater;
+    ConfigValidator *configValidator;
 
     void updateCursorPosition();
     void updateStatusBar();
@@ -176,6 +180,8 @@ private:
     void onProblemsFilterChanged(ProblemPanel::Filter filter);
     void toggleProblemPanel();
     void toggleTerminalPanel();
+    void onUpdateAvailable(const QString &version, const QString &downloadUrl);
+    void onUpdateCheckFailed(const QString &error);
     void showWelcomeScreen();
     void showEditorInterface();
     void applyTheme(const Theme &theme);

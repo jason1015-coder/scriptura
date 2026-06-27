@@ -6,6 +6,8 @@
 #include "todopanel.h"
 #include "gitpanel.h"
 #include "terminalpanel.h"
+#include "updater.h"
+#include "configvalidator.h"
 
 #include <QFileDialog>
 #include <QFile>
@@ -38,6 +40,7 @@
 #include <QFontComboBox>
 #include <QStandardPaths>
 #include <QStorageInfo>
+#include <QDesktopServices>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -50,6 +53,8 @@ MainWindow::MainWindow(QWidget *parent)
     , todoPanel(new TodoPanel(this))
     , gitPanel(new GitPanel(this))
     , terminalPanel(new TerminalPanel(this))
+    , updater(new Updater(this))
+    , configValidator(new ConfigValidator(this))
 {
     ui->setupUi(this);
 
@@ -224,6 +229,13 @@ MainWindow::MainWindow(QWidget *parent)
     // Problem panel connections
     connect(problemPanel, &ProblemPanel::problemActivated, this, &MainWindow::onProblemActivated);
     connect(problemPanel, &ProblemPanel::filterChanged, this, &MainWindow::onProblemsFilterChanged);
+
+    // Updater connections
+    connect(updater, &Updater::updateAvailable, this, &MainWindow::onUpdateAvailable);
+    connect(updater, &Updater::updateCheckFailed, this, &MainWindow::onUpdateCheckFailed);
+
+    // Config validator - validate settings on startup
+    configValidator->resetInvalidSettings();
 
     setSidebarCollapsed(settings.value("ui/sidebarCollapsed", true).toBool());
 }
@@ -2095,4 +2107,23 @@ void MainWindow::onEditorTextChanged()
 
     QString uri = QUrl::fromLocalFile(currentFile).toString();
     lspClient->didChange(uri, editor->toPlainText());
+}
+
+void MainWindow::onUpdateAvailable(const QString &version, const QString &downloadUrl)
+{
+    QMessageBox::StandardButton reply = QMessageBox::question(
+        this, tr("Update Available"),
+        tr("Version %1 is available. Would you like to download it?\n\n%2")
+            .arg(version).arg(downloadUrl),
+        QMessageBox::Yes | QMessageBox::No);
+
+    if (reply == QMessageBox::Yes) {
+        QDesktopServices::openUrl(QUrl(downloadUrl));
+    }
+}
+
+void MainWindow::onUpdateCheckFailed(const QString &error)
+{
+    qDebug() << "Update check failed:" << error;
+    // Silent fail - don't show error to user for background update check
 }
