@@ -44,15 +44,9 @@ public:
         nameLabel->setStyleSheet("font-size: 24px; font-weight: bold; color: palette(text);");
         nameLabel->setAlignment(Qt::AlignCenter);
 
-        // Version
-        QLabel *versionLabel = new QLabel(tr("Version 0.1"), this);
-        versionLabel->setStyleSheet("font-size: 12px; color: palette(mid);");
-        versionLabel->setAlignment(Qt::AlignCenter);
-
         layout->addStretch();
         layout->addWidget(iconLabel, 0, Qt::AlignCenter);
         layout->addWidget(nameLabel, 0, Qt::AlignCenter);
-        layout->addWidget(versionLabel, 0, Qt::AlignCenter);
         layout->addStretch();
 
         // Set initial style (will be overridden by setThemeBackground)
