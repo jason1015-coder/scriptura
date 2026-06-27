@@ -228,7 +228,10 @@ void LspClient::clearDiagnostics(const QString &uri)
 
 void LspClient::onProcessReadyRead()
 {
+    QMutexLocker locker(&m_mutex);
     m_buffer.append(m_process->readAllStandardOutput());
+    locker.unlock();
+
     m_timeoutTimer->start();
 
     while (true) {
@@ -291,6 +294,7 @@ void LspClient::processMessage(const QByteArray &data)
         QJsonObject obj = doc.object();
         if (obj.contains("id")) {
             // Response to our request
+            QMutexLocker locker(&m_mutex);
             handleResponse(obj);
         } else if (obj.contains("method")) {
             // Notification from server (e.g., textDocument/publishDiagnostics)
@@ -310,7 +314,11 @@ void LspClient::processMessage(const QByteArray &data)
 void LspClient::handleResponse(const QJsonObject &obj)
 {
     int id = obj["id"].toInt();
-    QString method = m_pendingRequests.take(id);
+    QString method;
+    {
+        QMutexLocker locker(&m_mutex);
+        method = m_pendingRequests.take(id);
+    }
 
     if (obj.contains("error") && !obj["error"].isNull()) {
         QJsonObject err = obj["error"].toObject();
@@ -358,7 +366,10 @@ void LspClient::handleNotification(const QJsonObject &obj)
             diags.append(parseDiagnostic(val.toObject()));
         }
 
+        QMutexLocker locker(&m_mutex);
         m_diagnostics[uri] = diags;
+        locker.unlock();
+
         emit diagnosticsReceived(uri, diags);
     } else if (method == "window/logMessage") {
         QJsonObject params = obj["params"].toObject();
@@ -382,6 +393,8 @@ void LspClient::handleRequest(const QJsonObject &obj)
 
 QByteArray LspClient::readMessage()
 {
+    QMutexLocker locker(&m_mutex);
+
     // Parse Content-Length header
     QByteArray headerEnd = "\r\n\r\n";
     int headerEndPos = m_buffer.indexOf(headerEnd);

@@ -443,18 +443,19 @@ void CodeHighlighter::handleCStyleBlockComment(const QString &text)
     }
 
     while ((index = text.indexOf("/*", index)) >= 0) {
+        const int start = index;
         const int end = text.indexOf("*/", index + 2);
         int length;
 
         if (end >= 0) {
-            length = end - index + 2;
+            length = end - start + 2;
             index = end + 2;
         } else {
-            length = text.length() - index;
+            length = text.length() - start;
             inBlockComment = true;
         }
 
-        setFormat(index, length, commentFormat);
+        setFormat(start, length, commentFormat);
 
         if (inBlockComment)
             return;
@@ -479,13 +480,13 @@ void CodeHighlighter::handlePythonTripleString(const QString &text)
     while (iterator.hasNext()) {
         QRegularExpressionMatch match = iterator.next();
         const QString delimiter = match.captured(0);
-        const int start = match.capturedStart();
-        const int end = text.indexOf(delimiter, start + 3);
+        const int matchStart = match.capturedStart();
+        const int end = text.indexOf(delimiter, matchStart + 3);
 
         if (end >= 0) {
-            setFormat(start, end + 3 - start, stringFormat);
+            setFormat(matchStart, end + 3 - matchStart, stringFormat);
         } else {
-            setFormat(start, text.length() - start, stringFormat);
+            setFormat(matchStart, text.length() - matchStart, stringFormat);
             inTripleString = true;
             tripleDelimiter = delimiter;
             return;
@@ -508,18 +509,19 @@ void CodeHighlighter::handleHtmlComment(const QString &text)
 
     int index = 0;
     while ((index = text.indexOf("<!--", index)) >= 0) {
+        const int start = index;
         const int end = text.indexOf("-->", index + 4);
         int length;
 
         if (end >= 0) {
-            length = end + 4 - index;
+            length = end + 4 - start;
             index = end + 4;
         } else {
-            length = text.length() - index;
+            length = text.length() - start;
             inHtmlComment = true;
         }
 
-        setFormat(index, length, commentFormat);
+        setFormat(start, length, commentFormat);
 
         if (inHtmlComment)
             return;

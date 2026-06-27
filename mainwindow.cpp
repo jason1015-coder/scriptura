@@ -5,6 +5,7 @@
 #include "codeeditor.h"
 #include "todopanel.h"
 #include "gitpanel.h"
+#include "terminalpanel.h"
 
 #include <QFileDialog>
 #include <QFile>
@@ -48,6 +49,7 @@ MainWindow::MainWindow(QWidget *parent)
     , problemPanel(new ProblemPanel(this))
     , todoPanel(new TodoPanel(this))
     , gitPanel(new GitPanel(this))
+    , terminalPanel(new TerminalPanel(this))
 {
     ui->setupUi(this);
 
@@ -147,11 +149,21 @@ MainWindow::MainWindow(QWidget *parent)
     );
     ui->iconSideBar->layout()->addWidget(problemsButton);
 
+    terminalButton = new QToolButton(this);
+    terminalButton->setText(">_");
+    terminalButton->setToolTip(tr("Toggle Terminal"));
+    terminalButton->setCheckable(true);
+    terminalButton->setStyleSheet(
+        "QToolButton { border: none; background: transparent; font-size: 16px; font-family: monospace; padding: 4px; }"
+        "QToolButton:checked { background: palette(highlight); border-radius: 4px; }"
+    );
+    ui->iconSideBar->layout()->addWidget(terminalButton);
+
     connect(fileTreeToggleButton, &QToolButton::clicked, this, [this](bool checked) {
         Q_UNUSED(checked);
         setSidebarCollapsed(!fileTreeToggleButton->isChecked());
     });
-    connect(terminalButton, &QToolButton::clicked, this, &MainWindow::on_action_new_window_triggered);
+    connect(terminalButton, &QToolButton::clicked, this, &MainWindow::toggleTerminalPanel);
     connect(problemsButton, &QToolButton::clicked, this, &MainWindow::toggleProblemPanel);
      connect(placeholderButton, &QToolButton::toggled, this, &MainWindow::on_placeholderButton_clicked);
 
@@ -174,6 +186,10 @@ MainWindow::MainWindow(QWidget *parent)
     // Add git panel at the bottom
     ui->editorLayout->addWidget(gitPanel);
     gitPanel->hide();
+
+    // Add terminal panel at the bottom
+    ui->editorLayout->addWidget(terminalPanel);
+    terminalPanel->hide();
 
     ui->editorLayout->removeWidget(ui->tabWidget);
     editorStack = new QStackedWidget(this);
@@ -377,7 +393,7 @@ void MainWindow::on_action_save_triggered()
             errorMsg = tr("Permission denied. Please check file permissions.");
         } else if (errorStr.contains("disk", Qt::CaseInsensitive) || errorStr.contains("space", Qt::CaseInsensitive)) {
             errorMsg = tr("Disk full. Cannot save file.");
-        } else if (currentFile.startsWith("//") || currentFile.contains(":/")) {
+        } else if (currentFile.contains("://")) {
             errorMsg = tr("Network path unavailable. Please check connection.");
         } else {
             errorMsg = tr("Cannot open file for writing: %1").arg(errorStr);
@@ -458,7 +474,7 @@ void MainWindow::on_action_open_file_triggered()
         QString errorStr = file.errorString();
         if (errorStr.contains("Permission", Qt::CaseInsensitive)) {
             errorMsg = tr("Permission denied. Please check file permissions.");
-        } else if (fileName.startsWith("//") || fileName.contains(":/")) {
+        } else if (fileName.contains("://")) {
             errorMsg = tr("Network path unavailable. Please check connection.");
         } else {
             errorMsg = tr("Cannot open file: %1").arg(errorStr);
@@ -763,8 +779,29 @@ void MainWindow::goUpClicked()
 
 void MainWindow::on_action_new_window_triggered()
 {
-    QString term = findTerminal();
-    QProcess::startDetached(term, QStringList());
+    // Use internal terminal if available, otherwise fall back to external
+    if (terminalPanel && !terminalPanel->isRunning()) {
+        terminalPanel->startShell(projectDir.isEmpty() ? QDir::currentPath() : projectDir);
+        terminalPanel->show();
+        terminalButton->setChecked(true);
+    } else {
+        QString term = findTerminal();
+        QProcess::startDetached(term, QStringList());
+    }
+}
+
+void MainWindow::toggleTerminalPanel()
+{
+    if (terminalPanel->isVisible()) {
+        terminalPanel->hide();
+        terminalButton->setChecked(false);
+    } else {
+        terminalPanel->show();
+        terminalButton->setChecked(true);
+        if (!terminalPanel->isRunning()) {
+            terminalPanel->startShell(projectDir.isEmpty() ? QDir::currentPath() : projectDir);
+        }
+    }
 }
 
 void MainWindow::on_action_clone_window_triggered()
@@ -1626,6 +1663,17 @@ void MainWindow::autoSave()
 {
     for (int i = 0; i < openFiles.size(); i++) {
         if (openFiles[i].modified) {
+            QFileInfo fileInfo(openFiles[i].filePath);
+            // Skip if file no longer exists or path is empty
+            if (openFiles[i].filePath.isEmpty() || !fileInfo.exists()) {
+                continue;
+            }
+            // Skip if file is not writable
+            if (!fileInfo.isWritable()) {
+                qDebug() << "Auto-save skipped (not writable):" << openFiles[i].filePath;
+                continue;
+            }
+
             QFile file(openFiles[i].filePath);
             if (file.open(QIODevice::WriteOnly | QIODevice::Text)) {
                 QTextStream out(&file);
@@ -1633,6 +1681,7 @@ void MainWindow::autoSave()
                 if (editor)
                     out << editor->toPlainText();
                 file.close();
+                openFiles[i].modified = false;
                 qDebug() << "Auto-saved:" << openFiles[i].filePath;
             }
         }
@@ -1645,15 +1694,26 @@ bool MainWindow::checkUnsavedChanges()
         if (f.modified) {
             QMessageBox::StandardButton reply = QMessageBox::question(
                 this, tr("Unsaved Changes"),
-                tr("There are unsaved changes. Save before closing?"),
+                tr("%1 has unsaved changes. Save before closing?").arg(f.fileName),
                 QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel);
 
             if (reply == QMessageBox::Save) {
-                on_action_save_triggered();
+                // Find and save the modified file
+                for (int i = 0; i < openFiles.size(); ++i) {
+                    if (openFiles[i].filePath == f.filePath && openFiles[i].modified) {
+                        ui->tabWidget->setCurrentIndex(i);
+                        currentFile = openFiles[i].filePath;
+                        on_action_save_triggered();
+                        if (openFiles[i].modified) {
+                            // Save failed or cancelled
+                            return false;
+                        }
+                        break;
+                    }
+                }
             } else if (reply == QMessageBox::Cancel) {
                 return false;
             }
-            break;
         }
     }
     return true;
@@ -1785,7 +1845,7 @@ void MainWindow::startLanguageServerForProject(const QString &projectPath)
     QStringList filters = {"*.cpp", "*.c", "*.h", "*.hpp", "*.py", "*.js", "*.ts", "*.java", "*.rs", "*.go"};
     QSet<QString> foundExtensions;
 
-    // Scan project directory for source files (limit depth to avoid too many files)
+    // Scan project directory for source files (limit to root and one level deep)
     dir.setFilter(QDir::Files | QDir::NoDotAndDotDot);
     dir.setNameFilters(filters);
     QFileInfoList files = dir.entryInfoList(QDir::Files, QDir::Name);
@@ -1843,8 +1903,13 @@ void MainWindow::startLanguageServerForProject(const QString &projectPath)
             }
             lspClient->initialize(rootUri, langId);
 
-            // Open all source files in the project for diagnostics
+            // Open only a limited number of source files for diagnostics
+            // to avoid overwhelming the language server
+            const int maxFilesToOpen = 50;
+            int openedCount = 0;
             for (const QFileInfo &fi : files) {
+                if (openedCount >= maxFilesToOpen)
+                    break;
                 QFile file(fi.absoluteFilePath());
                 if (file.open(QIODevice::ReadOnly | QIODevice::Text)) {
                     QTextStream in(&file);
@@ -1852,6 +1917,7 @@ void MainWindow::startLanguageServerForProject(const QString &projectPath)
                     file.close();
                     QString uri = QUrl::fromLocalFile(fi.absoluteFilePath()).toString();
                     lspClient->didOpen(uri, fi.suffix().toLower(), content);
+                    openedCount++;
                 }
             }
         });
@@ -1964,18 +2030,24 @@ void MainWindow::toggleProblemPanel()
 
 void MainWindow::on_action_git_commit_triggered()
 {
+    // Check if git is available
+    if (QStandardPaths::findExecutable("git").isEmpty()) {
+        QMessageBox::warning(this, tr("Error"), tr("Git is not installed or not in PATH."));
+        return;
+    }
+
     bool ok;
     QString message = QInputDialog::getText(this, tr("Git Commit"), tr("Commit message:"), QLineEdit::Normal, QString(), &ok);
     if (ok && !message.isEmpty()) {
         QProcess gitProcess(this);
         gitProcess.setWorkingDirectory(projectDir.isEmpty() ? QDir::currentPath() : projectDir);
         gitProcess.start("git", {"commit", "-m", message});
-        if (gitProcess.waitForFinished(3000)) {
+        if (gitProcess.waitForFinished(10000)) {
             QString output = QString::fromLocal8Bit(gitProcess.readAllStandardOutput());
             QString error = QString::fromLocal8Bit(gitProcess.readAllStandardError());
             gitPanel->setOutput(output + error);
         } else {
-            gitPanel->setOutput(tr("Failed to run git commit"));
+            gitPanel->setOutput(tr("Failed to run git commit. The operation may have timed out."));
         }
         gitPanel->show();
     }
@@ -1983,15 +2055,21 @@ void MainWindow::on_action_git_commit_triggered()
 
 void MainWindow::on_action_git_push_triggered()
 {
+    // Check if git is available
+    if (QStandardPaths::findExecutable("git").isEmpty()) {
+        QMessageBox::warning(this, tr("Error"), tr("Git is not installed or not in PATH."));
+        return;
+    }
+
     QProcess gitProcess(this);
     gitProcess.setWorkingDirectory(projectDir.isEmpty() ? QDir::currentPath() : projectDir);
     gitProcess.start("git", {"push"});
-    if (gitProcess.waitForFinished(3000)) {
+    if (gitProcess.waitForFinished(30000)) {
         QString output = QString::fromLocal8Bit(gitProcess.readAllStandardOutput());
         QString error = QString::fromLocal8Bit(gitProcess.readAllStandardError());
         gitPanel->setOutput(output + error);
     } else {
-        gitPanel->setOutput(tr("Failed to run git push"));
+        gitPanel->setOutput(tr("Failed to run git push. The operation may have timed out."));
     }
     gitPanel->show();
 }

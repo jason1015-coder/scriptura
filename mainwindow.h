@@ -30,6 +30,7 @@
 #include "problempanel.h"
 #include "todopanel.h"
 #include "gitpanel.h"
+#include "terminalpanel.h"
 
 enum class ThemeColorFamily {
     Default = 0,
@@ -146,9 +147,10 @@ private:
      QWidget     *welcomeWidget;
      QVBoxLayout *recentProjectsLayout;
      QStackedWidget *editorStack;
-     ProblemPanel *problemPanel;
+   ProblemPanel *problemPanel;
       TodoPanel    *todoPanel;
       GitPanel     *gitPanel;
+      TerminalPanel *terminalPanel;
       Theme selectedTheme;
 
     QTimer *autoSaveTimer;
@@ -173,6 +175,7 @@ private:
     void onProblemActivated(const QString &fileUri, int line, int column);
     void onProblemsFilterChanged(ProblemPanel::Filter filter);
     void toggleProblemPanel();
+    void toggleTerminalPanel();
     void showWelcomeScreen();
     void showEditorInterface();
     void applyTheme(const Theme &theme);
