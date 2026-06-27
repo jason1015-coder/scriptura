@@ -2,6 +2,7 @@
 #include <QDebug>
 #include <QFileInfo>
 #include <QDir>
+#include <QFont>
 
 ConfigValidator::ConfigValidator(QObject *parent)
     : QObject(parent)

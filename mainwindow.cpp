@@ -138,10 +138,12 @@ MainWindow::MainWindow(QWidget *parent)
     );
 
     terminalButton = findChild<QToolButton*>("terminalButton");
-    terminalButton->setToolTip(tr("New Terminal"));
+    terminalButton->setToolTip(tr("Toggle Terminal"));
+    terminalButton->setCheckable(true);
     terminalButton->setStyleSheet(
         "QToolButton { border: none; background: transparent; font-size: 16px; font-family: monospace; padding: 4px; }"
         "QToolButton:hover { background: palette(highlight); border-radius: 4px; }"
+        "QToolButton:checked { background: palette(highlight); border-radius: 4px; }"
     );
 
     problemsButton = new QToolButton(this);
@@ -153,16 +155,6 @@ MainWindow::MainWindow(QWidget *parent)
         "QToolButton:checked { background: palette(highlight); border-radius: 4px; }"
     );
     ui->iconSideBar->layout()->addWidget(problemsButton);
-
-    terminalButton = new QToolButton(this);
-    terminalButton->setText(">_");
-    terminalButton->setToolTip(tr("Toggle Terminal"));
-    terminalButton->setCheckable(true);
-    terminalButton->setStyleSheet(
-        "QToolButton { border: none; background: transparent; font-size: 16px; font-family: monospace; padding: 4px; }"
-        "QToolButton:checked { background: palette(highlight); border-radius: 4px; }"
-    );
-    ui->iconSideBar->layout()->addWidget(terminalButton);
 
     connect(fileTreeToggleButton, &QToolButton::clicked, this, [this](bool checked) {
         Q_UNUSED(checked);
@@ -380,6 +372,11 @@ void MainWindow::on_action_open_project_triggered()
     problemPanel->setCurrentFile(QString()); // Show all problems
     problemPanel->show();
     problemsButton->setChecked(true);
+
+    // Update terminal working directory
+    if (terminalPanel) {
+        terminalPanel->setWorkingDirectory(projectDir);
+    }
 }
 
 void MainWindow::on_action_save_triggered()
@@ -659,6 +656,10 @@ void MainWindow::on_fileTreeView_clicked(const QModelIndex &index)
         rootIndex = index;
         ui->fileTreeView->setRootIndex(index);
         goUpButton->setEnabled(rootIndex.parent().isValid());
+        // Update terminal working directory when folder is clicked
+        if (terminalPanel && terminalPanel->isRunning()) {
+            terminalPanel->setWorkingDirectory(path);
+        }
     } else {
         QFile file(path);
         if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
@@ -812,6 +813,8 @@ void MainWindow::toggleTerminalPanel()
         terminalButton->setChecked(true);
         if (!terminalPanel->isRunning()) {
             terminalPanel->startShell(projectDir.isEmpty() ? QDir::currentPath() : projectDir);
+        } else {
+            terminalPanel->setWorkingDirectory(projectDir.isEmpty() ? QDir::currentPath() : projectDir);
         }
     }
 }

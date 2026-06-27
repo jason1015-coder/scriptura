@@ -34,7 +34,7 @@ set(PROJECT_SOURCES
         terminalpanel.cpp
         terminalpanel.h
         splashscreen.h
-        icon.png
+        resources.qrc
         updater.cpp
         updater.h
         configvalidator.cpp

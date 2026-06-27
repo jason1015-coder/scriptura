@@ -10,6 +10,7 @@ find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Widgets Test)
 
 set(TEST_SOURCES
     test_configvalidator.cpp
+    ${CMAKE_SOURCE_DIR}/configvalidator.cpp
 )
 
 if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
@@ -25,4 +26,4 @@ endif()
 target_link_libraries(scriptura_tests PRIVATE Qt${QT_VERSION_MAJOR}::Widgets Qt${QT_VERSION_MAJOR}::Test)
 
 # Include the parent directory for headers
-target_include_directories(scriptura_tests PRIVATE ${CMAKE_SOURCE_DIR}/..)
+target_include_directories(scriptura_tests PRIVATE ${CMAKE_SOURCE_DIR})
