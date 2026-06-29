@@ -1,4 +1,4 @@
-ityname: Build Scriptura
+name: Build Scriptura
 
 on:
   push:
@@ -83,7 +83,7 @@ jobs:
             $binDir = Split-Path $qtBin.DirectoryName -Parent
             Write-Host "Adding Qt bin to PATH: $binDir"
             $env:Path = "$binDir;$env:Path"
-            echo "QT_BIN_DIR=$binDir" >> $env:GITHUB_ENV
+            Add-Content -Path $env:GITHUB_ENV -Value "QT_BIN_DIR=$binDir" -Encoding utf8
           } else {
             Write-Host "Qt bin directory not found, checking environment..."
             # Check if Qt6_DIR is set
@@ -91,7 +91,7 @@ jobs:
               $binDir = Join-Path (Split-Path $env:Qt6_DIR -Parent) "bin"
               Write-Host "Using Qt6_DIR: $binDir"
               $env:Path = "$binDir;$env:Path"
-              echo "QT_BIN_DIR=$binDir" >> $env:GITHUB_ENV
+              Add-Content -Path $env:GITHUB_ENV -Value "QT_BIN_DIR=$binDir" -Encoding utf8
             }
           }
       - name: Debug Qt environment
