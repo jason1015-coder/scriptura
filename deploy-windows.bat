@@ -4,7 +4,7 @@ setlocal enabledelayedexpansion
 REM Windows deployment script for Scriptura
 REM This script builds the project and bundles all Qt DLLs using windeployqt
 
-set BUILD_DIR=cmake-build-release
+set BUILD_DIR=build
 set DEPLOY_DIR=deploy
 
 echo === Scriptura Windows Deployment ===

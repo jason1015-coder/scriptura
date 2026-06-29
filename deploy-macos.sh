@@ -4,7 +4,7 @@ set -e
 # macOS deployment script for Scriptura
 # This script builds the project and creates a macOS app bundle with macdeployqt
 
-BUILD_DIR="cmake-build-release"
+BUILD_DIR="build"
 DEPLOY_DIR="deploy"
 APP_NAME="Scriptura.app"
 

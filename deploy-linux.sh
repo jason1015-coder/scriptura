@@ -4,7 +4,7 @@ set -e
 # Linux deployment script for Scriptura
 # This script builds the project and bundles all Qt libraries using linuxdeployqt
 
-BUILD_DIR="cmake-build-release"
+BUILD_DIR="build"
 DEPLOY_DIR="deploy"
 APPIMAGE_NAME="Scriptura.AppImage"
 

@@ -18,7 +18,12 @@ jobs:
           host: linux
           target: desktop
       - name: Install dependencies
-        run: sudo apt-get install -y cmake g++ linuxdeployqt
+        run: sudo apt-get install -y cmake g++
+      - name: Download linuxdeployqt
+        run: |
+          wget https://github.com/probonopd/linuxdeployqt/releases/download/continuous/linuxdeployqt-continuous-x86_64.AppImage
+          chmod +x linuxdeployqt-continuous-x86_64.AppImage
+          sudo mv linuxdeployqt-continuous-x86_64.AppImage /usr/local/bin/linuxdeployqt
       - name: Configure
         run: cmake -B build -S . -DCMAKE_BUILD_TYPE=Release
       - name: Build and Deploy
