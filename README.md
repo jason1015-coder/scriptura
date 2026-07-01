@@ -62,7 +62,7 @@ Or directly:
 
 ## Deployment
 
-The build scripts now support automatic deployment with the `--deploy` flag. This will bundle all Qt dependencies (DLLs, libraries, plugins) automatically.
+The build scripts now support automatic deployment with the `--deploy` flag. This will bundle all Qt dependencies (DLLs, libraries, plugins) automatically on Windows and macOS. Linux does not bundle Qt libraries and relies on system packages.
 
 ### Quick Deployment
 
@@ -80,14 +80,6 @@ The build scripts now support automatic deployment with the `--deploy` flag. Thi
 ```batch
 build.bat Release --deploy
 ```
-
-### Manual Deployment
-
-See [DEPLOYMENT.md](DEPLOYMENT.md) for detailed deployment instructions including:
-- Building release versions
-- Bundling Qt DLLs/libraries with windeployqt, linuxdeployqt, and macdeployqt
-- Creating distributable packages (ZIP, AppImage, DMG)
-- Troubleshooting common deployment issues
 
 ## Requirements
 

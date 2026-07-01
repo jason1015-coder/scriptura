@@ -28,15 +28,16 @@ echo "Build complete. Run with: ./$BUILD_DIR/scriptura"
 # Deploy if requested
 if [ "$DEPLOY" = true ]; then
     echo
-    echo "=== Deploying with Qt dependencies ==="
-    
     if [ "$(uname)" == "Darwin" ]; then
+        echo "=== Deploying with Qt dependencies (macOS) ==="
         echo "Running macOS deployment..."
         ./deploy-macos.sh
     elif [ "$(expr substr $(uname -s) 1 5)" == "Linux" ]; then
+        echo "=== Deploying (Linux - no Qt bundling) ==="
         echo "Running Linux deployment..."
         ./deploy-linux.sh
     else
+        echo "=== Deploying with Qt dependencies ==="
         echo "WARNING: Automated deployment not supported on this platform"
         echo "Please use the appropriate deploy script manually:"
         echo "  Linux:   ./deploy-linux.sh"
@@ -45,7 +46,7 @@ if [ "$DEPLOY" = true ]; then
     fi
 else
     echo
-    echo "To deploy with Qt dependencies, run:"
+    echo "To deploy, run:"
     echo "  ./build.sh $BUILD_TYPE --deploy"
     echo
     echo "Or use platform-specific deploy scripts:"

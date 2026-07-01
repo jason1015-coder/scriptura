@@ -102,7 +102,7 @@ set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "A simple Qt-based text editor with projec
 set(CPACK_PACKAGE_VENDOR "Scriptura")
 set(CPACK_PACKAGE_CONTACT "maintainer@example.com")
 
-# Linux AppImage packaging
+# Linux packaging
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/snap/snapcraft.yaml")
     set(CPACK_GENERATOR "TGZ")
 endif()
