@@ -791,9 +791,7 @@ void MainWindow::on_action_new_window_triggered()
 {
     // Use internal terminal if available, otherwise fall back to external
     if (terminalPanel && !terminalPanel->isRunning()) {
-        terminalPanel->startShell(projectDir.isEmpty() ? QDir::currentPath() : projectDir);
-        terminalPanel->show();
-        terminalButton->setChecked(true);
+        toggleTerminalPanel();
     } else {
         QString term = findTerminal();
         QProcess::startDetached(term, QStringList());
