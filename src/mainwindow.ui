@@ -113,70 +113,29 @@
         </number>
        </property>
        <item>
-        <widget class="QWidget" name="topToolbar">
-         <property name="minimumHeight">
-          <number>
-           44
-          </number>
+        <widget class="QTabBar" name="tabBar">
+         <property name="documentMode">
+          <bool>
+           true
+          </bool>
          </property>
-         <property name="maximumHeight">
-          <number>
-           44
-          </number>
+         <property name="expanding">
+          <bool>
+           true
+          </bool>
          </property>
-         <layout class="QHBoxLayout" name="topToolbarLayout">
-          <property name="spacing">
-           <number>
-            6
-           </number>
-          </property>
-          <property name="leftMargin">
-           <number>
-           8
-           </number>
-          </property>
-          <property name="topMargin">
-           <number>
-           4
-           </number>
-          </property>
-          <property name="rightMargin">
-           <number>
-           8
-           </number>
-          </property>
-          <property name="bottomMargin">
-           <number>
-           4
-           </number>
-          </property>
-         </layout>
+         <property name="drawBase">
+          <bool>
+           false
+          </bool>
+         </property>
+         <property name="movable">
+          <bool>
+           false
+          </bool>
+         </property>
         </widget>
        </item>
-        <item>
-         <widget class="QTabBar" name="tabBar">
-          <property name="documentMode">
-           <bool>
-            true
-           </bool>
-          </property>
-          <property name="expanding">
-           <bool>
-            true
-           </bool>
-          </property>
-          <property name="drawBase">
-           <bool>
-            false
-           </bool>
-          </property>
-          <property name="movable">
-           <bool>
-            false
-           </bool>
-          </property>
-         </widget>
-        </item>
        <item>
         <widget class="QStackedWidget" name="editorStack"/>
        </item>
@@ -275,6 +234,9 @@
      <width>1280</width>
      <height>24</height>
     </rect>
+   </property>
+   <property name="visible">
+    <bool>false</bool>
    </property>
    <widget class="QMenu" name="menu_File">
     <property name="title">

@@ -167,7 +167,7 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
         // Create a dropdown menu from the menu bar actions
         QMenu dropdownMenu(this);
         dropdownMenu.setObjectName("titleBarMenu");
-        
+
         // Add all menu bar actions to the dropdown
         const QList<QMenu*> menus = ui->menubar->findChildren<QMenu*>();
         for (QMenu *menu : menus) {
@@ -179,10 +179,24 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
                 }
             }
         }
-        
+
         // Show menu below the button
         QPoint menuPos = m_titleBar->menuButton->mapToGlobal(QPoint(0, m_titleBar->menuButton->height()));
         dropdownMenu.exec(menuPos);
+    });
+
+    // Connect unified title bar signals
+    connect(m_titleBar, &CustomTitleBar::sidebarToggleClicked, this, [this]() {
+        setSidebarCollapsed(!ui->sidebarDrawer->isVisible());
+    });
+    connect(m_titleBar, &CustomTitleBar::inspectorToggleClicked, this, [this]() {
+        // Toggle right-side inspector panel (placeholder)
+    });
+    connect(m_titleBar, &CustomTitleBar::searchRequested, this, [this]() {
+        QString query = m_titleBar->searchField->text();
+        if (!query.isEmpty()) {
+            on_action_project_search_triggered();
+        }
     });
     
     // Install title bar as event filter for dragging
@@ -284,29 +298,26 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
     projectSearchPanel = new ProjectSearchPanel(this);
     debugPanel = new DebugPanel(this);
 
-    // Top toolbar setup
-    sidebarToggleButton = new QToolButton(ui->topToolbar);
+    // Top toolbar setup — buttons now live in the unified title bar or editor area
+    sidebarToggleButton = new QToolButton(this);
     sidebarToggleButton->setIcon(ThemeIcons::instance()->icon(":/icons/sidebar-toggle.svg"));
     sidebarToggleButton->setIconSize(QSize(20, 20));
     sidebarToggleButton->setToolTip(tr("Toggle Sidebar"));
     sidebarToggleButton->setCheckable(true);
     sidebarToggleButton->setChecked(true);
     sidebarToggleButton->setFixedSize(32, 32);
-    ui->topToolbarLayout->addWidget(sidebarToggleButton);
+    sidebarToggleButton->hide(); // Managed by unified title bar
 
-    goUpButton = new QToolButton(ui->topToolbar);
+    goUpButton = new QToolButton(this);
     goUpButton->setIcon(ThemeIcons::instance()->icon(":/icons/go-up.svg"));
     goUpButton->setIconSize(QSize(18, 18));
     goUpButton->setToolTip(tr("Go Up"));
     goUpButton->setEnabled(false);
     goUpButton->setFixedSize(32, 32);
-    ui->topToolbarLayout->addWidget(goUpButton);
+    goUpButton->hide(); // Can be added to title bar later
 
-    ui->topToolbarLayout->addSpacing(8);
-
-    findReplaceBar = new FindReplaceBar(ui->topToolbar);
+    findReplaceBar = new FindReplaceBar(this);
     findReplaceBar->setVisible(false);
-    ui->topToolbarLayout->addWidget(findReplaceBar, 1);
 
     commandPalette = new CommandPalette(this);
 
@@ -316,13 +327,13 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
     projectSearchPanel->hide();
     debugPanel->hide();
 
-    // Right-side toolbar buttons
-    settingsButton = new QToolButton(ui->topToolbar);
+    // Right-side toolbar buttons (settings moved to title bar area)
+    settingsButton = new QToolButton(this);
     settingsButton->setIcon(ThemeIcons::instance()->icon(":/icons/settings.svg"));
     settingsButton->setIconSize(QSize(20, 20));
     settingsButton->setToolTip(tr("Editor Settings"));
     settingsButton->setFixedSize(32, 32);
-    ui->topToolbarLayout->addWidget(settingsButton);
+    settingsButton->hide(); // Accessible via title bar menu
 
     // Sidebar icon buttons (bottom of drawer)
     fileTreeToggleButton = new QToolButton(ui->sidebarDrawer);
@@ -644,6 +655,9 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
     connect(findReplaceBar, &FindReplaceBar::replaceAllComplete, this, [](int count) {
         qDebug() << "Replace all complete:" << count;
     });
+
+    // Hide the native menu bar — menus are accessible via the unified title bar dropdown
+    ui->menubar->hide();
 
     connect(projectSearchPanel, &ProjectSearchPanel::resultActivated, this, [this](const QString &filePath, int line, int column) {
         QModelIndex index = fileModel->index(filePath);
@@ -2323,17 +2337,26 @@ void MainWindow::applyTheme(const Theme &theme)
     QColor midColor = palette.color(QPalette::Mid);
     QColor lightColor = palette.color(QPalette::Light);
 
+    // Compute glassmorphism translucents
+    QColor glassSidebar = isDark ? QColor(42, 44, 47, 217) : QColor(242, 242, 247, 217);
+    QColor glassPanel = isDark ? QColor(38, 40, 43, 217) : QColor(232, 232, 232, 217);
+    QColor glassToolbar = isDark ? QColor(56, 58, 61, 230) : QColor(246, 246, 246, 230);
+    QColor glassStatus = isDark ? QColor(28, 31, 33, 242) : QColor(240, 240, 240, 242);
+    QColor glassBorder = isDark ? QColor(255, 255, 255, 20) : QColor(0, 0, 0, 25);
+    QColor neumorphicLight = isDark ? QColor(255, 255, 255, 12) : QColor(255, 255, 255, 180);
+    QColor neumorphicDark = isDark ? QColor(0, 0, 0, 40) : QColor(0, 0, 0, 25);
+
     QString modernSheet = QString(R"(
-        /* Modern Professional IDE Styling with Enhanced Visual Hierarchy */
-        
+        /* Xcode-Style Layout — Glassmorphism & Neumorphism */
+
         /* Base widget styling */
         QMainWindow, QDialog {
             background-color: %1;
         }
 
-        /* Group boxes and frames */
+        /* Group boxes and frames — neumorphic */
         QGroupBox, QFrame#recentProjectsFrame {
-            background-color: %2;
+            background-color: rgba(%8, %9, %10, 0.6);
             border: 1px solid %3;
             border-radius: 12px;
             margin-top: 16px;
@@ -2347,80 +2370,78 @@ void MainWindow::applyTheme(const Theme &theme)
             font-weight: 600;
         }
 
-        /* Tool buttons with modern styling */
+        /* Tool buttons — neumorphic soft press */
         QToolButton {
             background-color: transparent;
-            border: 1px solid transparent;
-            border-radius: 4px;
-            padding: 2px;
+            border: none;
+            border-radius: 6px;
+            padding: 4px;
             min-width: 24px;
             min-height: 24px;
             margin: 0px;
+            color: %4;
         }
         QToolButton:hover {
-            background-color: %5;
-            border: 1px solid %3;
+            background-color: rgba(%11, %12, %13, 0.10);
         }
         QToolButton:checked {
-            background-color: %6;
-            border: 1px solid %6;
-            color: %1;
+            background-color: rgba(%14, %15, %16, 0.15);
+            color: %4;
         }
         QToolButton:pressed {
-            background-color: %3;
+            background-color: rgba(%11, %12, %13, 0.18);
         }
         QToolButton:disabled {
-            color: palette(mid);
+            color: %3;
         }
 
-        /* Push buttons with professional styling */
+        /* Push buttons — neumorphic raised */
         QPushButton {
-            background-color: %2;
-            border: 1px solid %3;
-            border-radius: 4px;
-            padding: 4px 10px;
+            background-color: rgba(%8, %9, %10, 0.5);
+            border: 1px solid rgba(%17, %18, %19, 0.08);
+            border-radius: 8px;
+            padding: 6px 14px;
             color: %4;
             font-weight: 500;
             min-height: 28px;
             min-width: 64px;
         }
         QPushButton:hover {
-            background-color: %5;
-            border-color: %4;
+            background-color: rgba(%8, %9, %10, 0.7);
+            border-color: rgba(%14, %15, %16, 0.3);
         }
         QPushButton:pressed {
-            background-color: %3;
+            background-color: rgba(%8, %9, %10, 0.4);
         }
         QPushButton:disabled {
-            background-color: %3;
-            color: palette(mid);
-            border-color: %3;
+            background-color: rgba(%8, %9, %10, 0.3);
+            color: %3;
+            border-color: transparent;
         }
 
-        /* Input fields with modern styling */
+        /* Input fields — neumorphic inset */
         QLineEdit, QSpinBox, QFontComboBox {
-            background-color: %7;
-            border: 1px solid %3;
+            background-color: rgba(%20, %21, %22, 0.4);
+            border: 1px solid rgba(%17, %18, %19, 0.10);
             border-radius: 6px;
             padding: 6px 10px;
             color: %4;
             min-height: 28px;
         }
         QLineEdit:focus, QSpinBox:focus, QFontComboBox:focus {
-            border: 2px solid %6;
-            padding: 5px 9px;
-            background-color: %7;
+            border: 1px solid rgba(%14, %15, %16, 0.4);
+            background-color: rgba(%20, %21, %22, 0.5);
         }
         QLineEdit:disabled, QSpinBox:disabled, QFontComboBox:disabled {
-            border-color: %3;
-            color: palette(mid);
-            background-color: %2;
+            border-color: transparent;
+            color: %3;
+            background-color: rgba(%8, %9, %10, 0.3);
         }
 
         /* Text edit areas */
         QTextEdit, QPlainTextEdit {
             background-color: %7;
-            border: 1px solid %3;
+            border: 1px solid rgba(%17, %18, %19, 0.08);
             border-radius: 6px;
             padding: 8px;
             color: %4;
@@ -2428,74 +2449,72 @@ void MainWindow::applyTheme(const Theme &theme)
             selection-color: %1;
         }
         QTextEdit:focus, QPlainTextEdit:focus {
-            border: 2px solid %6;
+            border: 1px solid rgba(%14, %15, %16, 0.3);
         }
 
-        /* Tree view with modern styling */
+        /* Tree view — glassmorphism */
         QTreeView {
-            background-color: %2;
-            border: 1px solid %3;
-            border-radius: 6px;
-            selection-background-color: %6;
-            selection-color: %1;
+            background-color: transparent;
+            border: none;
+            selection-background-color: rgba(%14, %15, %16, 0.20);
+            selection-color: %4;
+            outline: none;
         }
         QTreeView::item {
             padding: 4px 8px;
-            border-radius: 4px;
-            margin: 1px;
+            border-radius: 6px;
+            margin: 1px 4px;
+            color: %4;
         }
         QTreeView::item:hover {
-            background-color: %5;
+            background-color: rgba(%11, %12, %13, 0.08);
         }
         QTreeView::item:selected {
-            background-color: %6;
-            color: %1;
-            border-radius: 4px;
+            background-color: rgba(%14, %15, %16, 0.20);
+            color: %4;
         }
 
-        /* Modern tab styling */
+        /* Xcode-style tabs — active merges with editor */
         QTabBar::tab {
             background-color: transparent;
             border: none;
             border-bottom: 2px solid transparent;
             padding: 8px 16px;
-            margin-right: 4px;
-            color: palette(mid);
-            min-width: 100px;
+            margin-right: 1px;
+            color: %3;
+            min-width: 80px;
+            font-size: 12px;
         }
         QTabBar::tab:hover:!selected {
-            background-color: %5;
-            border-radius: 8px 8px 0px 0px;
+            background-color: rgba(%11, %12, %13, 0.08);
             color: %4;
         }
         QTabBar::tab:selected {
             background-color: %7;
             border-bottom: 2px solid %6;
             color: %4;
-            margin-bottom: -2px;
         }
         QTabBar::tab:disabled {
-            color: palette(mid);
+            color: %3;
         }
-
         QTabWidget::pane {
             border: none;
             top: -1px;
         }
 
-        /* Status bar */
+        /* Status bar — darkest glassmorphism layer */
         QStatusBar {
-            background-color: %2;
+            background-color: rgba(%23, %24, %25, 0.95);
             border-top: 1px solid %3;
-            color: palette(mid);
-            padding: 4px 8px;
+            color: %3;
+            padding: 2px 10px;
             font-size: 12px;
         }
 
-        /* Menu bar with professional styling */
+        /* Menu bar — hidden but styled for dropdown */
         QMenuBar {
-            background-color: %2;
-            border-bottom: 1px solid %3;
+            background-color: transparent;
+            border: none;
             padding: 2px;
         }
         QMenuBar::item {
@@ -2505,78 +2524,71 @@ void MainWindow::applyTheme(const Theme &theme)
             color: %4;
         }
         QMenuBar::item:selected {
-            background-color: %5;
-            color: %4;
-        }
-        QMenuBar::item:pressed {
-            background-color: %3;
+            background-color: rgba(%11, %12, %13, 0.10);
         }
 
-        /* Menu styling */
+        /* Menu dropdown — glassmorphism */
         QMenu {
-            background-color: %2;
-            border: 1px solid %3;
-            border-radius: 8px;
-            padding: 4px;
+            background-color: rgba(%8, %9, %10, 0.92);
+            border: 1px solid rgba(%17, %18, %19, 0.12);
+            border-radius: 10px;
+            padding: 6px;
             margin: 2px;
         }
         QMenu::item {
             background-color: transparent;
-            padding: 6px 24px 6px 8px;
-            border-radius: 4px;
+            padding: 6px 24px 6px 10px;
+            border-radius: 6px;
             color: %4;
         }
         QMenu::item:selected {
-            background-color: %6;
-            color: %1;
+            background-color: rgba(%14, %15, %16, 0.20);
+            color: %4;
         }
         QMenu::item:disabled {
-            color: palette(mid);
+            color: %3;
         }
         QMenu::separator {
             height: 1px;
-            background-color: %3;
+            background-color: rgba(%17, %18, %19, 0.10);
             margin: 4px 8px;
         }
 
-        /* Modern scrollbar styling */
+        /* Scrollbars — thin overlay */
         QScrollBar:vertical {
-            background-color: %2;
-            width: 12px;
-            border-radius: 6px;
+            background: transparent;
+            width: 10px;
+            margin: 0px;
+        }
+        QScrollBar:horizontal {
+            background: transparent;
+            height: 10px;
             margin: 0px;
         }
         QScrollBar::handle:vertical {
-            background-color: %5;
-            border-radius: 6px;
-            min-height: 20px;
-        }
-        QScrollBar::handle:vertical:hover {
-            background-color: %6;
-        }
-        QScrollBar:horizontal {
-            background-color: %2;
-            height: 12px;
-            border-radius: 6px;
-            margin: 0px;
+            background-color: rgba(%11, %12, %13, 0.25);
+            border-radius: 5px;
+            min-height: 30px;
+            margin: 2px;
         }
         QScrollBar::handle:horizontal {
-            background-color: %5;
-            border-radius: 6px;
-            min-width: 20px;
+            background-color: rgba(%11, %12, %13, 0.25);
+            border-radius: 5px;
+            min-width: 30px;
+            margin: 2px;
         }
-        QScrollBar::handle:horizontal:hover {
-            background-color: %6;
+        QScrollBar::handle:hover {
+            background-color: rgba(%11, %12, %13, 0.45);
         }
-        QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical,
-        QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {
+        QScrollBar::add-line, QScrollBar::sub-line,
+        QScrollBar::add-page, QScrollBar::sub-page {
             height: 0px;
             width: 0px;
             border: none;
             background: transparent;
         }
 
-        /* Checkbox and radio button styling */
+        /* Checkbox and radio — neumorphic */
         QCheckBox, QRadioButton {
             spacing: 8px;
             color: %4;
@@ -2585,80 +2597,90 @@ void MainWindow::applyTheme(const Theme &theme)
             width: 16px;
             height: 16px;
             border-radius: 4px;
-            border: 1px solid %3;
-            background-color: %7;
+            border: 1px solid rgba(%17, %18, %19, 0.15);
+            background-color: rgba(%20, %21, %22, 0.3);
         }
         QRadioButton::indicator {
             border-radius: 8px;
+        }
+        QCheckBox::indicator:hover, QRadioButton::indicator:hover {
+            border-color: rgba(%14, %15, %16, 0.4);
         }
         QCheckBox::indicator:checked, QRadioButton::indicator:checked {
             background-color: %6;
             border: 1px solid %6;
         }
         QCheckBox:disabled, QRadioButton:disabled {
-            color: palette(mid);
+            color: %3;
         }
         QCheckBox::indicator:disabled, QRadioButton::indicator:disabled {
-            border-color: %3;
-            background-color: %2;
+            border-color: transparent;
+            background-color: rgba(%8, %9, %10, 0.3);
         }
 
-        /* Toolbar styling */
+        /* Tooltip — glassmorphism */
+        QToolTip {
+            background-color: rgba(%8, %9, %10, 0.92);
+            color: %4;
+            border: 1px solid rgba(%17, %18, %19, 0.12);
+            border-radius: 8px;
+            padding: 6px 10px;
+            font-size: 12px;
+        }
+
+        /* Toolbar */
         QToolBar {
-            background-color: %2;
+            background-color: transparent;
             border: none;
             spacing: 4px;
             padding: 2px;
         }
-
         QTabBar {
             background-color: transparent;
             border: none;
         }
 
-        /* Container widgets */
+        /* Container widgets — glassmorphism layers */
         QWidget#bottomPanelContainer {
-            background-color: %2;
-            border-top: 1px solid %3;
+            background-color: rgba(%26, %27, %28, 0.85);
+            border-top: 1px solid rgba(%17, %18, %19, 0.10);
         }
-
         QWidget#sidebarDrawer {
-            background-color: %2;
-            border-right: 1px solid %3;
+            background-color: rgba(%29, %30, %31, 0.85);
+            border-right: 1px solid rgba(%17, %18, %19, 0.10);
         }
-
         QWidget#editorContainer {
             background-color: %7;
         }
-
-        QWidget#topToolbar {
-            background-color: %2;
-            border-bottom: 1px solid %3;
+        QWidget#unifiedTitleBar {
+            background-color: rgba(%32, %33, %34, 0.90);
+            border-bottom: 1px solid rgba(%17, %18, %19, 0.10);
         }
 
         QFrame#recentProjectsFrame {
-            background-color: %2;
-            border: 1px solid %3;
+            background-color: rgba(%8, %9, %10, 0.5);
+            border: 1px solid rgba(%17, %18, %19, 0.10);
             border-radius: 12px;
+            padding: 16px;
         }
 
         /* Special buttons */
         QPushButton#projectButton {
-            background-color: %2;
-            border: 1px solid %3;
+            background-color: rgba(%8, %9, %10, 0.5);
+            border: 1px solid rgba(%17, %18, %19, 0.10);
             border-radius: 8px;
             padding: 8px;
             text-align: left;
         }
         QPushButton#projectButton:hover {
-            background-color: %5;
+            background-color: rgba(%8, %9, %10, 0.7);
         }
 
-        /* Primary buttons for welcome screen */
+        /* Primary buttons — neumorphic accent */
         QPushButton#primaryButton {
             background-color: %6;
             border: none;
-            border-radius: 8px;
+            border-radius: 10px;
             padding: 12px 24px;
             color: %1;
             font-weight: 600;
@@ -2667,11 +2689,9 @@ void MainWindow::applyTheme(const Theme &theme)
         }
         QPushButton#primaryButton:hover {
             background-color: %6;
-            opacity: 0.9;
         }
         QPushButton#primaryButton:pressed {
             background-color: %6;
-            opacity: 0.8;
         }
 
         /* Welcome screen title */
@@ -2679,49 +2699,56 @@ void MainWindow::applyTheme(const Theme &theme)
             color: %4;
         }
 
-        /* Recent projects frame */
-        QFrame#recentProjectsFrame {
-            background-color: %2;
-            border: 1px solid %3;
-            border-radius: 12px;
-            padding: 16px;
-        }
-
-        /* Tooltip styling */
-        QToolTip {
-            background-color: %2;
-            color: %4;
-            border: 1px solid %3;
-            border-radius: 6px;
-            padding: 6px 10px;
-            font-size: 12px;
-        }
-
-        /* Side bar icon bar */
+        /* Side bar icon bar — glassmorphism */
         QWidget#sidebarIconBar {
-            background-color: %2;
-            border-top: 1px solid %3;
+            background-color: transparent;
+            border-top: 1px solid rgba(%17, %18, %19, 0.10);
             padding: 8px;
         }
-        
+
         /* Focus styling */
         :focus {
             outline: none;
         }
-
-        /* Selection styling */
         ::selection {
             background-color: %6;
             color: %1;
         }
     )")
-        .arg(windowColor.name())
-        .arg(buttonColor.name())
-        .arg(midColor.name())
-        .arg(textColor.name())
-        .arg(lightColor.name())
-        .arg(accentColor.name())
-        .arg(baseColor.name());
+        .arg(windowColor.name())          // %1
+        .arg(buttonColor.name())          // %2
+        .arg(midColor.name())             // %3
+        .arg(textColor.name())            // %4
+        .arg(lightColor.name())           // %5
+        .arg(accentColor.name())          // %6
+        .arg(baseColor.name())            // %7
+        .arg(QString::number(glassSidebar.red()))    // %8
+        .arg(QString::number(glassSidebar.green()))  // %9
+        .arg(QString::number(glassSidebar.blue()))   // %10
+        .arg(QString::number(windowColor.red()))     // %11
+        .arg(QString::number(windowColor.green()))   // %12
+        .arg(QString::number(windowColor.blue()))    // %13
+        .arg(QString::number(accentColor.red()))     // %14
+        .arg(QString::number(accentColor.green()))   // %15
+        .arg(QString::number(accentColor.blue()))    // %16
+        .arg(QString::number(midColor.red()))        // %17
+        .arg(QString::number(midColor.green()))      // %18
+        .arg(QString::number(midColor.blue()))       // %19
+        .arg(QString::number(baseColor.red()))       // %20
+        .arg(QString::number(baseColor.green()))     // %21
+        .arg(QString::number(baseColor.blue()))      // %22
+        .arg(QString::number(glassStatus.red()))     // %23
+        .arg(QString::number(glassStatus.green()))   // %24
+        .arg(QString::number(glassStatus.blue()))    // %25
+        .arg(QString::number(glassPanel.red()))      // %26
+        .arg(QString::number(glassPanel.green()))    // %27
+        .arg(QString::number(glassPanel.blue()))     // %28
+        .arg(QString::number(glassSidebar.red()))    // %29
+        .arg(QString::number(glassSidebar.green()))  // %30
+        .arg(QString::number(glassSidebar.blue()))   // %31
+        .arg(QString::number(glassToolbar.red()))    // %32
+        .arg(QString::number(glassToolbar.green()))  // %33
+        .arg(QString::number(glassToolbar.blue()));  // %34
 
     for (QWidget *widget : QApplication::allWidgets()) {
         widget->setPalette(palette);

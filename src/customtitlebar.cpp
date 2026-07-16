@@ -7,6 +7,7 @@
 #include <QPushButton>
 #include <QHBoxLayout>
 #include <QLabel>
+#include <QLineEdit>
 #include <QDebug>
 
 CustomTitleBar::CustomTitleBar(QWidget *parent)
@@ -16,12 +17,16 @@ CustomTitleBar::CustomTitleBar(QWidget *parent)
     , closeButton(nullptr)
     , titleLabel(nullptr)
     , menuButton(nullptr)
+    , sidebarToggleButton(nullptr)
+    , inspectorToggleButton(nullptr)
+    , searchField(nullptr)
     , m_isDragging(false)
     , m_dragPosition(QPoint())
     , m_dropdownMenu(nullptr)
 {
-    setFixedHeight(32);
+    setFixedHeight(52);
     setAttribute(Qt::WA_TranslucentBackground, false);
+    setObjectName("unifiedTitleBar");
     setupLayout();
     styleButtons();
 }
@@ -29,26 +34,70 @@ CustomTitleBar::CustomTitleBar(QWidget *parent)
 void CustomTitleBar::setupLayout()
 {
     QHBoxLayout *layout = new QHBoxLayout(this);
-    layout->setContentsMargins(12, 4, 8, 4);
-    layout->setSpacing(4);
+    layout->setContentsMargins(8, 0, 8, 0);
+    layout->setSpacing(2);
 
+    // -- Leading: menu button + sidebar toggle --
     menuButton = new QPushButton(this);
     menuButton->setObjectName("TitleBarMenu");
-    menuButton->setFixedSize(32, 24);
+    menuButton->setFixedSize(36, 36);
     menuButton->setToolTip(tr("Menu"));
     menuButton->setIcon(ThemeIcons::instance()->icon(":/icons/menu.svg"));
-    menuButton->setIconSize(QSize(16, 16));
+    menuButton->setIconSize(QSize(18, 18));
     connect(menuButton, &QPushButton::clicked, this, &CustomTitleBar::showMenu);
     layout->addWidget(menuButton);
 
+    sidebarToggleButton = new QPushButton(this);
+    sidebarToggleButton->setObjectName("TitleBarSidebarToggle");
+    sidebarToggleButton->setFixedSize(36, 36);
+    sidebarToggleButton->setToolTip(tr("Toggle Sidebar"));
+    sidebarToggleButton->setCheckable(true);
+    sidebarToggleButton->setChecked(true);
+    sidebarToggleButton->setIcon(ThemeIcons::instance()->icon(":/icons/sidebar-toggle.svg"));
+    sidebarToggleButton->setIconSize(QSize(18, 18));
+    connect(sidebarToggleButton, &QPushButton::clicked, this, &CustomTitleBar::sidebarToggleClicked);
+    layout->addWidget(sidebarToggleButton);
+
+    // -- Spacer --
+    layout->addSpacing(4);
+
+    // -- Center: title --
     titleLabel = new QLabel(tr("Scriptura"), this);
     QFont titleFont = titleLabel->font();
-    titleFont.setPointSize(10);
+    titleFont.setPointSize(11);
     titleFont.setWeight(QFont::DemiBold);
     titleLabel->setFont(titleFont);
     titleLabel->setStyleSheet("color: palette(text); background: transparent;");
-    layout->addWidget(titleLabel, 1, Qt::AlignVCenter);
+    layout->addWidget(titleLabel, 0, Qt::AlignVCenter);
 
+    // -- Spacer --
+    layout->addStretch(1);
+
+    // -- Search field --
+    searchField = new QLineEdit(this);
+    searchField->setObjectName("unifiedSearchField");
+    searchField->setPlaceholderText(tr("Search..."));
+    searchField->setFixedSize(220, 30);
+    searchField->setClearButtonEnabled(true);
+    connect(searchField, &QLineEdit::returnPressed, this, &CustomTitleBar::searchRequested);
+    layout->addWidget(searchField, 0, Qt::AlignVCenter);
+
+    layout->addSpacing(4);
+
+    // -- Trailing: inspector toggle + window controls --
+    inspectorToggleButton = new QPushButton(this);
+    inspectorToggleButton->setObjectName("TitleBarInspectorToggle");
+    inspectorToggleButton->setFixedSize(36, 36);
+    inspectorToggleButton->setToolTip(tr("Toggle Inspector"));
+    inspectorToggleButton->setCheckable(true);
+    inspectorToggleButton->setIcon(ThemeIcons::instance()->icon(":/icons/inspector.svg"));
+    inspectorToggleButton->setIconSize(QSize(18, 18));
+    connect(inspectorToggleButton, &QPushButton::clicked, this, &CustomTitleBar::inspectorToggleClicked);
+    layout->addWidget(inspectorToggleButton);
+
+    layout->addSpacing(8);
+
+    // -- Window controls (traffic lights) --
     minimizeButton = new QPushButton(this);
     maximizeButton = new QPushButton(this);
     closeButton = new QPushButton(this);
@@ -57,9 +106,9 @@ void CustomTitleBar::setupLayout()
     maximizeButton->setObjectName("TitleBarMaximize");
     closeButton->setObjectName("TitleBarClose");
 
-    minimizeButton->setFixedSize(46, 24);
-    maximizeButton->setFixedSize(46, 24);
-    closeButton->setFixedSize(46, 24);
+    minimizeButton->setFixedSize(28, 28);
+    maximizeButton->setFixedSize(28, 28);
+    closeButton->setFixedSize(28, 28);
 
     layout->addWidget(minimizeButton);
     layout->addWidget(maximizeButton);
@@ -77,31 +126,62 @@ void CustomTitleBar::styleButtons()
             border: none;
             background-color: transparent;
             color: palette(text);
-            border-radius: 0px;
-            width: 46px;
-            height: 24px;
+            border-radius: 14px;
             padding: 0px;
         }
         QPushButton:hover {
-            background-color: rgba(128, 128, 128, 0.2);
+            background-color: rgba(255, 255, 255, 0.10);
         }
         QPushButton:pressed {
-            background-color: rgba(128, 128, 128, 0.35);
+            background-color: rgba(255, 255, 255, 0.18);
         }
-        QPushButton#TitleBarClose:hover {
-            background-color: #e81123;
-            color: white;
+    )";
+
+    const QString checkableButtonStyle = R"(
+        QPushButton {
+            border: none;
+            background-color: transparent;
+            color: palette(text);
+            border-radius: 6px;
+            padding: 0px;
         }
-        QPushButton#TitleBarClose:pressed {
-            background-color: #bf0f1d;
-            color: white;
+        QPushButton:hover {
+            background-color: rgba(255, 255, 255, 0.10);
+        }
+        QPushButton:checked {
+            background-color: rgba(255, 255, 255, 0.12);
+        }
+        QPushButton:pressed {
+            background-color: rgba(255, 255, 255, 0.18);
         }
     )";
 
     minimizeButton->setStyleSheet(buttonStyle);
     maximizeButton->setStyleSheet(buttonStyle);
     closeButton->setStyleSheet(buttonStyle);
-    menuButton->setStyleSheet(buttonStyle);
+    menuButton->setStyleSheet(checkableButtonStyle);
+    sidebarToggleButton->setStyleSheet(checkableButtonStyle);
+    inspectorToggleButton->setStyleSheet(checkableButtonStyle);
+
+    // Search field styling
+    searchField->setStyleSheet(R"(
+        QLineEdit#unifiedSearchField {
+            background-color: rgba(255, 255, 255, 0.06);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 6px;
+            padding: 4px 10px;
+            color: palette(text);
+            font-size: 12px;
+            font-family: "Inter", "SF Pro Text", sans-serif;
+        }
+        QLineEdit#unifiedSearchField:focus {
+            background-color: rgba(255, 255, 255, 0.10);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+        }
+        QLineEdit#unifiedSearchField:hover {
+            background-color: rgba(255, 255, 255, 0.08);
+        }
+    )");
 }
 
 void CustomTitleBar::paintEvent(QPaintEvent *event)
@@ -112,11 +192,9 @@ void CustomTitleBar::paintEvent(QPaintEvent *event)
 
     QColor iconColor = palette().color(foregroundRole());
 
-    // Minimize
+    // Window control glyphs
     paintWindowControls(p, minimizeButton->geometry(), minimizeButton->underMouse(), minimizeButton->isDown(), QStringLiteral("\u2014"));
-    // Maximize
     paintWindowControls(p, maximizeButton->geometry(), maximizeButton->underMouse(), maximizeButton->isDown(), QStringLiteral("\u25a1"));
-    // Close
     paintWindowControls(p, closeButton->geometry(), closeButton->underMouse(), closeButton->isDown(), QStringLiteral("\u2715"));
 }
 
@@ -173,7 +251,7 @@ void CustomTitleBar::showMenu()
     if (!m_dropdownMenu) {
         m_dropdownMenu = new QMenu(this);
         m_dropdownMenu->setObjectName("titleBarMenu");
-        
+
         m_dropdownMenu->addAction(tr("&Open Project..."), this, []() {});
         m_dropdownMenu->addAction(tr("&Open File..."), this, []() {});
         m_dropdownMenu->addSeparator();
@@ -185,7 +263,7 @@ void CustomTitleBar::showMenu()
         m_dropdownMenu->addSeparator();
         m_dropdownMenu->addAction(tr("&Preferences..."), this, []() {});
     }
-    
+
     QPoint menuPos = mapToGlobal(QPoint(0, height()));
     m_dropdownMenu->exec(menuPos);
 }

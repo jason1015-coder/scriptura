@@ -136,28 +136,27 @@ int main(int argc, char *argv[])
 
     a.setStyleSheet(R"(
 /* ============================================================
-   Scriptura — Modern IDE Design System
-   Cohesive, VS Code-inspired flat styling with refined spacing,
-   hairline borders, and consistent typography.
+   Scriptura — Xcode-Inspired Design System
+   Glassmorphism panels, neumorphic controls, unified toolbar.
    ============================================================ */
 
 /* ---- Base ---- */
 QMainWindow, QWidget {
     background-color: palette(window);
-    font-family: "Inter", "Segoe UI", "SF Pro Text", "Noto Sans", "DejaVu Sans", sans-serif;
+    font-family: "Inter", "SF Pro Text", "Segoe UI", "Noto Sans", "DejaVu Sans", sans-serif;
     font-size: 13px;
 }
 
 /* Monospace surfaces get a code font */
 QPlainTextEdit, QTextEdit {
-    font-family: "JetBrains Mono", "Cascadia Code", "Fira Code", "DejaVu Sans Mono", "Consolas", monospace;
+    font-family: "SF Mono", "JetBrains Mono", "Cascadia Code", "Fira Code", "DejaVu Sans Mono", "Consolas", monospace;
     font-size: 13px;
 }
 
-/* ---- Group boxes ---- */
+/* ---- Group boxes — neumorphic ---- */
 QGroupBox {
     border: 1px solid palette(mid);
-    border-radius: 8px;
+    border-radius: 12px;
     margin-top: 14px;
     padding-top: 14px;
     background-color: palette(base);
@@ -178,25 +177,24 @@ QTreeView,
 QListView,
 QTableView,
 QAbstractItemView {
-    border: 1px solid palette(mid);
+    border: none;
     border-radius: 6px;
-    background-color: palette(base);
+    background-color: transparent;
     outline: none;
     padding: 2px;
 }
 
-/* ---- Menu bar & toolbar ---- */
+/* ---- Menu bar ---- */
 QMenuBar {
-    background-color: palette(window);
+    background-color: transparent;
     border: none;
     padding: 2px 4px;
     spacing: 2px;
 }
 
 QToolBar {
-    background-color: palette(window);
+    background-color: transparent;
     border: none;
-    border-bottom: 1px solid palette(mid);
     padding: 4px 6px;
     spacing: 4px;
 }
@@ -220,11 +218,11 @@ QStatusBar::item {
     padding: 0 6px;
 }
 
-/* ---- Menus ---- */
+/* ---- Menus — glassmorphism ---- */
 QMenu {
     background-color: palette(base);
     border: 1px solid palette(mid);
-    border-radius: 8px;
+    border-radius: 10px;
     padding: 6px;
 }
 
@@ -271,7 +269,7 @@ QMenu::icon {
     padding-left: 6px;
 }
 
-/* ---- Tabs ---- */
+/* ---- Tabs — Xcode-style, active merges with editor ---- */
 QTabBar {
     background-color: transparent;
     border: none;
@@ -280,17 +278,18 @@ QTabBar {
 
 QTabBar::tab {
     border: none;
-    border-top: 2px solid transparent;
+    border-bottom: 2px solid transparent;
     background-color: transparent;
     padding: 8px 16px;
     margin: 0;
     color: palette(mid);
     min-width: 70px;
+    font-size: 12px;
 }
 
 QTabBar::tab:selected {
     background-color: palette(base);
-    border-top: 2px solid palette(highlight);
+    border-bottom: 2px solid palette(highlight);
     color: palette(text);
 }
 
@@ -309,11 +308,11 @@ QTabWidget::pane {
     background-color: palette(base);
 }
 
-/* ---- Buttons ---- */
+/* ---- Buttons — neumorphic ---- */
 QPushButton,
 QDialogButtonBox > QPushButton {
     border: 1px solid palette(mid);
-    border-radius: 6px;
+    border-radius: 8px;
     padding: 7px 16px;
     background-color: palette(button);
     color: palette(text);
@@ -345,12 +344,12 @@ QDialogButtonBox > QPushButton:disabled {
     color: palette(mid);
 }
 
-/* Accent primary button (welcome screen, dialogs) */
+/* Accent primary button (welcome screen, dialogs) — neumorphic */
 QPushButton#primaryButton {
     background-color: palette(highlight);
     color: palette(highlighted-text);
     border: none;
-    border-radius: 6px;
+    border-radius: 10px;
     padding: 9px 18px;
     font-weight: 600;
 }
@@ -360,7 +359,7 @@ QPushButton#primaryButton:hover {
     border: none;
 }
 
-/* ---- Tool buttons (icon buttons) ---- */
+/* ---- Tool buttons (icon buttons) — neumorphic ---- */
 QToolButton {
     border: none;
     border-radius: 6px;
@@ -386,7 +385,7 @@ QToolButton:disabled {
     color: palette(mid);
 }
 
-/* ---- Inputs ---- */
+/* ---- Inputs — neumorphic inset ---- */
 QLineEdit,
 QComboBox,
 QSpinBox,
@@ -451,7 +450,7 @@ QTextEdit:focus {
 QTreeView::item,
 QListView::item {
     padding: 5px 6px;
-    border-radius: 5px;
+    border-radius: 6px;
     color: palette(text);
     border: none;
 }
