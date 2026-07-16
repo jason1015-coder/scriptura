@@ -25,6 +25,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 find_package(QT NAMES Qt6 Qt5 REQUIRED COMPONENTS Widgets LinguistTools Network Sql Test)
 find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Widgets LinguistTools Network Sql Test)
+find_package(ZLIB REQUIRED)
 
 enable_testing()
 
@@ -106,7 +107,7 @@ set_target_properties(scriptura_core PROPERTIES
     FOLDER "Internal"
 )
 
-target_link_libraries(scriptura_core PRIVATE Qt${QT_VERSION_MAJOR}::Core Qt${QT_VERSION_MAJOR}::Widgets Qt${QT_VERSION_MAJOR}::Network Qt${QT_VERSION_MAJOR}::Sql)
+target_link_libraries(scriptura_core PRIVATE Qt${QT_VERSION_MAJOR}::Core Qt${QT_VERSION_MAJOR}::Widgets Qt${QT_VERSION_MAJOR}::Network Qt${QT_VERSION_MAJOR}::Sql ZLIB::ZLIB)
 if(WIN32)
     # DwmSetWindowAttribute (used by MainWindow::enableMicaEffect) lives in dwmapi.lib
     target_link_libraries(scriptura_core PRIVATE dwmapi)

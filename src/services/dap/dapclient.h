@@ -67,6 +67,10 @@ public:
     bool isRunning() const { return m_process && m_process->state() == QProcess::Running; }
     int currentThreadId() const { return m_currentThreadId; }
 
+    /// Parse a raw (framed) DAP message. Public so managers/tests can feed
+    /// messages without spawning a real debug adapter.
+    void processMessage(const QByteArray &data);
+
     void initialize(const QString &program, const QStringList &args, const QString &cwd);
     void launch();
     void configurationDone();
@@ -107,7 +111,6 @@ private:
     void sendMessage(const QJsonObject &msg);
     void sendRequest(const QString &method, const QJsonObject &params, int id);
     void sendNotification(const QString &method, const QJsonObject &params);
-    void processMessage(const QByteArray &data);
     void handleResponse(const QJsonObject &obj);
     void handleNotification(const QJsonObject &obj);
     void handleRequest(const QJsonObject &obj);

@@ -4,11 +4,11 @@
 #include "servicelocator.h"
 #include "versionfetcher.h"
 #include "plugincrashhandler.h"
+#include "archiveextractor.h"
 #include <QDebug>
 #include <QJsonArray>
 #include <QStandardPaths>
 #include <QFileInfo>
-#include <QProcess>
 #include <QDir>
 #include <QMessageBox>
 
@@ -795,13 +795,7 @@ bool PluginManager::installPluginFromArchive(const QString &pluginId, const QByt
         f.close();
     }
 
-    bool extracted = false;
-    if (!QStandardPaths::findExecutable("unzip").isEmpty()) {
-        QProcess unzip;
-        unzip.setWorkingDirectory(targetDir);
-        unzip.start("unzip", {"-o", archivePath});
-        extracted = unzip.waitForFinished(30000) && unzip.exitStatus() == QProcess::NormalExit;
-    }
+    bool extracted = Scriptura::ArchiveExtractor::extract(archivePath, targetDir);
     QFile::remove(archivePath);
 
     if (!extracted)

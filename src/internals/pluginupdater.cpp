@@ -1,4 +1,5 @@
 #include "pluginupdater.h"
+#include "archiveextractor.h"
 #include <QJsonDocument>
 #include <QJsonArray>
 #include <QJsonObject>
@@ -6,7 +7,6 @@
 #include <QDir>
 #include <QDebug>
 #include <QStandardPaths>
-#include <QProcess>
 #include <QApplication>
 #include <QCoreApplication>
 
@@ -171,9 +171,7 @@ bool PluginUpdater::installUpdate(const QString& pluginId)
         if (!zipFiles.isEmpty()) {
             QString zipPath = downloadDir + "/" + zipFiles.first();
 
-            QProcess unzip;
-            unzip.start("unzip", QStringList() << "-q" << "-o" << zipPath << "-d" << pluginDir);
-            if (unzip.waitForFinished(30000) && unzip.exitCode() == 0) {
+            if (Scriptura::ArchiveExtractor::extract(zipPath, pluginDir)) {
                 QDir(backupDir).removeRecursively();
                 emit pluginUpdated(pluginId);
                 return true;

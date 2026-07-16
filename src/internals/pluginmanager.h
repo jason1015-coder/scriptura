@@ -101,6 +101,29 @@ public:
      * @brief 插件安裝目錄
      */
     QString pluginsInstallDir() const;
+
+    /**
+     * @brief 建立插件依賴圖（公開以便測試與外部排序使用）
+     */
+    bool buildDependencyGraph(const QList<QJsonObject>& pluginMetadata);
+
+    /**
+     * @brief 執行拓撲排序，回傳排序後的插件 ID 列表
+     */
+    QStringList topologicalSort();
+
+    /**
+     * @brief 檢查插件版本相容性
+     */
+    bool checkVersionCompatibility(const QJsonObject& metadata) const;
+
+    /**
+     * @brief 載入插件元數據
+     * @param filePath 插件目錄路徑
+     * @param metadata 輸出的元數據物件
+     * @return 成功載入返回 true
+     */
+    bool loadPluginMetadata(const QString& filePath, QJsonObject& metadata);
     
     /**
      * @brief 卸載指定插件
@@ -295,15 +318,7 @@ signals:
      */
     void pluginIncompatible(const QString& id, const QString& coreVersion);
 
-private:
-    /**
-     * @brief 載入插件元數據
-     * @param filePath 插件目錄路徑
-     * @param metadata 輸出的元數據物件
-     * @return 成功載入返回 true
-     */
-    bool loadPluginMetadata(const QString& filePath, QJsonObject& metadata);
-    
+ private:
     /**
      * @brief 檢查插件依賴
      * @param metadata 插件元數據
@@ -327,20 +342,7 @@ private:
      * @param plugin 插件指標
      */
     void setupPluginConnections(ScripturaPlugin* plugin);
-    
-    /**
-     * @brief 建立依賴圖
-     * @param pluginMetadata 插件元數據列表
-     * @return 成功建立返回 true
-     */
-    bool buildDependencyGraph(const QList<QJsonObject>& pluginMetadata);
-    
-    /**
-     * @brief 執行拓撲排序
-     * @return 排序後的插件 ID 列表
-     */
-    QStringList topologicalSort();
-    
+
     /**
      * @brief 內部載入實作（不acquire鎖，供已持有鎖的內部呼叫使用）
      * @param filePath 插件庫檔案路徑
@@ -360,13 +362,7 @@ private:
      * @return 成功載入返回 true
      */
     bool loadPluginById(const QString& pluginId);
-    
-    /**
-     * @brief 檢查插件版本相容性
-     * @param metadata 插件元數據
-     * @return 相容返回 true
-     */
-    bool checkVersionCompatibility(const QJsonObject& metadata) const;
+
 
     /**
      * @brief 插件狀態列舉

@@ -99,6 +99,7 @@ moc_predefs.h
 .qtc/
 .qtc_clangd/
 .clangd/
+./kdev4/
 
 # Qt autogen
 *_autogen/

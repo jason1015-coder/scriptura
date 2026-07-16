@@ -9,6 +9,10 @@
 #include "test_permissionmanager.h"
 #include "test_pluginsettings.h"
 #include "test_taskrunner.h"
+#include "test_archiveextractor.h"
+#include "test_pluginmanager.h"
+#include "test_lspclient.h"
+#include "test_dapclient.h"
 
 int main(int argc, char *argv[])
 {
@@ -25,6 +29,10 @@ int main(int argc, char *argv[])
     status |= QTest::qExec(new TestPermissionManager, argc, argv);
     status |= QTest::qExec(new TestPluginSettings, argc, argv);
     status |= QTest::qExec(new TestTaskRunner, argc, argv);
+    status |= QTest::qExec(new TestArchiveExtractor, argc, argv);
+    status |= QTest::qExec(new TestPluginManager, argc, argv);
+    status |= QTest::qExec(new TestLspClient, argc, argv);
+    status |= QTest::qExec(new TestDapClient, argc, argv);
 
     return status;
 }

@@ -45,6 +45,10 @@ public:
                      const QString &rootUri = QString());
     void stopServer();
 
+    /// Parse a raw (framed) LSP message. Public so managers/tests can feed
+    /// messages without spawning a real language server.
+    void processMessage(const QByteArray &data);
+
     bool isRunning() const { return m_process && m_process->state() == QProcess::Running; }
 
     void initialize(const QString &rootUri, const QString &languageId);
@@ -116,11 +120,10 @@ private slots:
     void onProcessFinished(int exitCode, QProcess::ExitStatus exitStatus);
     void onTimeout();
 
-private:
+ private:
     void sendMessage(const QJsonObject &msg);
     void sendRequest(const QString &method, const QJsonObject &params, int id);
     void sendNotification(const QString &method, const QJsonObject &params);
-    void processMessage(const QByteArray &data);
     void handleResponse(const QJsonObject &obj);
     void handleNotification(const QJsonObject &obj);
     void handleRequest(const QJsonObject &obj);

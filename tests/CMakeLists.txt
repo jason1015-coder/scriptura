@@ -20,7 +20,18 @@ set(TEST_SOURCES
     test_pluginsettings.cpp
     test_taskrunner.h
     test_taskrunner.cpp
+    test_archiveextractor.h
+    test_archiveextractor.cpp
+    test_pluginmanager.h
+    test_pluginmanager.cpp
+    test_lspclient.h
+    test_lspclient.cpp
+    test_dapclient.h
+    test_dapclient.cpp
 )
+
+# Copy zip fixtures next to the test binary so tests can locate them.
+file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/fixtures DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 
 qt_add_executable(scriptura_tests
     ${TEST_SOURCES}
