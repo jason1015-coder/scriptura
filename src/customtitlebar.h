@@ -4,6 +4,7 @@
 #include <QWidget>
 #include <QPushButton>
 #include <QLabel>
+#include <QLineEdit>
 #include <QMouseEvent>
 #include <QHBoxLayout>
 #include <QMenu>
@@ -15,7 +16,7 @@ class CustomTitleBar : public QWidget
     Q_OBJECT
 public:
     explicit CustomTitleBar(QWidget *parent = nullptr);
-    
+
     void handleMousePress(QMouseEvent *event);
     void handleMouseMove(QMouseEvent *event);
     void stopDrag();
@@ -25,6 +26,9 @@ public:
     QPushButton* closeButton;
     QLabel* titleLabel;
     QPushButton* menuButton;
+    QPushButton* sidebarToggleButton;
+    QPushButton* inspectorToggleButton;
+    QLineEdit* searchField;
 
 signals:
     void windowMoveRequested();
@@ -32,6 +36,9 @@ signals:
     void minimizeRequest();
     void closeRequest();
     void menuRequested();
+    void sidebarToggleClicked();
+    void inspectorToggleClicked();
+    void searchRequested();
 
 public slots:
     void showMenu();
@@ -43,7 +50,7 @@ private:
     bool m_isDragging = false;
     QPoint m_dragPosition;
     QMenu* m_dropdownMenu;
-    
+
     void styleButtons();
     void setupLayout();
     void paintWindowControls(QPainter &p, const QRect &buttonRect, bool hovered, bool pressed, const QString &glyph);

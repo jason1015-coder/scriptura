@@ -18,5 +18,7 @@
     <file alias="icons/minimize.svg">resources/icons/minimize.svg</file>
     <file alias="icons/maximize.svg">resources/icons/maximize.svg</file>
     <file alias="icons/menu.svg">resources/icons/menu.svg</file>
+    <file alias="icons/search.svg">resources/icons/search.svg</file>
+    <file alias="icons/inspector.svg">resources/icons/inspector.svg</file>
 </qresource>
 </RCC>
