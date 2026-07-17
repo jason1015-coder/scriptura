@@ -139,7 +139,10 @@ jobs:
         run: cmake --build build --config Release --target scriptura_tests
 
       - name: Run unit tests
-        run: cd build && ctest --output-on-failure -C Release
+        run: |
+          $env:PATH = "${env:Qt6_DIR}\bin;$env:PATH"
+          cd build
+          ctest --output-on-failure -C Release
       
       - name: Convert icon to ICO
         run: |
