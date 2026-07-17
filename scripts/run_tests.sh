@@ -11,7 +11,7 @@ cmake -B "$BUILD_DIR" -S "$PROJECT_ROOT" \
     -DBUILD_TESTING=ON
 
 echo "==> Building tests..."
-cmake --build "$BUILD_DIR" -j"$(nproc)"
+cmake --build "$BUILD_DIR" --target scriptura_tests -j"$(nproc)"
 
 echo "==> Running unit tests..."
 cd "$BUILD_DIR"

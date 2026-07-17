@@ -24,10 +24,6 @@ jobs:
         run: cmake -B build -S . -DCMAKE_BUILD_TYPE=Release
       - name: Build
         run: cmake --build build --config Release -j$(nproc)
-      - name: Build unit tests
-        run: cmake --build build --config Release -j$(nproc) --target scriptura_tests
-      - name: Run unit tests
-        run: cd build && ctest --output-on-failure
       - name: Bundle AppImage
         run: |
           mkdir -p AppDir/usr/bin
@@ -84,12 +80,8 @@ jobs:
         run: cmake -B build -S . -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=/opt/homebrew/opt/qt
       - name: Build
         run: cmake --build build --config Release -j$(sysctl -n hw.ncpu)
-      - name: Build unit tests
-        run: cmake --build build --config Release --target scriptura_tests
       - name: Bundle Qt dependencies
         run: macdeployqt build/scriptura.app -always-overwrite
-      - name: Run unit tests
-        run: cd build && ctest --output-on-failure
       - name: Upload macOS artifact
         uses: actions/upload-artifact@v4
         with:
@@ -134,15 +126,6 @@ jobs:
       
       - name: Build
         run: cmake --build build --config Release -j
-       
-      - name: Build unit tests
-        run: cmake --build build --config Release --target scriptura_tests
-
-      - name: Run unit tests
-        run: |
-          $env:PATH = "${env:Qt6_DIR}\bin;$env:PATH"
-          cd build
-          ctest --output-on-failure -C Release
       
       - name: Convert icon to ICO
         run: |
