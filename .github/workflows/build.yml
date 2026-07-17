@@ -114,7 +114,7 @@ jobs:
           host: 'windows'
           target: 'desktop'
           arch: 'win64_msvc2022_64'
-          modules: 'qttools'
+          modules: 'tools'
           setup-python: 'true'
       
       - name: Install NSIS and ImageMagick
