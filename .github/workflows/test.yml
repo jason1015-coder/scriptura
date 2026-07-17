@@ -61,7 +61,7 @@ jobs:
         run: cmake -B build -S . -A x64 -DCMAKE_BUILD_TYPE=Debug -DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake -DBUILD_TESTING=ON
       
       - name: Build tests
-        run: cmake --build build --config Debug --target scriptura_unit_tests
+        run: cmake --build build --config Debug --target scriptura_tests
 
       - name: Run unit tests
         run: |
