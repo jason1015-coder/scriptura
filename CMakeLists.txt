@@ -2,6 +2,8 @@ cmake_minimum_required(VERSION 3.16)
 
 project(scriptura LANGUAGES CXX)
 
+option(BUILD_TESTING "Build the testing tree" OFF)
+
 # 版本號從 GitHub Release tag 注入，開發時預設為 0.0.0-dev
 if(DEFINED ENV{GITHUB_REF})
     string(REGEX MATCH "refs/tags/v([0-9.]+)" _ $ENV{GITHUB_REF})
@@ -23,11 +25,15 @@ set(CMAKE_AUTORCC ON)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-find_package(QT NAMES Qt6 Qt5 REQUIRED COMPONENTS Widgets LinguistTools Network Sql Test)
-find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Widgets LinguistTools Network Sql Test)
+find_package(QT NAMES Qt6 Qt5 REQUIRED COMPONENTS Widgets LinguistTools Network Sql)
+find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Widgets LinguistTools Network Sql)
 find_package(ZLIB REQUIRED)
 
-enable_testing()
+if(BUILD_TESTING)
+    find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Test)
+    enable_testing()
+    add_subdirectory(tests)
+endif()
 
 # Translation files
 file(GLOB TS_FILES "${CMAKE_CURRENT_SOURCE_DIR}/translations/*.ts")
@@ -195,7 +201,7 @@ if(EXISTS /home/jason/scriptura-plugins/duplicatelines)
   add_subdirectory(/home/jason/scriptura-plugins/duplicatelines /home/jason/scriptura/build/plugins/duplicatelines)
 endif()
 
-add_subdirectory(tests)
+# Plugin system configuration
 
 # Qt for iOS sets MACOSX_BUNDLE_GUI_IDENTIFIER automatically since Qt 6.1.
 # If you are developing for iOS or macOS you should consider setting an
