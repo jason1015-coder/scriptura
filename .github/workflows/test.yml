@@ -1,0 +1,70 @@
+name: Run Unit Tests
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  test-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake g++ qt6-base-dev qt6-tools-dev
+      - name: Configure
+        run: cmake -B build -S . -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTING=ON
+      - name: Build tests
+        run: cmake --build build --config Debug -j$(nproc) --target scriptura_tests
+      - name: Run unit tests
+        run: cd build && ctest --output-on-failure
+
+  test-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Qt
+        run: brew install qt
+      - name: Configure
+        run: cmake -B build -S . -DCMAKE_BUILD_TYPE=Debug -DCMAKE_PREFIX_PATH=/opt/homebrew/opt/qt -DBUILD_TESTING=ON
+      - name: Build tests
+        run: cmake --build build --config Debug -j$(sysctl -n hw.ncpu) --target scriptura_tests
+      - name: Run unit tests
+        run: cd build && ctest --output-on-failure
+
+  test-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Setup MSVC environment
+        uses: ilammy/msvc-dev-cmd@v1
+      
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.8.3'
+          host: 'windows'
+          target: 'desktop'
+          arch: 'win64_msvc2022_64'
+          setup-python: 'true'
+      
+      - name: Install vcpkg dependencies
+        run: vcpkg install zlib:x64-windows
+      
+      - name: Configure (MSVC)
+        run: cmake -B build -S . -A x64 -DCMAKE_BUILD_TYPE=Debug -DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake -DBUILD_TESTING=ON
+      
+      - name: Build tests
+        run: cmake --build build --config Debug --target scriptura_tests
+
+      - name: Run unit tests
+        run: |
+          $env:PATH = "${env:Qt6_DIR}\bin;$env:PATH"
+          cd build
+          ctest --output-on-failure -C Debug
