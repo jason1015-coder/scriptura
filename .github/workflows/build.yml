@@ -114,10 +114,14 @@ jobs:
           host: 'windows'
           target: 'desktop'
           arch: 'win64_msvc2022_64'
+          modules: 'qttools'
           setup-python: 'true'
       
       - name: Install NSIS and ImageMagick
         run: choco install nsis imagemagick -y
+      
+      - name: Install vcpkg dependencies
+        run: vcpkg install zlib:x64-windows
       
       - name: Get version from git tag
         id: get_version
@@ -127,7 +131,7 @@ jobs:
           echo "VERSION=$version" >> $env:GITHUB_OUTPUT
       
       - name: Configure (MSVC)
-        run: cmake -B build -S . -A x64 -DCMAKE_BUILD_TYPE=Release
+        run: cmake -B build -S . -A x64 -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake
       
       - name: Build
         run: cmake --build build --config Release -j
@@ -140,7 +144,11 @@ jobs:
       
       - name: Convert icon to ICO
         run: |
-          magick src/icon.png -resize 256x256 icon.ico
+          if (Test-Path "src/icon.png") {
+            magick src/icon.png -resize 256x256 icon.ico
+          } else {
+            Write-Host "src/icon.png not found, skipping icon conversion"
+          }
       
       - name: Deploy Qt dependencies
         run: |
@@ -165,9 +173,14 @@ jobs:
           $nsiContent = Get-Content "$env:GITHUB_WORKSPACE\deployment\windows\scriptura.nsi"
           $nsiContent = $nsiContent -replace '0\.0\.0-dev', '${{ steps.get_version.outputs.VERSION }}'
           Set-Content scriptura-temp.nsi $nsiContent
-          $makensis = Get-ChildItem 'C:\Program Files','C:\Program Files (x86)' -Recurse -Filter makensis.exe -ErrorAction SilentlyContinue | Select-Object -First 1
-          if (-not $makensis) { throw "makensis.exe not found under C:\Program Files*" }
-          & $makensis.FullName scriptura-temp.nsi
+          if (Get-Command makensis -ErrorAction SilentlyContinue) {
+            makensis scriptura-temp.nsi
+          } else {
+            # Fallback: search for makensis if not in PATH
+            $makensis = Get-ChildItem 'C:\Program Files','C:\Program Files (x86)','C:\ProgramData' -Recurse -Filter makensis.exe -ErrorAction SilentlyContinue | Select-Object -First 1
+            if (-not $makensis) { throw "makensis.exe not found. Install NSIS via choco or manually." }
+            & $makensis.FullName scriptura-temp.nsi
+          }
       
       - name: Create portable ZIP
         run: |
