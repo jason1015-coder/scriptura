@@ -16,7 +16,9 @@
 
 int main(int argc, char *argv[])
 {
+#if defined(Q_OS_LINUX) || defined(Q_OS_MACOS)
     qputenv("QT_QPA_PLATFORM", "offscreen");
+#endif
     QApplication app(argc, argv);
 
     int status = 0;
