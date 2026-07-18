@@ -2,6 +2,9 @@
 
 A simple Qt-based text editor with project file browsing.
 
+
+** note: this project is at early development stage which expect bugs and occasional broken features **
+
 ## Features
 
 - **Project-based workflow**: Open a project directory to browse files
