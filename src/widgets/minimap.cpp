@@ -88,7 +88,7 @@ void Minimap::mousePressEvent(QMouseEvent *event)
     
     int totalHeight = m_editor->document()->size().height();
     if (totalHeight > 0) {
-        int newPosition = (event->y() * totalHeight) / height();
+        int newPosition = static_cast<int>((event->position().y() * totalHeight) / height());
         m_editor->verticalScrollBar()->setValue(newPosition);
     }
 }

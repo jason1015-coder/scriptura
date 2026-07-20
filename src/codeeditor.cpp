@@ -15,233 +15,226 @@
 #include <QTextFormat>
 #include <QToolTip>
 #include <QTextOption>
+#include <QPixmap>
+#include <algorithm>
+
+// -----------------------------------------------------------------------
+// Helper patterns used by the highlighting rule builder
+// -----------------------------------------------------------------------
 
 namespace {
 
-QString languageForFile(const QString &filePath)
+inline QString functionCallPattern()
 {
-    const QString extension = QFileInfo(filePath).suffix().toLower();
-
-    if (extension == "py" || extension == "pyw")
-        return "python";
-    if (extension == "c")
-        return "c";
-    if (extension == "cpp" || extension == "cc" || extension == "cxx" || extension == "h" || extension == "hh" || extension == "hpp" || extension == "hxx")
-        return "cpp";
-    if (extension == "java")
-        return "java";
-    if (extension == "js" || extension == "jsx" || extension == "mjs")
-        return "javascript";
-    if (extension == "ts" || extension == "tsx")
-        return "typescript";
-    if (extension == "rs")
-        return "rust";
-    if (extension == "go")
-        return "go";
-    if (extension == "sh" || extension == "bash" || extension == "zsh")
-        return "shell";
-    if (extension == "html" || extension == "htm")
-        return "html";
-    if (extension == "css" || extension == "scss" || extension == "sass" || extension == "less")
-        return "css";
-    if (extension == "scr")
-        return "script";
-
-    return "text";
+    return "\\b(?!if\\b)(?!for\\b)(?!while\\b)(?!switch\\b)(?!catch\\b)(?!return\\b)(?!sizeof\\b)(?!typeof\\b)(?!new\\b)(?!delete\\b)(?!void\\b)(?!print\\b)([A-Za-z_]\\w*)\\s*(?=\\()";
 }
 
+inline QString numberPattern(const QString &suffix = "")
+{
+    return "\\b\\d+(?:\\.\\d+)?" + suffix + "\\b";
 }
+
+} // anonymous namespace
+
+// -----------------------------------------------------------------------
+// CodeHighlighter - uses LanguageRegistry for data-driven definitions
+// -----------------------------------------------------------------------
 
 CodeHighlighter::CodeHighlighter(QTextDocument *parent)
     : QSyntaxHighlighter(parent)
+    , m_formatCache(64)  // Cache up to 64 language format sets (covers 2 modes × ~30 languages)
 {
+    // Ensure the LanguageRegistry is populated
+    LanguageRegistry::instance();
     initializeFormats();
     setLanguage("text");
 }
 
 void CodeHighlighter::setLanguage(const QString &newLanguage)
 {
-    language = newLanguage.toLower();
-    rules.clear();
+    const QString lang = newLanguage.toLower();
+    if (m_language == lang)
+        return;
 
-    if (language == "python")
-        setupPython();
-    else if (language == "c" || language == "cpp")
-        setupCStyle();
-    else if (language == "java")
-        setupJava();
-    else if (language == "javascript")
-        setupJavaScript();
-    else if (language == "typescript")
-        setupTypeScript();
-    else if (language == "rust")
-        setupRust();
-    else if (language == "go")
-        setupGo();
-    if (language == "shell")
-        setupShell();
-    else if (language == "html")
-        setupHtml();
-    else if (language == "css")
-        setupCss();
-    else if (language == "script")
-        setupScript();
-    else
-        setupPlainText();
+    m_language = lang;
+    m_langDef = LanguageRegistry::instance().findByName(lang);
 
+    if (!m_langDef && lang != "text") {
+        m_langDef = LanguageRegistry::instance().findByName("text");
+    }
+
+    rebuildRules();
     rehighlight();
 }
 
 void CodeHighlighter::setDarkMode(bool dark)
 {
-    if (darkMode == dark)
+    if (m_darkMode == dark)
         return;
-    darkMode = dark;
+    m_darkMode = dark;
     initializeFormats();
-    setLanguage(language);
+    if (m_langDef || m_language == "text")
+        rebuildRules();
+    rehighlight();
 }
 
 void CodeHighlighter::setThemeColors(const QColor &keyword, const QColor &string, const QColor &comment,
-                                   const QColor &number, const QColor &preprocessor, const QColor &tag,
-                                   const QColor &attribute, const QColor &cssProperty,
-                                   const QColor &variable, const QColor &function, const QColor &escape,
-                                   const QColor &trailingSpace)
+                                     const QColor &number, const QColor &preprocessor, const QColor &tag,
+                                     const QColor &attribute, const QColor &cssProperty,
+                                     const QColor &variable, const QColor &function, const QColor &escape,
+                                     const QColor &trailingSpace)
 {
-    keywordFormat.setForeground(keyword);
-    keywordFormat.setFontWeight(QFont::Bold);
+    m_keywordFormat.setForeground(keyword);
+    m_keywordFormat.setFontWeight(QFont::Bold);
 
-    stringFormat.setForeground(string);
+    m_stringFormat.setForeground(string);
 
-    commentFormat.setForeground(comment);
-    commentFormat.setFontItalic(true);
+    m_commentFormat.setForeground(comment);
+    m_commentFormat.setFontItalic(true);
 
-    numberFormat.setForeground(number);
+    m_numberFormat.setForeground(number);
 
-    preprocessorFormat.setForeground(preprocessor);
-    preprocessorFormat.setFontWeight(QFont::Bold);
+    m_preprocessorFormat.setForeground(preprocessor);
+    m_preprocessorFormat.setFontWeight(QFont::Bold);
 
-    tagFormat.setForeground(tag);
-    tagFormat.setFontWeight(QFont::Bold);
+    m_tagFormat.setForeground(tag);
+    m_tagFormat.setFontWeight(QFont::Bold);
 
-    attributeFormat.setForeground(attribute);
+    m_attributeFormat.setForeground(attribute);
 
-    this->cssPropertyFormat.setForeground(cssProperty);
-    this->cssPropertyFormat.setFontWeight(QFont::Bold);
+    m_cssPropertyFormat.setForeground(cssProperty);
+    m_cssPropertyFormat.setFontWeight(QFont::Bold);
 
-    this->variableFormat.setForeground(variable);
-    this->variableFormat.setFontWeight(QFont::Bold);
+    m_variableFormat.setForeground(variable);
+    m_variableFormat.setFontWeight(QFont::Bold);
 
-    this->functionFormat.setForeground(function);
-    this->functionFormat.setFontWeight(QFont::Bold);
+    m_functionFormat.setForeground(function);
+    m_functionFormat.setFontWeight(QFont::Bold);
 
-    escapeFormat.setForeground(escape);
+    m_escapeFormat.setForeground(escape);
 
-    trailingSpaceFormat.setBackground(trailingSpace);
+    m_trailingSpaceFormat.setBackground(trailingSpace);
 
-    setLanguage(language);
+    rebuildRules();
+    rehighlight();
 }
 
 void CodeHighlighter::highlightBlock(const QString &text)
 {
+    // Performance: skip very long blocks (>10000 chars) to avoid freezing
     if (text.length() > 10000) {
         setCurrentBlockState(BlockNormal);
         return;
     }
 
-    if (language == "c" || language == "cpp" || language == "java" || language == "javascript" || language == "typescript" || language == "rust" || language == "go" || language == "css" || language == "script") {
+    const bool hasCStyle = m_langDef && m_langDef->hasCStyleComments;
+    const bool hasHtml = m_langDef && m_langDef->hasHtmlComments;
+    const bool hasPyTriple = m_langDef && m_langDef->hasPythonTripleStrings;
+
+    // Handle multi-line constructs first
+    if (hasCStyle && (previousBlockState() == BlockInComment || text.contains("/*"))) {
         handleCStyleBlockComment(text);
         if (currentBlockState() == BlockInComment)
             return;
     }
 
-    if (language == "html" && previousBlockState() == BlockInHtmlComment) {
+    if (hasHtml && (previousBlockState() == BlockInHtmlComment || text.contains("<!--"))) {
         handleHtmlComment(text);
         if (currentBlockState() == BlockInHtmlComment)
             return;
     }
 
-    for (const HighlightingRule &rule : rules) {
+    if (hasPyTriple && (previousBlockState() == BlockInTripleDouble || previousBlockState() == BlockInTripleSingle || text.contains("\"\"\"") || text.contains("'''"))) {
+        handlePythonTripleString(text);
+        if (currentBlockState() != BlockNormal)
+            return;
+    }
+
+    // Apply all highlighting rules
+    if (text.isEmpty())
+        return;
+
+    for (const HighlightingRule &rule : m_rules) {
         QRegularExpressionMatchIterator iterator = rule.pattern.globalMatch(text);
         while (iterator.hasNext()) {
             QRegularExpressionMatch match = iterator.next();
             const int start = match.capturedStart(rule.captureIndex);
             const int length = match.capturedLength(rule.captureIndex);
-            if (start >= 0)
+            if (start >= 0 && length > 0)
                 setFormat(start, length, rule.format);
         }
     }
 
-    if (language == "html")
+    // Handle HTML comments that start mid-block
+    if (hasHtml && previousBlockState() == BlockInHtmlComment) {
         handleHtmlComment(text);
-
-    if (language == "python")
-        handlePythonTripleString(text);
+    }
 }
 
 void CodeHighlighter::initializeFormats()
 {
-    if (darkMode) {
-        keywordFormat.setForeground(QColor("#93c5fd"));
-        keywordFormat.setFontWeight(QFont::Bold);
+    if (m_darkMode) {
+        m_keywordFormat.setForeground(QColor("#93c5fd"));
+        m_keywordFormat.setFontWeight(QFont::Bold);
 
-        stringFormat.setForeground(QColor("#86efac"));
+        m_stringFormat.setForeground(QColor("#86efac"));
 
-        commentFormat.setForeground(QColor("#94a3b8"));
-        commentFormat.setFontItalic(true);
+        m_commentFormat.setForeground(QColor("#94a3b8"));
+        m_commentFormat.setFontItalic(true);
 
-        numberFormat.setForeground(QColor("#c084fc"));
+        m_numberFormat.setForeground(QColor("#c084fc"));
 
-        preprocessorFormat.setForeground(QColor("#a855f7"));
-        preprocessorFormat.setFontWeight(QFont::Bold);
+        m_preprocessorFormat.setForeground(QColor("#a855f7"));
+        m_preprocessorFormat.setFontWeight(QFont::Bold);
 
-        tagFormat.setForeground(QColor("#60a5fa"));
-        tagFormat.setFontWeight(QFont::Bold);
+        m_tagFormat.setForeground(QColor("#60a5fa"));
+        m_tagFormat.setFontWeight(QFont::Bold);
 
-        attributeFormat.setForeground(QColor("#fbbf24"));
+        m_attributeFormat.setForeground(QColor("#fbbf24"));
 
-        cssPropertyFormat.setForeground(QColor("#2dd4bf"));
-        cssPropertyFormat.setFontWeight(QFont::Bold);
+        m_cssPropertyFormat.setForeground(QColor("#2dd4bf"));
+        m_cssPropertyFormat.setFontWeight(QFont::Bold);
 
-        variableFormat.setForeground(QColor("#38bdf8"));
-        variableFormat.setFontWeight(QFont::Bold);
+        m_variableFormat.setForeground(QColor("#38bdf8"));
+        m_variableFormat.setFontWeight(QFont::Bold);
 
-        functionFormat.setForeground(QColor("#f97316"));
-        functionFormat.setFontWeight(QFont::Bold);
+        m_functionFormat.setForeground(QColor("#f97316"));
+        m_functionFormat.setFontWeight(QFont::Bold);
 
-        escapeFormat.setForeground(QColor("#22d3ee"));
+        m_escapeFormat.setForeground(QColor("#22d3ee"));
 
-        trailingSpaceFormat.setBackground(QColor("#7f1d1d"));
+        m_trailingSpaceFormat.setBackground(QColor("#7f1d1d"));
     } else {
-        keywordFormat.setForeground(QColor("#1d4ed8"));
-        keywordFormat.setFontWeight(QFont::Bold);
+        m_keywordFormat.setForeground(QColor("#1d4ed8"));
+        m_keywordFormat.setFontWeight(QFont::Bold);
 
-        stringFormat.setForeground(QColor("#15803d"));
+        m_stringFormat.setForeground(QColor("#15803d"));
 
-        commentFormat.setForeground(QColor("#64748b"));
-        commentFormat.setFontItalic(true);
+        m_commentFormat.setForeground(QColor("#64748b"));
+        m_commentFormat.setFontItalic(true);
 
-        numberFormat.setForeground(QColor("#9333ea"));
+        m_numberFormat.setForeground(QColor("#9333ea"));
 
-        preprocessorFormat.setForeground(QColor("#7e22ce"));
-        preprocessorFormat.setFontWeight(QFont::Bold);
+        m_preprocessorFormat.setForeground(QColor("#7e22ce"));
+        m_preprocessorFormat.setFontWeight(QFont::Bold);
 
-        tagFormat.setForeground(QColor("#2563eb"));
-        tagFormat.setFontWeight(QFont::Bold);
+        m_tagFormat.setForeground(QColor("#2563eb"));
+        m_tagFormat.setFontWeight(QFont::Bold);
 
-        attributeFormat.setForeground(QColor("#a16207"));
+        m_attributeFormat.setForeground(QColor("#a16207"));
 
-        cssPropertyFormat.setForeground(QColor("#0f766e"));
-        cssPropertyFormat.setFontWeight(QFont::Bold);
+        m_cssPropertyFormat.setForeground(QColor("#0f766e"));
+        m_cssPropertyFormat.setFontWeight(QFont::Bold);
 
-        variableFormat.setForeground(QColor("#0369a1"));
-        variableFormat.setFontWeight(QFont::Bold);
+        m_variableFormat.setForeground(QColor("#0369a1"));
+        m_variableFormat.setFontWeight(QFont::Bold);
 
-        functionFormat.setForeground(QColor("#d97706"));
-        functionFormat.setFontWeight(QFont::Bold);
+        m_functionFormat.setForeground(QColor("#d97706"));
+        m_functionFormat.setFontWeight(QFont::Bold);
 
-        escapeFormat.setForeground(QColor("#0e7490"));
+        m_escapeFormat.setForeground(QColor("#0e7490"));
 
-        trailingSpaceFormat.setBackground(QColor("#fecaca"));
+        m_trailingSpaceFormat.setBackground(QColor("#fecaca"));
     }
 }
 
@@ -251,181 +244,255 @@ void CodeHighlighter::addRule(const QString &pattern, const QTextCharFormat &for
     rule.pattern = QRegularExpression(pattern);
     rule.format = format;
     rule.captureIndex = captureIndex;
-    rules.append(rule);
+    m_rules.append(rule);
 }
 
-void CodeHighlighter::setupCStyle()
+void CodeHighlighter::rebuildRules()
 {
-    addRule("\\b(alignas|alignof|and|and_eq|asm|auto|bitand|bitor|break|case|catch|char|char8_t|char16_t|char32_t|class|compl|concept|const|consteval|constexpr|constinit|const_cast|continue|co_await|co_return|co_yield|decltype|default|delete|do|double|dynamic_cast|else|enum|explicit|export|extern|false|for|friend|goto|if|inline|int|long|mutable|namespace|new|noexcept|not|not_eq|nullptr|operator|or|or_eq|private|protected|public|register|reinterpret_cast|requires|return|short|signed|sizeof|static|static_assert|static_cast|struct|switch|template|this|thread_local|throw|true|try|typedef|typeid|typename|union|unsigned|using|virtual|void|volatile|while|xor|xor_eq)\\b", keywordFormat);
-    addRule("\\b(?!if\\b)(?!for\\b)(?!while\\b)(?!switch\\b)(?!catch\\b)(?!return\\b)(?!sizeof\\b)(?!typeof\\b)(?!new\\b)(?!delete\\b)([A-Za-z_]\\w*)\\s*(?=\\()", functionFormat, 1);
-    addRule("\\bint\\s+(?:\\*\\s*)?([A-Za-z_]\\w*)", variableFormat, 1);
-    addRule("\\bfloat\\s+(?:\\*\\s*)?([A-Za-z_]\\w*)", variableFormat, 1);
-    addRule("\\bdouble\\s+(?:\\*\\s*)?([A-Za-z_]\\w*)", variableFormat, 1);
-    addRule("\\bchar\\s+(?:\\*\\s*)?([A-Za-z_]\\w*)", variableFormat, 1);
-    addRule("\\bbool\\s+(?:\\*\\s*)?([A-Za-z_]\\w*)", variableFormat, 1);
-    addRule("\\bauto\\s+(?:\\*\\s*)?([A-Za-z_]\\w*)", variableFormat, 1);
-    addRule("\\bString\\s+(?:\\*\\s*)?([A-Za-z_]\\w*)", variableFormat, 1);
-    addRule("[ \\t]+$", trailingSpaceFormat);
-    addRule("\\b\\d+(?:\\.\\d+)?(?:[fFlLuU]|ll|LL)?\\b", numberFormat);
-    addRule("\"(?:\\\\.|[^\"\\\\])*\"", stringFormat);
-    addRule("'(?:\\\\.|[^'\\\\])*'", stringFormat);
-    addRule("#\\s*\\w+.*", preprocessorFormat);
-    addRule("//[^\\n]*", commentFormat);
+    m_rules.clear();
+    m_languageKey = m_language + (m_darkMode ? "_dark" : "_light");
+
+    // Check cache first
+    if (const LanguageFormats *cached = m_formatCache.object(m_languageKey)) {
+        m_rules = cached->rules;
+        return;
+    }
+
+    // Always add trailing space rule
+    addRule("[ \\t]+$", m_trailingSpaceFormat);
+
+    if (!m_langDef || m_language == "text") {
+        // No rules for plain text beyond trailing spaces
+        auto *formats = new LanguageFormats();
+        formats->rules = m_rules;
+        m_formatCache.insert(m_languageKey, formats);
+        return;
+    }
+
+    const QString &lang = m_language;
+
+    // ---- Keywords ----
+    if (!m_langDef->keywords.isEmpty()) {
+        const QString kwPatternStr = "\\b(" + m_langDef->keywords.join("|") + ")\\b";
+        addRule(kwPatternStr, m_keywordFormat);
+    }
+
+    // ---- Builtins as variable format ----
+    if (!m_langDef->builtins.isEmpty()) {
+        const QString builtinPattern = "\\b(" + m_langDef->builtins.join("|") + ")\\b";
+        addRule(builtinPattern, m_variableFormat);
+    }
+
+    // ---- Language-specific rules ----
+    if (lang == "python") {
+        addRule("^\\s*def\\s+([A-Za-z_]\\w*)\\s*(?=\\()", m_functionFormat, 1);
+        addRule("^\\s*class\\s+([A-Za-z_]\\w*)", m_keywordFormat, 1);
+        addRule("^\\s*([A-Za-z_]\\w*)\\s*(?==)", m_variableFormat, 1);
+        addRule(numberPattern(), m_numberFormat);
+        addRule("\"(?:\\\\.|[^\"\\\\])*\"", m_stringFormat);
+        addRule("'(?:\\\\.|[^'\\\\])*'", m_stringFormat);
+        addRule("#[^\\n]*", m_commentFormat);
+    } else if (lang == "cpp" || lang == "c") {
+        addRule(functionCallPattern(), m_functionFormat, 1);
+        addRule("\\b(int|long|float|double|char|bool|auto|void|short|signed|unsigned|size_t|ssize_t|int8_t|int16_t|int32_t|int64_t|uint8_t|uint16_t|uint32_t|uint64_t|wchar_t|char16_t|char32_t|String|QString)\\s+(?:\\*\\s*)?([A-Za-z_]\\w*)", m_variableFormat, 2);
+        addRule(numberPattern("(?:[fFlLuU]|ll|LL)?"), m_numberFormat);
+        addRule("\"(?:\\\\.|[^\"\\\\])*\"", m_stringFormat);
+        addRule("'(?:\\\\.|[^'\\\\])*'", m_stringFormat);
+        addRule("#\\s*\\w+.*", m_preprocessorFormat);
+        addRule("//[^\\n]*", m_commentFormat);
+    } else if (lang == "java") {
+        addRule(functionCallPattern(), m_functionFormat, 1);
+        addRule("\\b(int|long|float|double|char|boolean|byte|short|String)\\s+(?:final\\s+)?(?:\\*\\s*)?([A-Za-z_]\\w*)", m_variableFormat, 2);
+        addRule("\\bvar\\s+([A-Za-z_]\\w*)", m_variableFormat, 1);
+        addRule(numberPattern("[fFdDlL]?"), m_numberFormat);
+        addRule("\"(?:\\\\.|[^\"\\\\])*\"", m_stringFormat);
+        addRule("'(?:\\\\.|[^'\\\\])*'", m_stringFormat);
+        addRule("//[^\\n]*", m_commentFormat);
+    } else if (lang == "javascript" || lang == "typescript") {
+        addRule(functionCallPattern(), m_functionFormat, 1);
+        addRule("\\b(let|const|var)\\s+([A-Za-z_]\\w*)", m_variableFormat, 2);
+        addRule(numberPattern(), m_numberFormat);
+        addRule("\"(?:\\\\.|[^\"\\\\])*\"", m_stringFormat);
+        addRule("'(?:\\\\.|[^'\\\\])*'", m_stringFormat);
+        if (m_langDef->templateStringDelimiter == "`") {
+            addRule("`(?:\\\\.|[^`\\\\])*`", m_stringFormat);
+        }
+        addRule("//[^\\n]*", m_commentFormat);
+    } else if (lang == "rust") {
+        addRule("\\bfn\\s+([A-Za-z_]\\w*)\\s*(?=\\()", m_functionFormat, 1);
+        addRule(functionCallPattern(), m_functionFormat, 1);
+        addRule("\\blet\\s+(?:mut\\s+)?([A-Za-z_]\\w*)", m_variableFormat, 1);
+        addRule(numberPattern("(?:_\\d+)*(?:\\.\\d+(?:_\\d+)*)?(?:[eE][+-]?\\d+)?(?:f32|f64|i8|i16|i32|i64|i128|isize|u8|u16|u32|u64|u128|usize)?"), m_numberFormat);
+        addRule("\"(?:\\\\.|[^\"\\\\])*\"", m_stringFormat);
+        addRule("'(?:\\\\.|[^'\\\\])*'", m_stringFormat);
+        addRule("//[^\\n]*", m_commentFormat);
+    } else if (lang == "go") {
+        addRule("\\bfunc\\s+(?:\\([^)]*\\)\\s*)?([A-Za-z_]\\w*)\\s*(?=\\()", m_functionFormat, 1);
+        addRule(functionCallPattern(), m_functionFormat, 1);
+        addRule("\\bvar\\s+([A-Za-z_]\\w*)", m_variableFormat, 1);
+        addRule(":\\s*=\\s*([A-Za-z_]\\w*)", m_variableFormat, 1);
+        addRule(numberPattern("(?:[iI]|[eE][+-]?\\d+)?"), m_numberFormat);
+        addRule("\"(?:\\\\.|[^\"\\\\])*\"", m_stringFormat);
+        addRule("'(?:\\\\.|[^'\\\\])*'", m_stringFormat);
+        addRule("`[^`]*`", m_stringFormat);
+        addRule("//[^\\n]*", m_commentFormat);
+    } else if (lang == "shell") {
+        addRule(numberPattern(), m_numberFormat);
+        addRule("\"(?:\\\\.|[^\"\\\\])*\"", m_stringFormat);
+        addRule("^\\s*([A-Za-z_]\\w*)\\s*\\(\\s*\\)", m_functionFormat, 1);
+        addRule("'[^']*'", m_stringFormat);
+        addRule("#[^\\n]*", m_commentFormat);
+        addRule("\\$\\{?[A-Za-z_][A-Za-z0-9_]*\\}?", m_variableFormat);
+    } else if (lang == "swift") {
+        addRule(functionCallPattern(), m_functionFormat, 1);
+        addRule("\\b(func|var|let)\\s+([A-Za-z_]\\w*)", m_variableFormat, 2);
+        addRule(numberPattern(), m_numberFormat);
+        addRule("\"(?:\\\\.|[^\"\\\\])*\"", m_stringFormat);
+        addRule("//[^\\n]*", m_commentFormat);
+    } else if (lang == "kotlin") {
+        addRule(functionCallPattern(), m_functionFormat, 1);
+        addRule("\\b(fun|val|var|lateinit\\s+var)\\s+([A-Za-z_]\\w*)", m_variableFormat, 2);
+        addRule(numberPattern(), m_numberFormat);
+        addRule("\"(?:\\\\.|[^\"\\\\])*\"", m_stringFormat);
+        addRule("//[^\\n]*", m_commentFormat);
+    } else if (lang == "ruby") {
+        addRule(functionCallPattern(), m_functionFormat, 1);
+        addRule("\\b(def|alias)\\s+([A-Za-z_]\\w*)", m_variableFormat, 2);
+        addRule(numberPattern(), m_numberFormat);
+        addRule("\"(?:\\\\.|[^\"\\\\])*\"", m_stringFormat);
+        addRule("'(?:\\\\.|[^'\\\\])*'", m_stringFormat);
+        addRule("#[^\\n]*", m_commentFormat);
+    } else if (lang == "php") {
+        addRule(functionCallPattern(), m_functionFormat, 1);
+        addRule("\\$(\\w+)", m_variableFormat);
+        addRule(numberPattern(), m_numberFormat);
+        addRule("\"(?:\\\\.|[^\"\\\\])*\"", m_stringFormat);
+        addRule("'(?:\\\\.|[^'\\\\])*'", m_stringFormat);
+        addRule("//[^\\n]*", m_commentFormat);
+        addRule("#[^\\n]*", m_commentFormat);  // PHP also uses # for comments
+    } else if (lang == "csharp") {
+        addRule(functionCallPattern(), m_functionFormat, 1);
+        addRule("\\b(int|long|float|double|char|bool|byte|short|decimal|string|var|object|dynamic)\\s+(\\w+)", m_variableFormat, 2);
+        addRule(numberPattern("[fFdDmMlL]?"), m_numberFormat);
+        addRule("\"(?:\\\\.|[^\"\\\\])*\"", m_stringFormat);
+        addRule("'(?:\\\\.|[^'\\\\])*'", m_stringFormat);
+        addRule("//[^\\n]*", m_commentFormat);
+    } else if (lang == "dart") {
+        addRule(functionCallPattern(), m_functionFormat, 1);
+        addRule("\\b(var|final|const|late)\\s+([A-Za-z_]\\w*)", m_variableFormat, 2);
+        addRule(numberPattern(), m_numberFormat);
+        addRule("\"(?:\\\\.|[^\"\\\\])*\"", m_stringFormat);
+        addRule("'(?:\\\\.|[^'\\\\])*'", m_stringFormat);
+        addRule("//[^\\n]*", m_commentFormat);
+    } else if (lang == "lua") {
+        addRule("\\bfunction\\s+(?:[A-Za-z_]\\w*\\s*\\.\\s*)?([A-Za-z_]\\w*)\\s*(?=\\()", m_functionFormat, 1);
+        addRule(numberPattern(), m_numberFormat);
+        addRule("\"(?:\\\\.|[^\"\\\\])*\"", m_stringFormat);
+        addRule("'(?:\\\\.|[^'\\\\])*'", m_stringFormat);
+        addRule("\\[\\[.*?\\]\\]", m_stringFormat);
+        addRule("--\\[\\[.*?\\]\\]", m_commentFormat);
+        addRule("--[^\\n]*", m_commentFormat);
+    } else if (lang == "r") {
+        addRule(functionCallPattern(), m_functionFormat, 1);
+        addRule(numberPattern(), m_numberFormat);
+        addRule("\"(?:\\\\.|[^\"\\\\])*\"", m_stringFormat);
+        addRule("'(?:\\\\.|[^'\\\\])*'", m_stringFormat);
+        addRule("#[^\\n]*", m_commentFormat);
+    } else if (lang == "scala") {
+        addRule(functionCallPattern(), m_functionFormat, 1);
+        addRule("\\b(var|val|def|val\\s+lazy)\\s+([A-Za-z_]\\w*)", m_variableFormat, 2);
+        addRule(numberPattern(), m_numberFormat);
+        addRule("\"(?:\\\\.|[^\"\\\\])*\"", m_stringFormat);
+        addRule("'(?:\\\\.|[^'\\\\])*'", m_stringFormat);
+        addRule("//[^\\n]*", m_commentFormat);
+    } else if (lang == "objectivec") {
+        addRule(functionCallPattern(), m_functionFormat, 1);
+        addRule("@\\w+", m_preprocessorFormat);
+        addRule(numberPattern(), m_numberFormat);
+        addRule("\"(?:\\\\.|[^\"\\\\])*\"", m_stringFormat);
+        addRule("'(?:\\\\.|[^'\\\\])*'", m_stringFormat);
+        addRule("//[^\\n]*", m_commentFormat);
+    } else if (lang == "yaml" || lang == "toml") {
+        addRule("#[^\\n]*", m_commentFormat);
+        addRule("\"(?:\\\\.|[^\"\\\\])*\"", m_stringFormat);
+        addRule("'(?:\\\\.|[^'\\\\])*'", m_stringFormat);
+        addRule("^\\s*\\w+(?=\\s*:)", m_keywordFormat);
+        addRule(numberPattern(), m_numberFormat);
+    } else if (lang == "json") {
+        addRule("\"(?:\\\\.|[^\"\\\\])*\"", m_stringFormat);
+        addRule(numberPattern(), m_numberFormat);
+        addRule("\\b(true|false|null)\\b", m_keywordFormat);
+        addRule("//[^\\n]*", m_commentFormat);
+    } else if (lang == "markdown") {
+        addRule("^#{1,6}\\s.*$", m_keywordFormat);
+        addRule("\\*\\*\\S(?:.*?\\S)?\\*\\*", m_stringFormat);
+        addRule("__(?:.*?)__", m_stringFormat);
+        addRule("\\*(?:.*?)\\*", m_commentFormat);
+        addRule("`[^`]+`", m_numberFormat);
+        addRule("^\\s*[-*+]\\s", m_variableFormat);
+        addRule("^\\s*\\d+\\.\\s", m_numberFormat);
+    } else if (lang == "sql") {
+        addRule("--[^\\n]*", m_commentFormat);
+        addRule("'(?:\\\\.|[^'\\\\])*'", m_stringFormat);
+        addRule(numberPattern(), m_numberFormat);
+    } else if (lang == "perl") {
+        addRule(functionCallPattern(), m_functionFormat, 1);
+        addRule("\\$\\{?\\w+\\}?", m_variableFormat);
+        addRule("@\\w+", m_variableFormat);
+        addRule("%\\w+", m_variableFormat);
+        addRule(numberPattern(), m_numberFormat);
+        addRule("\"(?:\\\\.|[^\"\\\\])*\"", m_stringFormat);
+        addRule("'(?:\\\\.|[^'\\\\])*'", m_stringFormat);
+        addRule("#[^\\n]*", m_commentFormat);
+    } else if (lang == "haskell") {
+        addRule("^[A-Z][A-Za-z_0-9]*\\s*(?=::)", m_functionFormat);
+        addRule(functionCallPattern(), m_functionFormat, 1);
+        addRule(numberPattern(), m_numberFormat);
+        addRule("\"(?:\\\\.|[^\"\\\\])*\"", m_stringFormat);
+        addRule("'[^']*'", m_stringFormat);
+        addRule("--[^\\n]*", m_commentFormat);
+    } else if (lang == "elixir") {
+        addRule("\\bdef(?:p|macro|guard|guardp)?\\s+([A-Za-z_]\\w*)", m_functionFormat, 1);
+        addRule(numberPattern(), m_numberFormat);
+        addRule("\"(?:\\\\.|[^\"\\\\])*\"", m_stringFormat);
+        addRule("'(?:\\\\.|[^'\\\\])*'", m_stringFormat);
+        addRule("#[^\\n]*", m_commentFormat);
+    } else if (lang == "html") {
+        addRule("<\\s*/?\\s*([A-Za-z][A-Za-z0-9:-]*)", m_tagFormat, 1);
+        addRule("\\s([A-Za-z_:][A-Za-z0-9:_.-]*)\\s*=", m_attributeFormat, 1);
+        addRule("\"(?:\\\\.|[^\"\\\\])*\"", m_stringFormat);
+        addRule("'(?:\\\\.|[^'\\\\])*'", m_stringFormat);
+    } else if (lang == "css") {
+        const QStringList cssProps = {"color", "background", "background-color", "margin",
+            "padding", "display", "position", "top", "right", "bottom", "left",
+            "width", "height", "min-width", "max-width", "min-height", "max-height",
+            "font", "font-size", "font-weight", "font-family", "flex", "grid", "gap",
+            "border", "border-radius", "overflow", "z-index", "cursor", "opacity",
+            "transform", "transition", "box-shadow", "text-align", "line-height"};
+        addRule("\\b(" + cssProps.join("|") + ")\\s*:", m_cssPropertyFormat, 1);
+        addRule("\\b(rgb|hsl|calc|var|clamp|min|max)\\s*(?=\\()", m_functionFormat, 1);
+        addRule(numberPattern("(?:px|em|rem|%|vh|vw|s|ms)?"), m_numberFormat);
+        addRule("\"(?:\\\\.|[^\"\\\\])*\"", m_stringFormat);
+        addRule("'(?:\\\\.|[^'\\\\])*'", m_stringFormat);
+    } else if (lang == "script") {
+        addRule("\\b(print|let|var|true|false)\\b", m_keywordFormat);
+        addRule(functionCallPattern(), m_functionFormat, 1);
+        addRule("\\b(let|var)\\s+([A-Za-z_]\\w*)", m_variableFormat, 2);
+        addRule("\\b([A-Za-z_]\\w*)\\b", m_variableFormat);
+        addRule(numberPattern(), m_numberFormat);
+        addRule("\"(?:\\\\.|[^\"\\\\])*\"", m_stringFormat);
+        addRule("#[^\\n]*", m_commentFormat);
+    }
+
+    // Cache the built rules
+    auto *formats = new LanguageFormats();
+    formats->rules = m_rules;
+    m_formatCache.insert(m_languageKey, formats);
 }
 
-void CodeHighlighter::setupPython()
-{
-    addRule("\\b(False|None|True|and|as|assert|async|await|break|class|continue|def|del|elif|else|except|finally|for|from|global|if|import|in|is|lambda|nonlocal|not|or|pass|raise|return|try|while|with|yield)\\b", keywordFormat);
-    addRule("^\\s*def\\s+([A-Za-z_]\\w*)\\s*(?=\\()", functionFormat, 1);
-    addRule("\\b(print|len|range|str|int|float|list|dict|set|tuple|open|sum|enumerate|zip|map|filter|sorted|reversed|abs|round|isinstance|issubclass|super|property|staticmethod|classmethod)\\b", variableFormat);
-    addRule("\\b(?!if\\b)(?!for\\b)(?!while\\b)(?!return\\b)(?!print\\b)(?!len\\b)(?!range\\b)(?!str\\b)(?!int\\b)(?!float\\b)(?!list\\b)(?!dict\\b)(?!set\\b)(?!tuple\\b)(?!open\\b)([A-Za-z_]\\w*)\\s*(?=\\()", functionFormat, 1);
-    addRule("^\\s*([A-Za-z_]\\w*)\\s*(?==)", variableFormat, 1);
-    addRule("[ \\t]+$", trailingSpaceFormat);
-    addRule("\\b\\d+(?:\\.\\d+)?\\b", numberFormat);
-    addRule("\"(?:\\\\.|[^\"\\\\])*\"", stringFormat);
-    addRule("'(?:\\\\.|[^'\\\\])*'", stringFormat);
-    addRule("#[^\\n]*", commentFormat);
-}
-
-void CodeHighlighter::setupJava()
-{
-    addRule("\\b(abstract|assert|boolean|break|byte|case|catch|char|class|const|continue|default|do|double|else|enum|extends|final|finally|float|for|goto|if|implements|import|instanceof|int|interface|long|native|new|package|private|protected|public|return|short|static|strictfp|super|switch|synchronized|this|throw|throws|transient|try|void|volatile|while|var|record|sealed|permits|yields)\\b", keywordFormat);
-    addRule("\\b(?!if\\b)(?!for\\b)(?!while\\b)(?!switch\\b)(?!catch\\b)(?!return\\b)([A-Za-z_]\\w*)\\s*(?=\\()", functionFormat, 1);
-    addRule("\\bint\\s+(?:final\\s+)?(?:\\*\\s*)?([A-Za-z_]\\w*)", variableFormat, 1);
-    addRule("\\bString\\s+(?:final\\s+)?(?:\\*\\s*)?([A-Za-z_]\\w*)", variableFormat, 1);
-    addRule("\\bvar\\s+([A-Za-z_]\\w*)", variableFormat, 1);
-    addRule("=\\s*([A-Za-z_]\\w*)\\s*(?==)", variableFormat, 1);
-    addRule(",\\s*([A-Za-z_]\\w*)\\s*(?==)", variableFormat, 1);
-    addRule("\\(\\s*([A-Za-z_]\\w*)\\s*(?==)", variableFormat, 1);
-    addRule("[ \\t]+$", trailingSpaceFormat);
-    addRule("\\b\\d+(?:\\.\\d+)?[fFdDlL]?\\b", numberFormat);
-    addRule("\"(?:\\\\.|[^\"\\\\])*\"", stringFormat);
-    addRule("'(?:\\\\.|[^'\\\\])*'", stringFormat);
-    addRule("//[^\\n]*", commentFormat);
-}
-
-void CodeHighlighter::setupJavaScript()
-{
-    addRule("\\b(async|await|break|case|catch|class|const|continue|debugger|default|delete|do|else|export|extends|false|finally|for|function|if|import|in|instanceof|let|new|null|of|return|super|switch|this|throw|true|try|typeof|undefined|var|void|while|with|yield|static|get|set)\\b", keywordFormat);
-    addRule("\\b\\d+(?:\\.\\d+)?\\b", numberFormat);
-    addRule("\"(?:\\\\.|[^\"\\\\])*\"", stringFormat);
-    addRule("\\b(?!if\\b)(?!for\\b)(?!while\\b)(?!switch\\b)(?!catch\\b)(?!return\\b)(?!typeof\\b)(?!delete\\b)(?!void\\b)([A-Za-z_]\\w*)\\s*(?=\\()", functionFormat, 1);
-    addRule("\\blet\\s+([A-Za-z_]\\w*)", variableFormat, 1);
-    addRule("\\bconst\\s+([A-Za-z_]\\w*)", variableFormat, 1);
-    addRule("\\bvar\\s+([A-Za-z_]\\w*)", variableFormat, 1);
-    addRule("=\\s*([A-Za-z_]\\w*)\\s*(?==)", variableFormat, 1);
-    addRule(",\\s*([A-Za-z_]\\w*)\\s*(?==)", variableFormat, 1);
-    addRule("\\(\\s*([A-Za-z_]\\w*)\\s*(?==)", variableFormat, 1);
-    addRule("[ \\t]+$", trailingSpaceFormat);
-    addRule("'(?:\\\\.|[^'\\\\])*'", stringFormat);
-    addRule("`(?:\\\\.|[^`\\\\])*`", stringFormat);
-    addRule("//[^\\n]*", commentFormat);
-}
-
-void CodeHighlighter::setupTypeScript()
-{
-    addRule("\\b(abstract|any|as|async|await|boolean|break|case|catch|class|const|continue|debugger|declare|default|delete|do|else|enum|export|extends|false|finally|for|from|function|get|if|implements|import|in|instanceof|interface|keyof|let|module|namespace|new|null|number|object|of|private|protected|public|readonly|return|set|static|string|super|switch|symbol|this|throw|true|try|type|typeof|undefined|unknown|var|void|while|with|yield)\\b", keywordFormat);
-    addRule("\\b(?!if\\b)(?!for\\b)(?!while\\b)(?!switch\\b)(?!catch\\b)(?!return\\b)(?!typeof\\b)(?!delete\\b)(?!void\\b)([A-Za-z_]\\w*)\\s*(?=\\()", functionFormat, 1);
-    addRule("\\blet\\s+([A-Za-z_]\\w*)", variableFormat, 1);
-    addRule("\\bconst\\s+([A-Za-z_]\\w*)", variableFormat, 1);
-    addRule("\\bvar\\s+([A-Za-z_]\\w*)", variableFormat, 1);
-    addRule("=\\s*([A-Za-z_]\\w*)\\s*(?==)", variableFormat, 1);
-    addRule(",\\s*([A-Za-z_]\\w*)\\s*(?==)", variableFormat, 1);
-    addRule("\\(\\s*([A-Za-z_]\\w*)\\s*(?==)", variableFormat, 1);
-    addRule("[ \\t]+$", trailingSpaceFormat);
-    addRule("\\b\\d+(?:\\.\\d+)?\\b", numberFormat);
-    addRule("\"(?:\\\\.|[^\"\\\\])*\"", stringFormat);
-    addRule("'(?:\\\\.|[^'\\\\])*'", stringFormat);
-    addRule("`(?:\\\\.|[^`\\\\])*`", stringFormat);
-    addRule("//[^\\n]*", commentFormat);
-}
-
-void CodeHighlighter::setupRust()
-{
-    addRule("\\b(as|async|await|break|const|continue|crate|dyn|else|enum|extern|false|fn|for|if|impl|in|let|loop|match|mod|move|mut|pub|ref|return|self|Self|static|struct|super|trait|true|type|unsafe|use|where|while)\\b", keywordFormat);
-    addRule("\\bfn\\s+([A-Za-z_]\\w*)\\s*(?=\\()", functionFormat, 1);
-    addRule("\\b(?!if\\b)(?!for\\b)(?!while\\b)(?!match\\b)(?!loop\\b)(?!return\\b)([A-Za-z_]\\w*)\\s*(?=\\()", functionFormat, 1);
-    addRule("\\blet\\s+(?:mut\\s+)?([A-Za-z_]\\w*)", variableFormat, 1);
-    addRule("=\\s*([A-Za-z_]\\w*)\\s*(?==)", variableFormat, 1);
-    addRule(",\\s*([A-Za-z_]\\w*)\\s*(?==)", variableFormat, 1);
-    addRule("\\(\\s*([A-Za-z_]\\w*)\\s*(?==)", variableFormat, 1);
-    addRule("[ \\t]+$", trailingSpaceFormat);
-    addRule("\\b\\d+(?:_\\d+)*(?:\\.\\d+(?:_\\d+)*)?(?:[eE][+-]?\\d+)?(?:f32|f64|i8|i16|i32|i64|i128|isize|u8|u16|u32|u64|u128|usize)?\\b", numberFormat);
-    addRule("\"(?:\\\\.|[^\"\\\\])*\"", stringFormat);
-    addRule("'(?:\\\\.|[^'\\\\])*'", stringFormat);
-    addRule("//[^\\n]*", commentFormat);
-}
-
-void CodeHighlighter::setupGo()
-{
-    addRule("\\b(break|default|func|interface|select|case|defer|go|map|struct|chan|else|goto|package|switch|const|fallthrough|if|range|type|continue|for|import|return|var)\\b", keywordFormat);
-    addRule("\\bfunc\\s+(?:\\([^)]*\\)\\s*)?([A-Za-z_]\\w*)\\s*(?=\\()", functionFormat, 1);
-    addRule("\\b(?!if\\b)(?!for\\b)(?!range\\b)(?!switch\\b)(?!select\\b)(?!defer\\b)(?!go\\b)([A-Za-z_]\\w*)\\s*(?=\\()", functionFormat, 1);
-    addRule("\\bvar\\s+([A-Za-z_]\\w*)", variableFormat, 1);
-    addRule("=\\s*([A-Za-z_]\\w*)\\s*(?==)", variableFormat, 1);
-    addRule(":\\s*=\\s*([A-Za-z_]\\w*)", variableFormat, 1);
-    addRule("[ \\t]+$", trailingSpaceFormat);
-    addRule("\\b\\d+(?:\\.\\d+)?(?:[iI]|[eE][+-]?\\d+)?\\b", numberFormat);
-    addRule("\"(?:\\\\.|[^\"\\\\])*\"", stringFormat);
-    addRule("'(?:\\\\.|[^'\\\\])*'", stringFormat);
-    addRule("`[^`]*`", stringFormat);
-    addRule("//[^\\n]*", commentFormat);
-}
-
-void CodeHighlighter::setupShell()
-{
-    addRule("\\b(if|then|else|elif|fi|for|while|do|done|case|esac|function|select|in|time|coproc)\\b", keywordFormat);
-    addRule("\\b\\d+\\b", numberFormat);
-    addRule("\"(?:\\\\.|[^\"\\\\])*\"", stringFormat);
-    addRule("^\\s*([A-Za-z_]\\w*)\\s*\\(\\s*\\)", functionFormat, 1);
-    addRule("[ \\t]+$", trailingSpaceFormat);
-    addRule("'[^']*'", stringFormat);
-    addRule("#[^\\n]*", commentFormat);
-    addRule("\\$\\{?[A-Za-z_][A-Za-z0-9_]*\\}?", variableFormat);
-}
-
-void CodeHighlighter::setupHtml()
-{
-    addRule("<\\s*/?\\s*([A-Za-z][A-Za-z0-9:-]*)", tagFormat, 1);
-    addRule("\\s([A-Za-z_:][A-Za-z0-9:_.-]*)\\s*=", attributeFormat, 1);
-    addRule("[ \\t]+$", trailingSpaceFormat);
-    addRule("\"(?:\\\\.|[^\"\\\\])*\"", stringFormat);
-    addRule("'(?:\\\\.|[^'\\\\])*'", stringFormat);
-}
-
-void CodeHighlighter::setupCss()
-{
-    addRule("\\b(color|background|background-color|margin|padding|display|position|top|right|bottom|left|width|height|min-width|max-width|min-height|max-height|font|font-size|font-weight|font-family|flex|grid|gap|border|border-radius|overflow|z-index|cursor|opacity|transform|transition|box-shadow|text-align|line-height)\\s*:", cssPropertyFormat, 1);
-    addRule("\\b(rgb|hsl|calc|var|clamp|min|max)\\s*(?=\\()", functionFormat, 1);
-    addRule("[ \\t]+$", trailingSpaceFormat);
-    addRule("\\b\\d+(?:\\.\\d+)?(?:px|em|rem|%|vh|vw|s|ms)?\\b", numberFormat);
-    addRule("\"(?:\\\\.|[^\"\\\\])*\"", stringFormat);
-    addRule("'(?:\\\\.|[^'\\\\])*'", stringFormat);
-}
-
-void CodeHighlighter::setupScript()
-{
-    // Script language keywords: print, let, var, true, false
-    addRule("\\b(print|let|var|true|false)\\b", keywordFormat);
-    // Function calls (print is already highlighted as keyword)
-    addRule("\\b(?!print\\b)(?!let\\b)(?!var\\b)(?!true\\b)(?!false\\b)([A-Za-z_]\\w*)\\s*(?=\\()", functionFormat, 1);
-    // Variable declarations
-    addRule("\\b(let|var)\\s+([A-Za-z_]\\w*)", variableFormat, 2);
-    // Identifiers
-    addRule("\\b([A-Za-z_]\\w*)\\b", variableFormat);
-    // Numbers
-    addRule("\\b\\d+(?:\\.\\d+)?\\b", numberFormat);
-    // Strings
-    addRule("\"(?:\\\\.|[^\"\\\\])*\"", stringFormat);
-    // Comments
-    addRule("#[^\\n]*", commentFormat);
-    // Trailing spaces
-    addRule("[ \\t]+$", trailingSpaceFormat);
-}
-
-void CodeHighlighter::setupPlainText()
-{
-}
+// -----------------------------------------------------------------------
+// Multi-line construct handlers
+// -----------------------------------------------------------------------
 
 void CodeHighlighter::handleCStyleBlockComment(const QString &text)
 {
@@ -434,11 +501,11 @@ void CodeHighlighter::handleCStyleBlockComment(const QString &text)
     if (previousBlockState() == BlockInComment) {
         index = text.indexOf("*/");
         if (index >= 0) {
-            setFormat(0, index + 2, commentFormat);
+            setFormat(0, index + 2, m_commentFormat);
             setCurrentBlockState(BlockNormal);
-            index = 0;
+            index = 0; // Continue scanning for more comments
         } else {
-            setFormat(0, text.length(), commentFormat);
+            setFormat(0, text.length(), m_commentFormat);
             setCurrentBlockState(BlockInComment);
             return;
         }
@@ -457,7 +524,7 @@ void CodeHighlighter::handleCStyleBlockComment(const QString &text)
             setCurrentBlockState(BlockInComment);
         }
 
-        setFormat(start, length, commentFormat);
+        setFormat(start, length, m_commentFormat);
 
         if (currentBlockState() == BlockInComment)
             return;
@@ -472,22 +539,22 @@ void CodeHighlighter::handlePythonTripleString(const QString &text)
     if (prevState == BlockInTripleDouble) {
         const int end = text.indexOf("\"\"\"");
         if (end >= 0) {
-            setFormat(0, end + 3, stringFormat);
+            setFormat(0, end + 3, m_stringFormat);
             start = end + 3;
             setCurrentBlockState(BlockNormal);
         } else {
-            setFormat(0, text.length(), stringFormat);
+            setFormat(0, text.length(), m_stringFormat);
             setCurrentBlockState(BlockInTripleDouble);
             return;
         }
     } else if (prevState == BlockInTripleSingle) {
         const int end = text.indexOf("'''");
         if (end >= 0) {
-            setFormat(0, end + 3, stringFormat);
+            setFormat(0, end + 3, m_stringFormat);
             start = end + 3;
             setCurrentBlockState(BlockNormal);
         } else {
-            setFormat(0, text.length(), stringFormat);
+            setFormat(0, text.length(), m_stringFormat);
             setCurrentBlockState(BlockInTripleSingle);
             return;
         }
@@ -501,10 +568,10 @@ void CodeHighlighter::handlePythonTripleString(const QString &text)
         const int end = text.indexOf(delimiter, matchStart + 3);
 
         if (end >= 0) {
-            setFormat(matchStart, end + 3 - matchStart, stringFormat);
+            setFormat(matchStart, end + 3 - matchStart, m_stringFormat);
             start = end + 3;
         } else {
-            setFormat(matchStart, text.length() - matchStart, stringFormat);
+            setFormat(matchStart, text.length() - matchStart, m_stringFormat);
             setCurrentBlockState(delimiter == "\"\"\"" ? BlockInTripleDouble : BlockInTripleSingle);
             return;
         }
@@ -518,11 +585,11 @@ void CodeHighlighter::handleHtmlComment(const QString &text)
     if (previousBlockState() == BlockInHtmlComment) {
         const int end = text.indexOf("-->");
         if (end >= 0) {
-            setFormat(0, end + 3, commentFormat);
+            setFormat(0, end + 3, m_commentFormat);
             start = end + 3;
             setCurrentBlockState(BlockNormal);
         } else {
-            setFormat(0, text.length(), commentFormat);
+            setFormat(0, text.length(), m_commentFormat);
             setCurrentBlockState(BlockInHtmlComment);
             return;
         }
@@ -541,12 +608,16 @@ void CodeHighlighter::handleHtmlComment(const QString &text)
             setCurrentBlockState(BlockInHtmlComment);
         }
 
-        setFormat(blockStart, length, commentFormat);
+        setFormat(blockStart, length, m_commentFormat);
 
         if (currentBlockState() == BlockInHtmlComment)
             return;
     }
 }
+
+// -----------------------------------------------------------------------
+// CodeEditor implementation with performance optimizations
+// -----------------------------------------------------------------------
 
 CodeEditor::CodeEditor(QWidget *parent)
     : QPlainTextEdit(parent)
@@ -581,7 +652,8 @@ CodeEditor::CodeEditor(QWidget *parent)
 
 void CodeEditor::setLanguageForFile(const QString &filePath)
 {
-    syntaxHighlighter->setLanguage(languageForFile(filePath));
+    syntaxHighlighter->setLanguage(
+        LanguageRegistry::instance().languageForFile(filePath));
 }
 
 void CodeEditor::setDarkMode(bool dark)
@@ -624,6 +696,10 @@ void CodeEditor::changeEvent(QEvent *event)
     }
 }
 
+// -----------------------------------------------------------------------
+// Performance-optimized paintEvent
+// -----------------------------------------------------------------------
+
 void CodeEditor::paintEvent(QPaintEvent *event)
 {
     QPlainTextEdit::paintEvent(event);
@@ -632,6 +708,10 @@ void CodeEditor::paintEvent(QPaintEvent *event)
     drawGhostText(event);
 }
 
+// -----------------------------------------------------------------------
+// Performance: drawIndentGuides with batch line drawing
+// -----------------------------------------------------------------------
+
 void CodeEditor::drawIndentGuides(QPaintEvent *event)
 {
     if (!m_showIndentGuides)
@@ -639,44 +719,73 @@ void CodeEditor::drawIndentGuides(QPaintEvent *event)
 
     QPainter painter(viewport());
     painter.setRenderHint(QPainter::Antialiasing, false);
-    painter.setPen(QPen(QColor(128, 128, 128, 80), 1, Qt::SolidLine));
 
-    qreal tabStop = document()->defaultTextOption().tabStopDistance();
-    if (tabStop <= 0)
-        tabStop = fontMetrics().horizontalAdvance(QLatin1Char(' ')) * 4;
+    const qreal tabStop = document()->defaultTextOption().tabStopDistance();
+    const qreal charWidth = fontMetrics().horizontalAdvance(QLatin1Char(' '));
+    const qreal effectiveTabStop = (tabStop > 0) ? tabStop : charWidth * m_tabWidth;
+
+    // Pre-compute the content offset
+    const QPointF offset = contentOffset();
+
+    // Collect all guide x-positions and y-ranges per indent level for batch drawing
+    QVector<QPair<int, QPair<int, int>>> guideLines; // (x, top, bottom) pairs
 
     QTextBlock block = firstVisibleBlock();
-    qreal top = blockBoundingGeometry(block).translated(contentOffset()).top();
-    qreal bottom = top + blockBoundingRect(block).height();
+    int top = static_cast<int>(blockBoundingGeometry(block).translated(offset).top());
+    int bottom = top + static_cast<int>(blockBoundingRect(block).height());
+
+    // Pre-allocate reasonable size
+    guideLines.reserve(blockCount() * 4);
 
     while (block.isValid() && top <= event->rect().bottom()) {
         if (block.isVisible() && bottom >= event->rect().top()) {
-            QString text = block.text();
+            const QString text = block.text();
             if (!text.isEmpty() && !text.trimmed().isEmpty()) {
                 qreal width = 0;
                 for (const QChar &c : text) {
                     if (c == QLatin1Char(' ')) {
-                        width += fontMetrics().horizontalAdvance(QLatin1Char(' '));
+                        width += charWidth;
                     } else if (c == QLatin1Char('\t')) {
-                        width = (std::floor(width / tabStop) + 1) * tabStop;
+                        width = (std::floor(width / effectiveTabStop) + 1) * effectiveTabStop;
                     } else {
                         break;
                     }
                 }
 
-                for (qreal pos = tabStop; pos <= width + 0.1; pos += tabStop) {
-                    int guideX = static_cast<int>(pos) + static_cast<int>(contentOffset().x());
-                    painter.drawLine(guideX, static_cast<int>(top),
-                                   guideX, static_cast<int>(bottom));
+                // Batch each indent level
+                for (qreal pos = effectiveTabStop; pos <= width + 0.1; pos += effectiveTabStop) {
+                    int guideX = static_cast<int>(pos + offset.x());
+                    guideLines.append(qMakePair(guideX, qMakePair(top, bottom)));
                 }
             }
         }
 
         block = block.next();
         top = bottom;
-        bottom = top + blockBoundingRect(block).height();
+        bottom = top + static_cast<int>(blockBoundingRect(block).height());
+    }
+
+    // Batch draw all guide lines
+    if (!guideLines.isEmpty()) {
+        // Sort by x to minimize pen changes (same-color lines)
+        std::sort(guideLines.begin(), guideLines.end(),
+                  [](const QPair<int, QPair<int, int>> &a,
+                     const QPair<int, QPair<int, int>> &b) {
+                      return a.first < b.first;
+                  });
+
+        painter.setPen(QPen(QColor(128, 128, 128, 80), 1, Qt::SolidLine));
+
+        for (const auto &guide : guideLines) {
+            painter.drawLine(guide.first, guide.second.first,
+                           guide.first, guide.second.second);
+        }
     }
 }
+
+// -----------------------------------------------------------------------
+// Performance: drawInlayHints with visible line range filtering
+// -----------------------------------------------------------------------
 
 void CodeEditor::drawInlayHints(QPaintEvent *event)
 {
@@ -685,16 +794,31 @@ void CodeEditor::drawInlayHints(QPaintEvent *event)
 
     QPainter painter(viewport());
     painter.setRenderHint(QPainter::Antialiasing, true);
-    painter.setPen(QPen(QColor(128, 128, 128, 180), 1));
-    painter.setFont(font());
 
-    QTextBlock block = firstVisibleBlock();
-    int blockNumber = block.blockNumber();
+    // Compute visible line range
+    QTextBlock firstBlock = firstVisibleBlock();
+    const int firstVisibleLine = firstBlock.blockNumber();
+    const QPointF offset = contentOffset();
+    const int viewportBottom = event->rect().bottom();
+
+    int lastVisibleLine = firstVisibleLine;
+    QTextBlock block = firstBlock;
+    qreal blockTop = blockBoundingGeometry(block).translated(offset).top();
+    while (block.isValid() && blockTop <= viewportBottom) {
+        lastVisibleLine = block.blockNumber();
+        block = block.next();
+        blockTop += blockBoundingRect(block).height();
+    }
+
+    const QFont &editorFont = font();
+    painter.setFont(editorFont);
+    const QColor hintColor(128, 128, 128, 180);
+    painter.setPen(QPen(hintColor, 1));
 
     for (const LspClient::InlayHint &hint : m_inlayHints) {
-        if (hint.position.line < blockNumber || hint.position.line >= blockNumber + blockCount()) {
+        // Skip hints outside visible range
+        if (hint.position.line < firstVisibleLine || hint.position.line > lastVisibleLine)
             continue;
-        }
 
         QTextBlock hintBlock = document()->findBlockByNumber(hint.position.line);
         if (!hintBlock.isValid())
@@ -722,6 +846,10 @@ void CodeEditor::drawInlayHints(QPaintEvent *event)
     }
 }
 
+// -----------------------------------------------------------------------
+// Performance: drawGhostText with minimal updates
+// -----------------------------------------------------------------------
+
 void CodeEditor::drawGhostText(QPaintEvent *event)
 {
     if (m_ghostText.isEmpty())
@@ -729,7 +857,6 @@ void CodeEditor::drawGhostText(QPaintEvent *event)
 
     QPainter painter(viewport());
     painter.setFont(font());
-    painter.setPen(QPen(QColor(128, 128, 128, 140), 1));
 
     QTextCursor cursor(textCursor());
     cursor.clearSelection();
@@ -740,6 +867,8 @@ void CodeEditor::drawGhostText(QPaintEvent *event)
     QRect textRect = rect;
     textRect.setWidth(fontMetrics().horizontalAdvance(m_ghostText));
     textRect.setHeight(fontMetrics().height());
+
+    painter.setPen(QPen(QColor(128, 128, 128, 140), 1));
     painter.drawText(textRect, Qt::AlignLeft | Qt::AlignVCenter, m_ghostText);
 }
 
@@ -786,7 +915,7 @@ void CodeEditor::highlightCurrentLine()
     QList<QTextEdit::ExtraSelection> extraSelections;
     extraSelections.append(m_diagnosticSelections);
     extraSelections.append(m_pluginExtraSelections);
-    
+
     if (!isReadOnly()) {
         QTextEdit::ExtraSelection selection;
         QColor lineColor = palette().color(QPalette::Highlight);
@@ -795,7 +924,7 @@ void CodeEditor::highlightCurrentLine()
         selection.format.setProperty(QTextFormat::FullWidthSelection, true);
         selection.cursor = textCursor();
         selection.cursor.clearSelection();
-        
+
         // Replace existing line highlight if present
         bool found = false;
         for (int i = 0; i < extraSelections.size(); ++i) {
@@ -891,42 +1020,59 @@ void CodeEditor::keyPressEvent(QKeyEvent *event)
     m_multiCursor->clear();
 }
 
- void CodeEditor::lineNumberAreaPaintEvent(QPaintEvent *event)
- {
-     QPainter painter(lineNumberArea);
+// -----------------------------------------------------------------------
+// Performance-optimized lineNumberAreaPaintEvent
+// -----------------------------------------------------------------------
 
-     QColor alternate = palette().color(QPalette::AlternateBase);
-     QColor base = palette().color(QPalette::Base);
-     QLinearGradient gradient(0, 0, lineNumberArea->width(), 0);
-     gradient.setColorAt(0, alternate);
-     gradient.setColorAt(1, base);
-     painter.fillRect(event->rect(), gradient);
+void CodeEditor::lineNumberAreaPaintEvent(QPaintEvent *event)
+{
+    QPainter painter(lineNumberArea);
 
-     QTextBlock block = firstVisibleBlock();
+    const QColor altBase = palette().color(QPalette::AlternateBase);
+    const QColor base = palette().color(QPalette::Base);
+
+    // Draw a subtle gradient (replaces the base fill since the gradient covers the entire rect)
+    if (lineNumberArea->width() > 3) {
+        QLinearGradient gradient(0, 0, lineNumberArea->width(), 0);
+        gradient.setColorAt(0, altBase);
+        gradient.setColorAt(1, base);
+        painter.fillRect(event->rect(), gradient);
+    } else {
+        painter.fillRect(event->rect(), altBase);
+    }
+
+    QTextBlock block = firstVisibleBlock();
     int blockNumber = block.blockNumber();
-    int top = static_cast<int>(blockBoundingGeometry(block).translated(contentOffset()).top());
+    const QPointF offset = contentOffset();
+    int top = static_cast<int>(blockBoundingGeometry(block).translated(offset).top());
     int bottom = top + static_cast<int>(blockBoundingRect(block).height());
+
+    const int areaWidth = lineNumberArea->width();
+    const int fontHeight = fontMetrics().height();
+    const QPen numberPen(palette().color(QPalette::Midlight));
+
+    painter.setPen(numberPen);
 
     while (block.isValid() && top <= event->rect().bottom()) {
         if (block.isVisible() && bottom >= event->rect().top()) {
             int line = blockNumber + 1;
-            
+
             // Draw breakpoint icon if this line has a breakpoint
             if (m_breakpointLines.contains(line)) {
                 QPainterPath path;
-                path.addEllipse(4, top + (bottom - top) / 2 - 5, 10, 10);
-                QPen pen(Qt::red);
-                pen.setWidth(2);
-                painter.setPen(pen);
+                int cx = 9;
+                int cy = top + (bottom - top) / 2;
+                path.addEllipse(cx - 5, cy - 5, 10, 10);
+                painter.setPen(QPen(Qt::red, 2));
                 painter.setBrush(Qt::red);
                 painter.drawPath(path);
+                painter.setPen(numberPen);
             }
-            
-             // Draw line number
-             QString number = QString::number(line);
-             painter.setPen(palette().color(QPalette::Midlight));
-             painter.drawText(20, top, lineNumberArea->width() - 20, fontMetrics().height(),
-                             Qt::AlignRight, number);
+
+            // Draw line number
+            QString number = QString::number(line);
+            painter.drawText(20, top, areaWidth - 20, fontHeight,
+                           Qt::AlignRight, number);
         }
 
         block = block.next();
@@ -962,7 +1108,6 @@ void CodeEditor::setDiagnosticTooltips(const QList<QPair<QTextCursor, QString>> 
 void CodeEditor::setInlayHints(const QList<LspClient::InlayHint> &hints)
 {
     m_inlayHints = hints;
-    // Inlay hints will be rendered in paintEvent
     update();
 }
 
@@ -1024,7 +1169,6 @@ bool CodeEditor::event(QEvent *event)
 
 void CodeEditor::updateHoverTooltip(const QPoint &pos)
 {
-    // Check if mouse is over a diagnostic selection
     QTextCursor cursor = cursorForPosition(pos);
     int cursorPos = cursor.position();
 
@@ -1060,19 +1204,19 @@ void CodeEditor::clearBreakpoints()
 void CodeEditor::highlightCurrentLine(int line)
 {
     m_currentDebugLine = line;
-    
+
     QTextBlock block = document()->findBlockByNumber(line - 1);
     if (!block.isValid())
         return;
-    
+
     QTextCursor cursor(block);
     cursor.select(QTextCursor::LineUnderCursor);
-    
+
     QTextEdit::ExtraSelection selection;
     selection.format.setBackground(QColor(255, 255, 0, 100));
     selection.format.setProperty(QTextFormat::FullWidthSelection, true);
     selection.cursor = cursor;
-    
+
     QList<QTextEdit::ExtraSelection> extraSelections;
     extraSelections.append(selection);
     extraSelections.append(m_diagnosticSelections);

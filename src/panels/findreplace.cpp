@@ -74,9 +74,9 @@ FindReplaceBar::FindReplaceBar(QWidget *parent)
     connect(m_replaceBtn, &QPushButton::clicked, this, &FindReplaceBar::onReplaceClicked);
     connect(m_replaceAllBtn, &QPushButton::clicked, this, &FindReplaceBar::onReplaceAllClicked);
     connect(m_toggleReplaceBtn, &QPushButton::clicked, this, &FindReplaceBar::onToggleReplace);
-    connect(m_caseSensitive, &QCheckBox::stateChanged, this, &FindReplaceBar::updateMatches);
-    connect(m_wholeWord, &QCheckBox::stateChanged, this, &FindReplaceBar::updateMatches);
-    connect(m_regex, &QCheckBox::stateChanged, this, &FindReplaceBar::updateMatches);
+    connect(m_caseSensitive, &QCheckBox::checkStateChanged, this, &FindReplaceBar::updateMatches);
+    connect(m_wholeWord, &QCheckBox::checkStateChanged, this, &FindReplaceBar::updateMatches);
+    connect(m_regex, &QCheckBox::checkStateChanged, this, &FindReplaceBar::updateMatches);
 }
 
 void FindReplaceBar::setEditor(QPlainTextEdit *editor)

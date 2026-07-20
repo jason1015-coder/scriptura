@@ -77,6 +77,7 @@
 #include <QPropertyAnimation>
 #include <QEasingCurve>
 #include <QAbstractAnimation>
+#include <QFrame>
 #include "customtitlebar.h"
 #include "windowanimator.h"
 #include "thememanager.h"
@@ -132,6 +133,8 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
     , m_isDebugging(false)
     , m_workspace(new Workspace(this))
     , m_minimap(nullptr)
+    , m_inspectorDrawer(nullptr)
+    , m_universalSearch(nullptr)
     , m_splitManager(new SplitManager(this))
     , m_breadcrumb(nullptr)
     , m_aiInline(new AiInlineCompletion(this))
@@ -193,15 +196,94 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
         setSidebarCollapsed(!ui->sidebarDrawer->isVisible());
     });
     connect(m_titleBar, &CustomTitleBar::inspectorToggleClicked, this, [this]() {
-        // Toggle right-side inspector panel (placeholder)
+        toggleInspector();
     });
-    connect(m_titleBar, &CustomTitleBar::searchRequested, this, [this]() {
-        QString query = m_titleBar->searchField->text();
-        if (!query.isEmpty()) {
-            on_action_project_search_triggered();
+    // ---- Universal Search ----
+    m_universalSearch = new UniversalSearchPopup(m_titleBar->searchField, this);
+
+    // Connect file search results to open files
+    connect(m_universalSearch, &UniversalSearchPopup::fileOpenRequested, this, [this](const QString &path) {
+        openFileInTab(path);
+    });
+
+    // Register commands in universal search
+    {
+        using Cat = SearchResult::Category;
+        auto regCmd = [this](const QString &label, const QString &sub, auto fn, Cat cat = Cat::Command) {
+            m_universalSearch->registerResult({cat, label, sub, fn});
+        };
+
+        // Commands
+        regCmd(tr("Open Project..."),         tr("Ctrl+Shift+O"), [this]() { on_action_open_project_triggered(); });
+        regCmd(tr("Open File..."),            tr("Ctrl+O"),      [this]() { on_action_open_file_triggered(); });
+        regCmd(tr("Save"),                    tr("Ctrl+S"),      [this]() { on_action_save_triggered(); });
+        regCmd(tr("Save As..."),              tr("Ctrl+Shift+S"),[this]() { on_action_save_as_triggered(); });
+        regCmd(tr("New File"),                tr("Ctrl+N"),      [this]() { on_action_add_file_directory_triggered(); });
+        regCmd(tr("Undo"),                    tr("Ctrl+Z"),      [this]() { on_action_Undo_triggered(); });
+        regCmd(tr("Redo"),                    tr("Ctrl+Y"),      [this]() { on_action_Redo_triggered(); });
+        regCmd(tr("Cut"),                     tr("Ctrl+X"),      [this]() { on_actionCu_t_triggered(); });
+        regCmd(tr("Copy"),                    tr("Ctrl+C"),      [this]() { on_action_copy_triggered(); });
+        regCmd(tr("Paste"),                   tr("Ctrl+V"),      [this]() { on_action_Paste_triggered(); });
+        regCmd(tr("Find in File"),            tr("Ctrl+F"),      [this]() { on_action_find_triggered(); });
+        regCmd(tr("Find and Replace"),        tr("Ctrl+H"),      [this]() { on_action_replace_triggered(); });
+        regCmd(tr("Project Search"),          tr("Ctrl+Shift+F"),[this]() { on_action_project_search_triggered(); });
+        regCmd(tr("Command Palette"),         tr("Ctrl+Shift+P"),[this]() { on_action_command_palette_triggered(); });
+        regCmd(tr("Git Commit"),              QString(),          [this]() { on_action_git_commit_triggered(); });
+        regCmd(tr("Git Push"),                QString(),          [this]() { on_action_git_push_triggered(); });
+        regCmd(tr("Git Pull"),                QString(),          [this]() { on_action_git_pull_triggered(); });
+        regCmd(tr("Git Fetch"),               QString(),          [this]() { on_action_git_fetch_triggered(); });
+        regCmd(tr("Format Document"),          tr("Ctrl+Shift+I"),[this]() { on_action_format_document_triggered(); });
+        regCmd(tr("Go to Definition"),        tr("F12"),         [this]() { on_action_go_to_definition_triggered(); });
+        regCmd(tr("Toggle Breakpoint"),       tr("F9"),          [this]() { on_action_toggle_breakpoint_triggered(); });
+        regCmd(tr("Run / Debug"),             tr("F5"),          [this]() { on_action_run_debug_triggered(); });
+        regCmd(tr("Step Over"),               tr("F10"),         [this]() { on_action_step_over_triggered(); });
+        regCmd(tr("Step Into"),               tr("F11"),         [this]() { on_action_step_into_triggered(); });
+        regCmd(tr("Step Out"),                tr("Shift+F11"),   [this]() { on_action_step_out_triggered(); });
+        regCmd(tr("Continue"),                tr("Ctrl+F5"),     [this]() { on_action_continue_debug_triggered(); });
+        regCmd(tr("Manage Plugins..."),       QString(),          [this]() { on_action_manage_plugins_triggered(); });
+        regCmd(tr("Check for Updates..."),    QString(),          [this]() { on_action_check_updates_triggered(); });
+        regCmd(tr("Keyboard Shortcuts"),      tr("Ctrl+K"),      [this]() { showKeyboardShortcuts(); });
+        regCmd(tr("About Scriptura"),         QString(),          [this]() { on_action_about_triggered(); });
+
+        // Settings pages
+        regCmd(tr("Editor Settings"),          QString(), [this]() { on_action_editor_settings_triggered(); }, Cat::Setting);
+        regCmd(tr("Theme Settings"),           QString(), [this]() { on_action_theme_triggered(); }, Cat::Setting);
+        regCmd(tr("Update Settings"),          QString(), [this]() {
+            for (int i = 0; i < tabBar->count(); ++i)
+                if (static_cast<TabType>(tabBar->tabData(i).toInt()) == TabType::UpdaterSettings) {
+                    tabBar->setCurrentIndex(i); return;
+                }
+        }, Cat::Setting);
+
+        // Theme quick-switches
+        struct ThemeEntry { QString name; ThemeColorFamily family; ThemeMode mode; };
+        ThemeEntry themes[] = {
+            {tr("Default Light"), ThemeColorFamily::Default, ThemeMode::Light},
+            {tr("Default Dark"),  ThemeColorFamily::Default, ThemeMode::Dark},
+            {tr("Blue Light"),    ThemeColorFamily::Blue,   ThemeMode::Light},
+            {tr("Blue Dark"),     ThemeColorFamily::Blue,   ThemeMode::Dark},
+            {tr("Green Light"),   ThemeColorFamily::Green,  ThemeMode::Light},
+            {tr("Green Dark"),    ThemeColorFamily::Green,  ThemeMode::Dark},
+            {tr("Red Light"),     ThemeColorFamily::Red,    ThemeMode::Light},
+            {tr("Red Dark"),      ThemeColorFamily::Red,    ThemeMode::Dark},
+            {tr("Cyan Light"),    ThemeColorFamily::Cyan,   ThemeMode::Light},
+            {tr("Cyan Dark"),     ThemeColorFamily::Cyan,   ThemeMode::Dark},
+            {tr("Violet Light"),  ThemeColorFamily::Violet, ThemeMode::Light},
+            {tr("Violet Dark"),   ThemeColorFamily::Violet, ThemeMode::Dark},
+        };
+        for (const auto &t : themes) {
+            Theme targetTheme(t.family, t.mode);
+            regCmd(t.name, tr("Theme"), [this, targetTheme]() {
+                if (targetTheme != selectedTheme) {
+                    selectedTheme = targetTheme;
+                    applyTheme(selectedTheme);
+                    QSettings s;
+                    s.setValue("theme/selected", themeToLegacyInt(selectedTheme));
+                }
+            }, Cat::Theme);
         }
-    });
-    
+    }
+
     // Install title bar as event filter for dragging
     m_titleBar->installEventFilter(this);
     
@@ -249,6 +331,11 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
     ui->fileTreeView->setColumnHidden(1, true);
     ui->fileTreeView->setColumnHidden(2, true);
     ui->fileTreeView->setColumnHidden(3, true);
+
+    // Wire file model into universal search for file name searching
+    if (m_universalSearch) {
+        m_universalSearch->setFileModel(fileModel, QDir::homePath());
+    }
 
     editorStack = ui->editorStack;
     bottomPanelStack = ui->bottomPanelStack;
@@ -388,6 +475,138 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
     iconBarLayout->addWidget(gitButton);
 
     ui->sidebarDrawerLayout->addWidget(iconBar);
+
+    // --- Right-side Inspector Drawer ---
+    m_inspectorDrawer = new QWidget(this);
+    m_inspectorDrawer->setObjectName("inspectorDrawer");
+    m_inspectorDrawer->setMinimumWidth(0);
+    m_inspectorDrawer->setMaximumWidth(0);
+    m_inspectorDrawer->setVisible(true);
+
+    QVBoxLayout *inspectorLayout = new QVBoxLayout(m_inspectorDrawer);
+    inspectorLayout->setContentsMargins(0, 0, 0, 0);
+    inspectorLayout->setSpacing(0);
+
+    // Header bar
+    QWidget *inspectorHeader = new QWidget(m_inspectorDrawer);
+    inspectorHeader->setObjectName("inspectorHeader");
+    QHBoxLayout *headerLayout = new QHBoxLayout(inspectorHeader);
+    headerLayout->setContentsMargins(12, 8, 8, 8);
+    headerLayout->setSpacing(4);
+
+    QLabel *inspectorTitle = new QLabel(tr("Assistant"), inspectorHeader);
+    inspectorTitle->setObjectName("inspectorTitle");
+    QFont titleFont = inspectorTitle->font();
+    titleFont.setPointSize(11);
+    titleFont.setBold(true);
+    inspectorTitle->setFont(titleFont);
+
+    QPushButton *inspectorCloseBtn = new QPushButton(inspectorHeader);
+    inspectorCloseBtn->setObjectName("inspectorCloseBtn");
+    inspectorCloseBtn->setFixedSize(24, 24);
+    inspectorCloseBtn->setIcon(ThemeIcons::instance()->icon(":/icons/close.svg"));
+    inspectorCloseBtn->setFlat(true);
+    inspectorCloseBtn->setCursor(Qt::ArrowCursor);
+    inspectorCloseBtn->setToolTip(tr("Close inspector"));
+    connect(inspectorCloseBtn, &QPushButton::clicked, this, &MainWindow::toggleInspector);
+
+    headerLayout->addWidget(inspectorTitle);
+    headerLayout->addStretch();
+    headerLayout->addWidget(inspectorCloseBtn);
+
+    inspectorLayout->addWidget(inspectorHeader);
+
+    // Separator line
+    QFrame *separator = new QFrame(m_inspectorDrawer);
+    separator->setFrameShape(QFrame::HLine);
+    separator->setFrameShadow(QFrame::Sunken);
+    separator->setObjectName("inspectorSeparator");
+    inspectorLayout->addWidget(separator);
+
+    // Content area
+    QWidget *inspectorContent = new QWidget(m_inspectorDrawer);
+    inspectorContent->setObjectName("inspectorContent");
+    QVBoxLayout *contentLayout = new QVBoxLayout(inspectorContent);
+    contentLayout->setContentsMargins(16, 16, 16, 16);
+    contentLayout->setSpacing(12);
+    contentLayout->setAlignment(Qt::AlignCenter);
+
+    // Sparkle icon placeholder
+    QLabel *iconLabel = new QLabel(inspectorContent);
+    iconLabel->setObjectName("assistantIcon");
+    iconLabel->setPixmap(QIcon(":/icons/app-icon.svg").pixmap(48, 48));
+    iconLabel->setAlignment(Qt::AlignCenter);
+
+    QLabel *aiLabel = new QLabel(tr("AI Assistant is in development"), inspectorContent);
+    aiLabel->setObjectName("aiStatusLabel");
+    aiLabel->setAlignment(Qt::AlignCenter);
+    aiLabel->setWordWrap(true);
+    QFont aiFont = aiLabel->font();
+    aiFont.setPointSize(12);
+    aiLabel->setFont(aiFont);
+
+    QLabel *subtitleLabel = new QLabel(tr("Coming soon — intelligent code assistance, ") +
+                                        tr("refactoring suggestions, and more."), inspectorContent);
+    subtitleLabel->setObjectName("aiSubtitleLabel");
+    subtitleLabel->setAlignment(Qt::AlignCenter);
+    subtitleLabel->setWordWrap(true);
+    QFont subFont = subtitleLabel->font();
+    subFont.setPointSize(10);
+    subtitleLabel->setFont(subFont);
+
+    contentLayout->addStretch();
+    contentLayout->addWidget(iconLabel);
+    contentLayout->addSpacing(8);
+    contentLayout->addWidget(aiLabel);
+    contentLayout->addSpacing(4);
+    contentLayout->addWidget(subtitleLabel);
+    contentLayout->addStretch();
+
+    inspectorLayout->addWidget(inspectorContent, 1);
+
+    // Insert into the main horizontal layout, after editorContainer (index 1), before tabWidget (index 2)
+    QHBoxLayout *mainLayout = qobject_cast<QHBoxLayout*>(ui->centralwidget->layout());
+    if (mainLayout) {
+        mainLayout->insertWidget(2, m_inspectorDrawer);
+    }
+
+    // Apply styles for the inspector drawer
+    m_inspectorDrawer->setStyleSheet(R"(
+        QWidget#inspectorDrawer {
+            border-left: 1px solid palette(mid);
+            background-color: palette(window);
+        }
+        QWidget#inspectorHeader {
+            background-color: transparent;
+            border-bottom: none;
+        }
+        QLabel#inspectorTitle {
+            color: palette(text);
+        }
+        QPushButton#inspectorCloseBtn {
+            border: none;
+            border-radius: 4px;
+            padding: 2px;
+            background-color: transparent;
+        }
+        QPushButton#inspectorCloseBtn:hover {
+            background-color: palette(light);
+        }
+        QFrame#inspectorSeparator {
+            color: palette(mid);
+            max-height: 1px;
+        }
+        QWidget#inspectorContent {
+            background-color: transparent;
+        }
+        QLabel#aiStatusLabel {
+            color: palette(text);
+            font-weight: bold;
+        }
+        QLabel#aiSubtitleLabel {
+            color: palette(midlight);
+        }
+    )");
 
     // Tab bar styling and connections
     tabBar->setTabsClosable(false);
@@ -1494,6 +1713,11 @@ void MainWindow::loadProjectDirectory(const QString &dirName)
     rootIndex = fileModel->index(projectDir);
     ui->fileTreeView->setRootIndex(rootIndex);
     ui->fileTreeView->hideColumn(1);
+    
+    // Update the universal search file model to the current project
+    if (m_universalSearch) {
+        m_universalSearch->setFileModel(fileModel, projectDir);
+    }
     ui->fileTreeView->hideColumn(2);
     ui->fileTreeView->hideColumn(3);
     // Disable goUpButton to restrict access to other directories when project is opened
@@ -2857,6 +3081,37 @@ void MainWindow::on_action_license_triggered()
         minAnim->setEndValue(48);
         minAnim->setEasingCurve(QEasingCurve::InOutCubic);
         minAnim->start(QAbstractAnimation::DeleteWhenStopped);
+    }
+}
+
+void MainWindow::toggleInspector()
+{
+    if (!m_inspectorDrawer)
+        return;
+
+    const bool visible = m_inspectorDrawer->width() > 0;
+    const int targetWidth = visible ? 0 : 280;
+
+    QPropertyAnimation *animation = new QPropertyAnimation(m_inspectorDrawer, "maximumWidth", this);
+    animation->setDuration(200);
+    animation->setStartValue(m_inspectorDrawer->width());
+    animation->setEndValue(targetWidth);
+    animation->setEasingCurve(QEasingCurve::InOutCubic);
+
+    connect(animation, &QPropertyAnimation::finished, this, [this, targetWidth]() {
+        if (targetWidth == 0) {
+            m_inspectorDrawer->setMinimumWidth(0);
+            m_inspectorDrawer->setMaximumWidth(0);
+        } else {
+            m_inspectorDrawer->setMinimumWidth(280);
+            m_inspectorDrawer->setMaximumWidth(280);
+        }
+    });
+
+    animation->start(QAbstractAnimation::DeleteWhenStopped);
+
+    if (m_titleBar) {
+        m_titleBar->inspectorToggleButton->setChecked(!visible);
     }
 }
 

@@ -50,6 +50,7 @@
 #include "splitmanager.h"
 #include "breadcrumb.h"
 #include "aiinlinecompletion.h"
+#include "universalsearch.h"
 #include "httpclientpanel.h"
 #include "codeactionui.h"
 #include "sqliteviewer.h"
@@ -291,6 +292,8 @@ private:
     Minimap *m_minimap;
     SplitManager *m_splitManager;
     Breadcrumb *m_breadcrumb;
+    QWidget *m_inspectorDrawer;
+    UniversalSearchPopup *m_universalSearch;
 
     // Plugin Developer API instances (owned by PluginContext)
     void setupPluginApis();
@@ -336,6 +339,7 @@ private:
     void openFileInTab(const QString &fileName);
     void applyTheme(const Theme &theme);
     void setSidebarCollapsed(bool collapsed);
+    void toggleInspector();
     void loadRecentProjects();
     void saveRecentProjects();
     void updateRecentProjectsOnWelcome();

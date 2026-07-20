@@ -46,17 +46,14 @@ void DebuggerGutter::paintEvent(QPaintEvent *event)
 
     if (!m_editor) return;
 
-    int lineHeight = fontMetrics().height();
-    int top = 0;
+    const int lineHeight = fontMetrics().height();
 
     for (int line : m_breakpoints) {
-        int y = (line - 1) * lineHeight + lineHeight / 2;
-        
+        const int y = (line - 1) * lineHeight + lineHeight / 2;
+
         QPainterPath path;
         path.addEllipse(4, y - 5, 10, 10);
-        QPen pen(Qt::red);
-        pen.setWidth(2);
-        painter.setPen(pen);
+        painter.setPen(QPen(Qt::red, 2));
         painter.setBrush(Qt::red);
         painter.drawPath(path);
     }
@@ -66,7 +63,7 @@ void DebuggerGutter::mousePressEvent(QMouseEvent *event)
 {
     if (!m_editor) return;
 
-    int lineHeight = fontMetrics().height();
-    int line = (event->y() / lineHeight) + 1;
+    const int lineHeight = fontMetrics().height();
+    const int line = static_cast<int>(event->position().y() / lineHeight) + 1;
     toggleBreakpoint(line);
 }

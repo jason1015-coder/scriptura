@@ -14,11 +14,14 @@
 #include <QColor>
 #include <QEvent>
 #include <QSet>
+#include <QCache>
 #include "multi-cursor.h"
 #include "lspclient.h"
+#include "languageregistry.h"
 
 class CodeHighlighter : public QSyntaxHighlighter
 {
+    Q_OBJECT
 public:
     explicit CodeHighlighter(QTextDocument *parent = nullptr);
     void setLanguage(const QString &language);
@@ -27,7 +30,9 @@ public:
                         const QColor &number, const QColor &preprocessor, const QColor &tag,
                         const QColor &attribute, const QColor &cssProperty,
                         const QColor &variable, const QColor &function, const QColor &escape,
-                        const QColor &trailingSpace);
+                        const QColor &trailingSpace = QColor());
+
+    QString currentLanguage() const { return m_language; }
 
 protected:
     void highlightBlock(const QString &text) override;
@@ -41,40 +46,40 @@ private:
 
     void initializeFormats();
     void addRule(const QString &pattern, const QTextCharFormat &format, int captureIndex = 0);
-    void setupCStyle();
-    void setupPython();
-    void setupJava();
-    void setupJavaScript();
-    void setupTypeScript();
-    void setupRust();
-    void setupGo();
-    void setupShell();
-    void setupHtml();
-    void setupCss();
-    void setupScript();
-    void setupPlainText();
+    void rebuildRules();
 
+    // Block-level handlers for multi-line constructs
     void handleCStyleBlockComment(const QString &text);
     void handlePythonTripleString(const QString &text);
     void handleHtmlComment(const QString &text);
 
-    QString language;
-    QVector<HighlightingRule> rules;
-    enum BlockState { BlockNormal = 0, BlockInComment = 1, BlockInTripleDouble = 2, BlockInTripleSingle = 3, BlockInHtmlComment = 4 };
-    bool darkMode = false;
+    QString m_language;
+    QString m_languageKey;  // Cache key for the current language
+    QVector<HighlightingRule> m_rules;
+    const LanguageDefinition *m_langDef = nullptr;
 
-    QTextCharFormat keywordFormat;
-    QTextCharFormat stringFormat;
-    QTextCharFormat commentFormat;
-    QTextCharFormat numberFormat;
-    QTextCharFormat preprocessorFormat;
-    QTextCharFormat tagFormat;
-    QTextCharFormat attributeFormat;
-    QTextCharFormat cssPropertyFormat;
-    QTextCharFormat variableFormat;
-    QTextCharFormat functionFormat;
-    QTextCharFormat escapeFormat;
-    QTextCharFormat trailingSpaceFormat;
+    enum BlockState { BlockNormal = 0, BlockInComment = 1, BlockInTripleDouble = 2, BlockInTripleSingle = 3, BlockInHtmlComment = 4 };
+    bool m_darkMode = false;
+
+    // Pre-built format cache for common languages
+    struct LanguageFormats {
+        QVector<HighlightingRule> rules;
+        QString keywordPattern;
+    };
+    QCache<QString, LanguageFormats> m_formatCache;
+
+    QTextCharFormat m_keywordFormat;
+    QTextCharFormat m_stringFormat;
+    QTextCharFormat m_commentFormat;
+    QTextCharFormat m_numberFormat;
+    QTextCharFormat m_preprocessorFormat;
+    QTextCharFormat m_tagFormat;
+    QTextCharFormat m_attributeFormat;
+    QTextCharFormat m_cssPropertyFormat;
+    QTextCharFormat m_variableFormat;
+    QTextCharFormat m_functionFormat;
+    QTextCharFormat m_escapeFormat;
+    QTextCharFormat m_trailingSpaceFormat;
 };
 
 class CodeEditor : public QPlainTextEdit
