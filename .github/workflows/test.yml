@@ -87,10 +87,12 @@ jobs:
 
       - name: Debug - run test binary directly
         run: |
-          ls build/tests/scriptura_tests.exe 2>&1
+          $exe = "build/tests/Debug/scriptura_tests.exe"
+          if (-not (Test-Path $exe)) { $exe = "build/tests/scriptura_tests.exe" }
+          ls $exe 2>&1
           echo "=== Running test binary directly ==="
           $env:PATH = "${env:Qt6_DIR}\bin;$env:PATH"
-          & build/tests/scriptura_tests.exe 2>&1
+          & $exe 2>&1
           if ($LASTEXITCODE -ne 0) { echo "Exit code: $LASTEXITCODE" }
       - name: Run unit tests
         run: |
