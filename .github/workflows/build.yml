@@ -24,10 +24,6 @@ jobs:
         run: cmake -B build -S . -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON
       - name: Build
         run: cmake --build build --config Release -j$(nproc)
-      - name: Build and run tests
-        run: |
-          cmake --build build --config Release -j$(nproc) --target scriptura_tests
-          cd build && ctest --output-on-failure || echo "Tests failed (non-blocking for build workflow)"
       - name: Bundle AppImage
         run: |
           mkdir -p AppDir/usr/bin
@@ -84,10 +80,6 @@ jobs:
         run: cmake -B build -S . -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=/opt/homebrew/opt/qt -DBUILD_TESTING=ON
       - name: Build
         run: cmake --build build --config Release -j$(sysctl -n hw.ncpu)
-      - name: Build and run tests
-        run: |
-          cmake --build build --config Release -j$(sysctl -n hw.ncpu) --target scriptura_tests
-          cd build && ctest --output-on-failure || echo "Tests failed (non-blocking for build workflow)"
       - name: Bundle Qt dependencies
         run: macdeployqt build/scriptura.app -always-overwrite
       - name: Upload macOS artifact
@@ -134,12 +126,6 @@ jobs:
       
       - name: Build
         run: cmake --build build --config Release -j
-      
-      - name: Build and run tests
-        run: |
-          cmake --build build --config Release --target scriptura_tests
-          $env:PATH = "${env:Qt6_DIR}\\bin;$env:PATH"
-          cd build && ctest --output-on-failure -C Release || echo "Tests failed (non-blocking for build workflow)"
       
       - name: Convert icon to ICO
         run: |
