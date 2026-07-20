@@ -58,7 +58,10 @@ enum class PluginFeature {
     // 整合功能
     VCSIntegration,         ///< 版本控制
     TerminalEmulator,       ///< 終端機
-    ExternalTool            ///< 外部工具
+    ExternalTool,           ///< 外部工具
+
+    // 主題功能
+    ThemeProvider           ///< 主題提供者 (可自訂顏色主題)
 };
 
 // 註冊為 QMetaType 以支援 QVariant 封裝

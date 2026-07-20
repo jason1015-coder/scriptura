@@ -11,11 +11,13 @@
 #include <QLabel>
 #include <QAction>
 #include <QToolButton>
+#include <QLabel>
 #include "../include/scriptura/plugininterface.h"
 #include "../include/scriptura/plugincontext.h"
 #include "../include/scriptura/pluginapi/uiapi.h"
 #include "../include/scriptura/pluginapi/notificationapi.h"
 #include "../include/scriptura/pluginapi/editorapi.h"
+#include "../include/scriptura/pluginapi/themeapi.h"
 
 /**
  * @file helloplugin.h
@@ -54,6 +56,7 @@ public slots:
     void sayHello();
     void onDecorateClicked();
     void onNotifyClicked();
+    void onThemeDemoClicked();
 
 private:
     void cleanupApi();

@@ -7,6 +7,7 @@
 #include "plugins/api/uiapi.h"
 #include "plugins/api/editorapi.h"
 #include "plugins/api/notificationapi.h"
+#include "plugins/api/themeapi.h"
 #include <QDebug>
 #include <QApplication>
 
@@ -17,12 +18,14 @@ PluginContext::PluginContext(MainWindow* mainWindow, QObject* parent)
     , m_uiApi(nullptr)
     , m_editorApi(nullptr)
     , m_notificationApi(nullptr)
+    , m_themeApi(nullptr)
 {
     if (mainWindow) {
         m_settings = new QSettings(this);
         m_uiApi = new PluginUIApi(mainWindow, this);
         m_editorApi = new PluginEditorApi(mainWindow, this);
         m_notificationApi = new PluginNotificationApi(mainWindow, this);
+        m_themeApi = new PluginThemeApi(mainWindow, this);
     }
 }
 
@@ -45,6 +48,11 @@ PluginEditorApi* PluginContext::editorApi() const
 PluginNotificationApi* PluginContext::notifications() const
 {
     return m_notificationApi;
+}
+
+PluginThemeApi* PluginContext::theme() const
+{
+    return m_themeApi;
 }
 
 MainWindow* PluginContext::mainWindow() const

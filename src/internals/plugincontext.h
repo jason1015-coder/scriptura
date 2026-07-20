@@ -18,6 +18,7 @@ class GitPanel;
 class PluginUIApi;
 class PluginEditorApi;
 class PluginNotificationApi;
+class PluginThemeApi;
 
 /**
  * @class PluginContext
@@ -67,10 +68,11 @@ public:
     EventBus::SubscriptionId subscribe(const QString& event, std::function<void(const QVariant&)> callback, QObject* owner = nullptr);
     void unsubscribe(const QString& event, EventBus::SubscriptionId subscriptionId);
 
-    // ── Developer API (UI, Editor, Notifications) ──────────────
+    // ── Developer API (UI, Editor, Notifications, Theme) ───────
     PluginUIApi*            ui() const;
     PluginEditorApi*        editorApi() const;
     PluginNotificationApi*  notifications() const;
+    PluginThemeApi*         theme() const;
 
 private:
     MainWindow* m_mainWindow;
@@ -80,6 +82,7 @@ private:
     mutable PluginUIApi*            m_uiApi = nullptr;
     mutable PluginEditorApi*        m_editorApi = nullptr;
     mutable PluginNotificationApi*  m_notificationApi = nullptr;
+    mutable PluginThemeApi*         m_themeApi = nullptr;
 
     EventBus::SubscriptionId subscribe(const QString& event, std::function<void(const QVariant&)> callback);
 
