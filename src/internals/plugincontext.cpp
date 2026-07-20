@@ -4,6 +4,9 @@
 #include "pluginmanager.h"
 #include "mainwindow.h"
 #include "permission.h"
+#include "plugins/api/uiapi.h"
+#include "plugins/api/editorapi.h"
+#include "plugins/api/notificationapi.h"
 #include <QDebug>
 #include <QApplication>
 
@@ -11,14 +14,37 @@ PluginContext::PluginContext(MainWindow* mainWindow, QObject* parent)
     : QObject(parent)
     , m_mainWindow(mainWindow)
     , m_settings(nullptr)
+    , m_uiApi(nullptr)
+    , m_editorApi(nullptr)
+    , m_notificationApi(nullptr)
 {
     if (mainWindow) {
         m_settings = new QSettings(this);
+        m_uiApi = new PluginUIApi(mainWindow, this);
+        m_editorApi = new PluginEditorApi(mainWindow, this);
+        m_notificationApi = new PluginNotificationApi(mainWindow, this);
     }
 }
 
 PluginContext::~PluginContext()
 {
+}
+
+// ── Developer API ────────────────────────────────────────────────
+
+PluginUIApi* PluginContext::ui() const
+{
+    return m_uiApi;
+}
+
+PluginEditorApi* PluginContext::editorApi() const
+{
+    return m_editorApi;
+}
+
+PluginNotificationApi* PluginContext::notifications() const
+{
+    return m_notificationApi;
 }
 
 MainWindow* PluginContext::mainWindow() const

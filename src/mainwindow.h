@@ -291,6 +291,9 @@ private:
     Minimap *m_minimap;
     SplitManager *m_splitManager;
     Breadcrumb *m_breadcrumb;
+
+    // Plugin Developer API instances (owned by PluginContext)
+    void setupPluginApis();
     AiInlineCompletion *m_aiInline;
     HttpClientPanel *m_httpClient;
     CodeActionController *m_codeActionCtrl;

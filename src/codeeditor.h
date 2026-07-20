@@ -94,6 +94,11 @@ public:
     int tabWidth() const;
     void setDiagnostics(const QList<QTextEdit::ExtraSelection> &diags);
     void setDiagnosticTooltips(const QList<QPair<QTextCursor, QString>> &tips);
+
+    // Plugin extra selections (decorations) — rendered on top of diagnostics
+    void setPluginExtraSelections(const QList<QTextEdit::ExtraSelection> &selections);
+    QList<QTextEdit::ExtraSelection> pluginExtraSelections() const { return m_pluginExtraSelections; }
+    void clearPluginExtraSelections();
     void setInlayHints(const QList<LspClient::InlayHint> &hints);
     void setGhostText(const QString &text);
     void clearGhostText();
@@ -138,6 +143,7 @@ private:
     bool m_showIndentGuides = true;
     int m_tabWidth = 4;
     QList<QTextEdit::ExtraSelection> m_diagnosticSelections;
+    QList<QTextEdit::ExtraSelection> m_pluginExtraSelections;
     QList<QPair<QTextCursor, QString>> m_diagnosticTooltips;
     QList<QTextEdit::ExtraSelection> m_extraCursors;
     QList<LspClient::InlayHint> m_inlayHints;

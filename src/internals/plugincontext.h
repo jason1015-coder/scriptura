@@ -15,6 +15,9 @@ class LspClient;
 class ProblemPanel;
 class TerminalPanel;
 class GitPanel;
+class PluginUIApi;
+class PluginEditorApi;
+class PluginNotificationApi;
 
 /**
  * @class PluginContext
@@ -26,6 +29,7 @@ class GitPanel;
  * - 與其他插件通訊
  * - 訂閱和發佈事件
  * - 檢查和請求權限
+ * - 控制 UI 佈局、編輯器、通知
  */
 class PluginContext : public QObject
 {
@@ -63,11 +67,19 @@ public:
     EventBus::SubscriptionId subscribe(const QString& event, std::function<void(const QVariant&)> callback, QObject* owner = nullptr);
     void unsubscribe(const QString& event, EventBus::SubscriptionId subscriptionId);
 
+    // ── Developer API (UI, Editor, Notifications) ──────────────
+    PluginUIApi*            ui() const;
+    PluginEditorApi*        editorApi() const;
+    PluginNotificationApi*  notifications() const;
+
 private:
     MainWindow* m_mainWindow;
     QSettings* m_settings;
     PermissionManager* m_permissionManager = nullptr;
     QString m_currentPluginId;
+    mutable PluginUIApi*            m_uiApi = nullptr;
+    mutable PluginEditorApi*        m_editorApi = nullptr;
+    mutable PluginNotificationApi*  m_notificationApi = nullptr;
 
     EventBus::SubscriptionId subscribe(const QString& event, std::function<void(const QVariant&)> callback);
 

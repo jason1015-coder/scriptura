@@ -28,6 +28,9 @@
 #include "httpclientpanel.h"
 #include "codeactionui.h"
 #include "sqliteviewer.h"
+#include "plugins/api/uiapi.h"
+#include "plugins/api/editorapi.h"
+#include "plugins/api/notificationapi.h"
 #include "pluginregistry.h"
 #include "customtitlebar.h"
 #include "windowanimator.h"
@@ -939,6 +942,9 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
     connect(m_pluginRegistry, &PluginRegistry::installFailed, this, [this](const QString &pluginId, const QString &error) {
         statusBar()->showMessage(tr("Plugin install failed for '%1': %2").arg(pluginId, error));
     });
+
+    // Init plugin developer API wiring
+    setupPluginApis();
 
     // Config validator - validate settings on startup
     configValidator->resetInvalidSettings();
@@ -3478,6 +3484,18 @@ bool MainWindow::eventFilter(QObject *watched, QEvent *event)
     }
 
     return QMainWindow::eventFilter(watched, event);
+}
+
+void MainWindow::setupPluginApis()
+{
+    // When the active editor tab changes, notify the plugin editor API
+    // so it can re-apply decorations, markers, and annotations.
+    connect(ui->tabWidget, &QTabWidget::currentChanged, this, [this](int index) {
+        Q_UNUSED(index);
+        if (pluginContext && pluginContext->editorApi()) {
+            pluginContext->editorApi()->onEditorChanged();
+        }
+    });
 }
 
 void MainWindow::closeEvent(QCloseEvent *event)
