@@ -15,9 +15,6 @@ private slots:
     void testResetToDefaults();
     void testTypedValueAccess();
     void testOwnsSettings();
-
-private:
-    QString m_settingsPath;
 };
 
 #endif // TEST_PLUGINSETTINGS_H

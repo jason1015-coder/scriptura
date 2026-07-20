@@ -1,8 +1,8 @@
 #include <QTest>
-#include <QTemporaryDir>
 #include <QFile>
 #include <QSettings>
 #include <QJsonObject>
+#include <QStandardPaths>
 #include "configvalidator.h"
 #include "test_configvalidator.h"
 
@@ -12,17 +12,16 @@ void TestConfigValidator::initTestCase()
     QCoreApplication::setOrganizationName("ScripturaTests");
     QCoreApplication::setApplicationName("ConfigValidator");
 
-    QTemporaryDir dir;
-    QVERIFY(dir.isValid());
-    m_settingsPath = dir.filePath("settings.ini");
-    QSettings::setPath(QSettings::IniFormat, QSettings::UserScope, dir.path());
-    QSettings::setPath(QSettings::IniFormat, QSettings::SystemScope, dir.path());
+    // Qt 6: QSettings::setPath() is deprecated and has no effect.
+    // Use QStandardPaths test mode to redirect settings to a temp location
+    // instead of polluting the real user config (registry on Windows).
+    QStandardPaths::setTestModeEnabled(true);
 }
 
 void TestConfigValidator::cleanupTestCase()
 {
-    QSettings::setPath(QSettings::IniFormat, QSettings::UserScope, QString());
-    QSettings::setPath(QSettings::IniFormat, QSettings::SystemScope, QString());
+    // Restore normal mode so subsequent test classes use real paths
+    QStandardPaths::setTestModeEnabled(false);
 }
 
 void TestConfigValidator::testValidTabWidthAccepted()

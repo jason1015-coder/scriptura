@@ -1,7 +1,7 @@
 #include <QTest>
-#include <QTemporaryDir>
 #include <QSettings>
 #include <QJsonObject>
+#include <QStandardPaths>
 #include "pluginsettings.h"
 #include "test_pluginsettings.h"
 
@@ -11,17 +11,14 @@ void TestPluginSettings::initTestCase()
     QCoreApplication::setOrganizationName("ScripturaTests");
     QCoreApplication::setApplicationName("PluginSettings");
 
-    QTemporaryDir dir;
-    QVERIFY(dir.isValid());
-    m_settingsPath = dir.filePath("settings.ini");
-    QSettings::setPath(QSettings::IniFormat, QSettings::UserScope, dir.path());
-    QSettings::setPath(QSettings::IniFormat, QSettings::SystemScope, dir.path());
+    // Qt 6: QSettings::setPath() is deprecated and has no effect.
+    // Use QStandardPaths test mode to redirect settings to a temp location.
+    QStandardPaths::setTestModeEnabled(true);
 }
 
 void TestPluginSettings::cleanupTestCase()
 {
-    QSettings::setPath(QSettings::IniFormat, QSettings::UserScope, QString());
-    QSettings::setPath(QSettings::IniFormat, QSettings::SystemScope, QString());
+    QStandardPaths::setTestModeEnabled(false);
 }
 
 void TestPluginSettings::testValueReturnsDefault()
