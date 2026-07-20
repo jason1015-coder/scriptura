@@ -2,6 +2,7 @@ find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Test Widgets Core Network
 
 set(TEST_SOURCES
     test_main.cpp
+    # Existing tests
     test_workspace.h
     test_workspace.cpp
     test_configvalidator.h
@@ -28,6 +29,75 @@ set(TEST_SOURCES
     test_lspclient.cpp
     test_dapclient.h
     test_dapclient.cpp
+    # New tests — Internals
+    test_crashhandler.h
+    test_crashhandler.cpp
+    test_plugincrashhandler.h
+    test_plugincrashhandler.cpp
+    test_plugincontext.h
+    test_plugincontext.cpp
+    test_servicelocator.h
+    test_servicelocator.cpp
+    test_versionfetcher.h
+    test_versionfetcher.cpp
+    test_updater.h
+    test_updater.cpp
+    # New tests — Panels
+    test_findreplace.h
+    test_findreplace.cpp
+    test_problempanel.h
+    test_problempanel.cpp
+    test_terminalpanel.h
+    test_terminalpanel.cpp
+    test_todopanel.h
+    test_todopanel.cpp
+    test_gitpanel.h
+    test_gitpanel.cpp
+    # New tests — Plugins
+    test_pluginregistry.h
+    test_pluginregistry.cpp
+    test_codeactionui.h
+    test_codeactionui.cpp
+    # New tests — Services
+    test_debugconfiguration.h
+    test_debugconfiguration.cpp
+    test_debuggergutter.h
+    test_debuggergutter.cpp
+    test_projectsearch.h
+    test_projectsearch.cpp
+    # New tests — Widgets
+    test_breadcrumb.h
+    test_breadcrumb.cpp
+    test_splitmanager.h
+    test_splitmanager.cpp
+    test_commandpalette.h
+    test_commandpalette.cpp
+    test_minimap.h
+    test_minimap.cpp
+    # New tests — Panels (git)
+    test_gitbranchwidget.h
+    test_gitbranchwidget.cpp
+    test_gitdiffwidget.h
+    test_gitdiffwidget.cpp
+    test_gitmergewidget.h
+    test_gitmergewidget.cpp
+    # New tests — Plugins
+    test_aiinlinecompletion.h
+    test_aiinlinecompletion.cpp
+    test_sqliteviewer.h
+    test_sqliteviewer.cpp
+    # New tests — Core
+    test_themeicons.h
+    test_themeicons.cpp
+    test_thememanager.h
+    test_thememanager.cpp
+    test_windowanimator.h
+    test_windowanimator.cpp
+    # New tests — Internals (continued)
+    test_pluginupdater.h
+    test_pluginupdater.cpp
+    test_rundialog.h
+    test_rundialog.cpp
 )
 
 # Copy zip fixtures next to the test binary so tests can locate them.

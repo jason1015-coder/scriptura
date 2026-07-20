@@ -28,6 +28,12 @@
 #include <sys/stat.h>
 #endif
 
+QString CrashHandler::dumpPath()
+{
+    return QStandardPaths::writableLocation(QStandardPaths::TempLocation)
+           + "/scriptura-crash.log";
+}
+
 // Async-signal-safe crash dump writing for Linux/macOS
 #ifdef Q_OS_LINUX
 static void writeCrashDumpSafe(int sig) {
