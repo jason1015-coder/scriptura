@@ -83,6 +83,7 @@ moc_predefs.h
 
 # Build directories
 /build/
+/build-*/
 /cmake-build-*/
 
 # Packaging reference artefacts (not part of the repo)
