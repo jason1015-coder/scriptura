@@ -1,0 +1,8 @@
+set(__QT_DEPLOY_TARGET_scriptura_tests_FILE /home/jason/scriptura/build-cov/tests/scriptura_tests)
+set(__QT_DEPLOY_TARGET_scriptura_tests_TYPE EXECUTABLE)
+set(__QT_DEPLOY_TARGET_gitplugin_FILE /home/jason/scriptura/build-cov/plugins/git/libgitplugin.so)
+set(__QT_DEPLOY_TARGET_gitplugin_TYPE SHARED_LIBRARY)
+set(__QT_DEPLOY_TARGET_scriptura_FILE /home/jason/scriptura/build-cov/scriptura)
+set(__QT_DEPLOY_TARGET_scriptura_TYPE EXECUTABLE)
+set(__QT_DEPLOY_TARGET_scriptura_core_FILE /home/jason/scriptura/build-cov/libscriptura_core.a)
+set(__QT_DEPLOY_TARGET_scriptura_core_TYPE STATIC_LIBRARY)

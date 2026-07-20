@@ -1,0 +1,11 @@
+set(lupdate_project_file "/home/jason/scriptura/CMakeLists.txt")
+set(lupdate_translations "")
+set(lupdate_include_paths "")
+set(lupdate_sources "")
+set(lupdate_subproject_count 1)
+
+set(lupdate_subproject1_source_dir "/home/jason/scriptura")
+set(lupdate_subproject1_include_paths "/home/jason/scriptura/build-cov/scriptura_autogen/include;/usr/include/x86_64-linux-gnu/qt6/QtCore;/usr/include/x86_64-linux-gnu/qt6;/usr/lib/x86_64-linux-gnu/qt6/mkspecs/linux-g++;/usr/include/x86_64-linux-gnu/qt6;/home/jason/scriptura/src;/home/jason/scriptura/src/services/lsp;/home/jason/scriptura/src/services/dap;/home/jason/scriptura/src/panels;/home/jason/scriptura/src/widgets;/home/jason/scriptura/src/internals;/home/jason/scriptura/src/plugins;/home/jason/scriptura/include;/home/jason/scriptura/include/scriptura;/home/jason/scriptura/sdk/include;/home/jason/scriptura/sdk/include/scriptura;/home/jason/scriptura/build-cov;/usr/include/x86_64-linux-gnu/qt6/QtWidgets;/usr/include/x86_64-linux-gnu/qt6;/usr/include/x86_64-linux-gnu/qt6/QtGui;/usr/include/x86_64-linux-gnu/qt6;/usr/include;/usr/include;/usr/include;/usr/include;/usr/include/x86_64-linux-gnu/qt6/QtNetwork;/usr/include/x86_64-linux-gnu/qt6")
+set(lupdate_subproject1_sources "/home/jason/scriptura/build-cov/scriptura_autogen/mocs_compilation.cpp;src/main.cpp;src/resources.qrc;/home/jason/scriptura/build-cov/scriptura_autogen/include/src/ui_mainwindow.h;/home/jason/scriptura/build-cov/scriptura_autogen/timestamp;/home/jason/scriptura/build-cov/scriptura_autogen/UVLADIE3JM/qrc_resources.cpp;/home/jason/scriptura/build-cov/scriptura_autogen/timestamp.rule;/home/jason/scriptura/build-cov/scriptura_autogen/UVLADIE3JM/qrc_resources.cpp.rule")
+set(lupdate_subproject1_excluded "")
+set(lupdate_subproject1_autogen_dir "/home/jason/scriptura/build-cov/scriptura_autogen")
