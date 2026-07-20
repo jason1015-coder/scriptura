@@ -43,6 +43,7 @@ file(GLOB_RECURSE SCRIPTURA_CORE_SOURCES
 )
 list(FILTER SCRIPTURA_CORE_SOURCES EXCLUDE REGEX "src/tests/")
 list(FILTER SCRIPTURA_CORE_SOURCES EXCLUDE REGEX "src/plugins/git/")
+list(FILTER SCRIPTURA_CORE_SOURCES EXCLUDE REGEX "src/pluginhost/")
 
 # The plugin SDK interface headers live outside src/ (in include/ and sdk/include/)
 # and contain Q_OBJECT classes (ScripturaPlugin, PluginContext). Their MOC-generated
@@ -103,7 +104,8 @@ set_target_properties(scriptura_core PROPERTIES
     FOLDER "Internal"
 )
 
-target_link_libraries(scriptura_core PRIVATE Qt${QT_VERSION_MAJOR}::Core Qt${QT_VERSION_MAJOR}::Widgets Qt${QT_VERSION_MAJOR}::Network Qt${QT_VERSION_MAJOR}::Sql)
+find_package(ZLIB REQUIRED)
+target_link_libraries(scriptura_core PRIVATE Qt${QT_VERSION_MAJOR}::Core Qt${QT_VERSION_MAJOR}::Widgets Qt${QT_VERSION_MAJOR}::Network Qt${QT_VERSION_MAJOR}::Sql ZLIB::ZLIB)
 if(WIN32)
     # DwmSetWindowAttribute (used by MainWindow::enableMicaEffect) lives in dwmapi.lib
     target_link_libraries(scriptura_core PRIVATE dwmapi)

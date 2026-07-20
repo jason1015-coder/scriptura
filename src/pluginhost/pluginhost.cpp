@@ -7,6 +7,7 @@
 #include <QDebug>
 #include <QFileInfo>
 #include <QDir>
+#include <cstdio>
 
 PluginHost::PluginHost(QObject *parent)
     : QObject(parent)
@@ -41,24 +42,23 @@ void PluginHost::run()
     m_running = true;
     emit started();
 
-    QByteArray buffer;
     while (m_running) {
-        if (!stdin->waitForReadyRead(100))
-            continue;
+        char buf[4096];
+        size_t n = fread(buf, 1, sizeof(buf), stdin);
+        if (n == 0)
+            break;
 
-        buffer.append(stdin->readAll());
-        m_framer->append(buffer);
-        buffer.clear();
+        m_framer->append(QByteArray(buf, static_cast<int>(n)));
 
         while (m_framer->canReadMessage()) {
             QByteArray msg = m_framer->readMessage();
             if (msg.isEmpty())
                 break;
 
-            QJsonParseError error;
-            QJsonDocument doc = QJsonDocument::fromJson(msg, &error);
-            if (error.error != QJsonParseError::NoError) {
-                emit error(QObject::tr("JSON parse error: %1").arg(error.errorString()));
+            QJsonParseError parseError;
+            QJsonDocument doc = QJsonDocument::fromJson(msg, &parseError);
+            if (parseError.error != QJsonParseError::NoError) {
+                emit error(QObject::tr("JSON parse error: %1").arg(parseError.errorString()));
                 continue;
             }
 
@@ -69,8 +69,9 @@ void PluginHost::run()
                 response["id"] = request["id"];
 
             QByteArray out = QJsonDocument(response).toJson(QJsonDocument::Compact);
-            stdout->write(LengthPrefixedFramer::frame(out));
-            stdout->flush();
+            QByteArray frame = LengthPrefixedFramer::frame(out);
+            fwrite(frame.constData(), 1, frame.size(), stdout);
+            fflush(stdout);
         }
     }
 }

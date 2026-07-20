@@ -10,6 +10,7 @@
 #include <QDebug>
 #include <QStandardPaths>
 #include <QDir>
+#include <cstdio>
 
 class PluginHost : public QObject
 {
@@ -19,21 +20,22 @@ public:
         : QObject(parent)
         , m_framer(new LengthPrefixedFramer(this))
     {
-        connect(m_framer, &LengthPrefixedFramer::messageReceived, this, &PluginHost::onMessageReceived);
     }
 
-    void run()
+    int run()
     {
-        QByteArray all = QCoreApplication::readAll();
+        QByteArray all;
+        while (!feof(stdin)) {
+            char buf[4096];
+            size_t n = fread(buf, 1, sizeof(buf), stdin);
+            if (n > 0)
+                all.append(buf, static_cast<int>(n));
+            else
+                break;
+        }
         m_framer->append(all);
         processMessages();
-        return exec();
-    }
-
-private slots:
-    void onMessageReceived(const QByteArray &data)
-    {
-        processMessage(data);
+        return 0;
     }
 
 private:
@@ -146,9 +148,10 @@ private:
 
     void handleShutdown(int id, const QString &pluginId)
     {
-        Q_UNUSED(id)
-        if (!m_instances.contains(pluginId))
+        if (!m_instances.contains(pluginId)) {
+            sendOk(id);
             return;
+        }
 
         QObject *instance = m_instances[pluginId];
         try {
@@ -156,6 +159,7 @@ private:
         } catch (const std::exception &e) {
             qWarning() << "Exception during plugin shutdown:" << e.what();
         }
+        sendOk(id);
     }
 
     void handleUnload(int id, const QString &pluginId)
@@ -175,7 +179,7 @@ private:
         sendError(id, "Method calls not yet supported in pluginhost");
     }
 
-    void sendOk(int requestId, const QJsonValue &result)
+    void sendOk(int requestId, const QJsonValue &result = QJsonValue{})
     {
         QJsonObject resp = PluginHostProtocol::okResponse(requestId, result);
         send(LengthPrefixedFramer::frame(QJsonDocument(resp).toJson(QJsonDocument::Compact)));

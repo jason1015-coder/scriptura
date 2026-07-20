@@ -3,6 +3,7 @@
 #include "servicelocator.h"
 #include "versionfetcher.h"
 #include "plugincrashhandler.h"
+#include "plugincontext.h"
 #include <QDebug>
 #include <QJsonArray>
 #include <QStandardPaths>
@@ -47,7 +48,7 @@ void PluginManager::setPermissionManager(PermissionManager* manager)
 void PluginManager::setCrashHandler(PluginCrashHandler* handler)
 {
     QMutexLocker locker(&m_mutex);
-    m_crashHandler = handler;
+    m_crashHandler.reset(handler);
 }
 
 bool PluginManager::checkPermission(const QString& pluginId, Permission permission) const
@@ -765,7 +766,7 @@ QString PluginManager::pluginsInstallDir() const
     return dir;
 }
 
-bool PluginManager::installPluginFromArchive(const QString &pluginId, const QByteArray &archiveData)
+bool PluginManager::installPluginFromArchive(const QString &pluginId, const QByteArray &archiveData, QWidget* parentWidget)
 {
     QMutexLocker locker(&m_mutex);
     
@@ -821,7 +822,7 @@ bool PluginManager::installPluginFromArchive(const QString &pluginId, const QByt
                        .arg(name, version, author, description, permissions);
 
     QMessageBox::StandardButton trust = QMessageBox::question(
-        parent,
+        parentWidget,
         QObject::tr("Install Plugin"),
         info,
         QMessageBox::Yes | QMessageBox::No);

@@ -1,6 +1,22 @@
 # This file is used to ignore files which are generated
 # ----------------------------------------------------------------------------
 
+# Environment variables / secrets
+.env
+.env.*
+*.env
+*.local
+.env.local
+.env.*.local
+secrets.json
+secrets.yaml
+secrets.yml
+*.pem
+*.key
+private_key.pem
+credentials.json
+
+
 *~
 *.autosave
 *.a
@@ -84,7 +100,10 @@ moc_predefs.h
 # Build directories
 /build/
 /build-*/
+/build-cov/
 /cmake-build-*/
+/out/
+/dist/
 
 # Packaging reference artefacts (not part of the repo)
 /packaging/
@@ -101,6 +120,7 @@ moc_predefs.h
 .qtc_clangd/
 .clangd/
 ./kdev4/
+.kdev4/
 
 # Qt autogen
 *_autogen/
@@ -111,8 +131,35 @@ cmake_install.cmake
 # CMake generated files
 compile_commands.json
 
-# Translation backups
-*.ts.bak
+# CTest / test output
+/Testing/
+test_results/
+*.result
+*.log
+
+# Coverage reports
+coverage/
+coverage.info
+*.gcda
+*.gcno
+*.gcov
+lcov.info
+
+
+# Qt generated translation binaries (source-of-truth is *.ts)
+*.qm
+
+# Python (used by tooling/helpers such as src/mainwindow.py)
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.venv/
+venv/
+env/
+*.egg-info/
+.mypy_cache/
+.ruff_cache/
 
 # Windows icons
 *.ico
