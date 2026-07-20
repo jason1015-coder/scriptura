@@ -6,6 +6,7 @@
 #include <QStackedWidget>
 #include <QTabBar>
 #include <QVBoxLayout>
+#include <QHBoxLayout>
 #include <QDebug>
 
 PluginUIApi::PluginUIApi(MainWindow *mainWindow, QObject *parent)
