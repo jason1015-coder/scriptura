@@ -439,13 +439,7 @@ void LspClient::handleResponse(const QJsonObject &obj)
         }
         emit completionReceived(items, id);
     } else if (method == "definition") {
-        QJsonArray locations;
-        QJsonValue resultVal = obj["result"];
-        if (resultVal.isObject()) {
-            locations.append(resultVal);
-        } else if (resultVal.isArray()) {
-            locations = resultVal.toArray();
-        }
+        QJsonArray locations = obj["result"].toArray();
         emit definitionReceived(locations, id);
     } else if (method == "hover") {
         QJsonObject contents = obj["result"].toObject();
@@ -501,31 +495,13 @@ void LspClient::handleResponse(const QJsonObject &obj)
         QJsonObject help = obj["result"].toObject();
         emit signatureHelpReceived(help, id);
     } else if (method == "declaration") {
-        QJsonArray locations;
-        QJsonValue resultVal = obj["result"];
-        if (resultVal.isObject()) {
-            locations.append(resultVal);
-        } else if (resultVal.isArray()) {
-            locations = resultVal.toArray();
-        }
+        QJsonArray locations = obj["result"].toArray();
         emit declarationReceived(locations, id);
     } else if (method == "typeDefinition") {
-        QJsonArray locations;
-        QJsonValue resultVal = obj["result"];
-        if (resultVal.isObject()) {
-            locations.append(resultVal);
-        } else if (resultVal.isArray()) {
-            locations = resultVal.toArray();
-        }
+        QJsonArray locations = obj["result"].toArray();
         emit typeDefinitionReceived(locations, id);
     } else if (method == "implementation") {
-        QJsonArray locations;
-        QJsonValue resultVal = obj["result"];
-        if (resultVal.isObject()) {
-            locations.append(resultVal);
-        } else if (resultVal.isArray()) {
-            locations = resultVal.toArray();
-        }
+        QJsonArray locations = obj["result"].toArray();
         emit implementationReceived(locations, id);
     } else if (method == "formatting" || method == "rangeFormatting") {
         QJsonArray edits = obj["result"].toArray();

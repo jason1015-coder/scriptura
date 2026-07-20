@@ -1,14 +1,13 @@
 #include "pluginmanager.h"
-#include "plugincontext.h"
 #include "eventbus.h"
 #include "servicelocator.h"
 #include "versionfetcher.h"
 #include "plugincrashhandler.h"
-#include "archiveextractor.h"
 #include <QDebug>
 #include <QJsonArray>
 #include <QStandardPaths>
 #include <QFileInfo>
+#include <QProcess>
 #include <QDir>
 #include <QMessageBox>
 
@@ -48,15 +47,7 @@ void PluginManager::setPermissionManager(PermissionManager* manager)
 void PluginManager::setCrashHandler(PluginCrashHandler* handler)
 {
     QMutexLocker locker(&m_mutex);
-    // Disconnect old handler if it exists
-    if (m_crashHandler) {
-        disconnect(m_crashHandler.data(), &PluginCrashHandler::pluginCrashed, this, &PluginManager::onPluginCrashed);
-    }
-    m_crashHandler.reset(handler);
-    // Connect new handler
-    if (m_crashHandler) {
-        connect(m_crashHandler.data(), &PluginCrashHandler::pluginCrashed, this, &PluginManager::onPluginCrashed);
-    }
+    m_crashHandler = handler;
 }
 
 bool PluginManager::checkPermission(const QString& pluginId, Permission permission) const
@@ -774,7 +765,7 @@ QString PluginManager::pluginsInstallDir() const
     return dir;
 }
 
-bool PluginManager::installPluginFromArchive(const QString &pluginId, const QByteArray &archiveData, QWidget* parent)
+bool PluginManager::installPluginFromArchive(const QString &pluginId, const QByteArray &archiveData)
 {
     QMutexLocker locker(&m_mutex);
     
@@ -795,7 +786,13 @@ bool PluginManager::installPluginFromArchive(const QString &pluginId, const QByt
         f.close();
     }
 
-    bool extracted = Scriptura::ArchiveExtractor::extract(archivePath, targetDir);
+    bool extracted = false;
+    if (!QStandardPaths::findExecutable("unzip").isEmpty()) {
+        QProcess unzip;
+        unzip.setWorkingDirectory(targetDir);
+        unzip.start("unzip", {"-o", archivePath});
+        extracted = unzip.waitForFinished(30000) && unzip.exitStatus() == QProcess::NormalExit;
+    }
     QFile::remove(archivePath);
 
     if (!extracted)

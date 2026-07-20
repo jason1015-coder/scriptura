@@ -2,8 +2,6 @@ cmake_minimum_required(VERSION 3.16)
 
 project(scriptura LANGUAGES CXX)
 
-option(BUILD_TESTING "Build the testing tree" OFF)
-
 # 版本號從 GitHub Release tag 注入，開發時預設為 0.0.0-dev
 if(DEFINED ENV{GITHUB_REF})
     string(REGEX MATCH "refs/tags/v([0-9.]+)" _ $ENV{GITHUB_REF})
@@ -25,15 +23,10 @@ set(CMAKE_AUTORCC ON)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-find_package(QT NAMES Qt6 Qt5 REQUIRED COMPONENTS Widgets LinguistTools Network Sql)
-find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Widgets LinguistTools Network Sql)
-find_package(ZLIB REQUIRED)
+find_package(QT NAMES Qt6 Qt5 REQUIRED COMPONENTS Widgets LinguistTools Network Sql Test)
+find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Widgets LinguistTools Network Sql Test)
 
-if(BUILD_TESTING)
-    find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Test)
-    enable_testing()
-    add_subdirectory(tests)
-endif()
+enable_testing()
 
 # Translation files
 file(GLOB TS_FILES "${CMAKE_CURRENT_SOURCE_DIR}/translations/*.ts")
@@ -44,15 +37,12 @@ set(PROJECT_SOURCES
         src/resources.qrc
 )
 
-# Discover all core library sources under src/ (excluding tests/ and plugins/git/ which has its own CMakeLists.txt,
-# and pluginhost directories which are for the separate executable)
+# Discover all core library sources under src/ (excluding tests/ and plugins/git/ which has its own CMakeLists.txt)
 file(GLOB_RECURSE SCRIPTURA_CORE_SOURCES
     "src/*.cpp" "src/*.h" "src/*.ui" "src/*.qrc" "src/*.h.in"
 )
 list(FILTER SCRIPTURA_CORE_SOURCES EXCLUDE REGEX "src/tests/")
 list(FILTER SCRIPTURA_CORE_SOURCES EXCLUDE REGEX "src/plugins/git/")
-list(FILTER SCRIPTURA_CORE_SOURCES EXCLUDE REGEX "src/plugins/pluginhost/")
-list(FILTER SCRIPTURA_CORE_SOURCES EXCLUDE REGEX "src/pluginhost/")
 
 # The plugin SDK interface headers live outside src/ (in include/ and sdk/include/)
 # and contain Q_OBJECT classes (ScripturaPlugin, PluginContext). Their MOC-generated
@@ -113,7 +103,7 @@ set_target_properties(scriptura_core PROPERTIES
     FOLDER "Internal"
 )
 
-target_link_libraries(scriptura_core PRIVATE Qt${QT_VERSION_MAJOR}::Core Qt${QT_VERSION_MAJOR}::Widgets Qt${QT_VERSION_MAJOR}::Network Qt${QT_VERSION_MAJOR}::Sql ZLIB::ZLIB)
+target_link_libraries(scriptura_core PRIVATE Qt${QT_VERSION_MAJOR}::Core Qt${QT_VERSION_MAJOR}::Widgets Qt${QT_VERSION_MAJOR}::Network Qt${QT_VERSION_MAJOR}::Sql)
 if(WIN32)
     # DwmSetWindowAttribute (used by MainWindow::enableMicaEffect) lives in dwmapi.lib
     target_link_libraries(scriptura_core PRIVATE dwmapi)
@@ -149,59 +139,25 @@ set_target_properties(scriptura PROPERTIES
 )
 
 # Plugin host executable for sandboxed plugin isolation
-# Commented out temporarily to get tests passing, as pluginhost.cpp needs further fixes
-#add_executable(scriptura_pluginhost
-#    src/pluginhost/pluginhost.cpp
-#    src/pluginhost/pluginhost.h
-#    src/internals/lengthprefixedframer.cpp
-#    src/internals/lengthprefixedframer.h
-#)
-#set_target_properties(scriptura_pluginhost PROPERTIES
-#    FOLDER "Internal"
-#    WIN32_EXECUTABLE FALSE
-#)
-#target_link_libraries(scriptura_pluginhost PRIVATE
-#    scriptura_core
-#    Qt${QT_VERSION_MAJOR}::Core
-#    Qt${QT_VERSION_MAJOR}::Widgets
-#)
+add_executable(scriptura_pluginhost
+    src/pluginhost/pluginhost.cpp
+    src/pluginhost/pluginhost.h
+    src/internals/lengthprefixedframer.cpp
+    src/internals/lengthprefixedframer.h
+)
+set_target_properties(scriptura_pluginhost PROPERTIES
+    FOLDER "Internal"
+    WIN32_EXECUTABLE FALSE
+)
+target_link_libraries(scriptura_pluginhost PRIVATE
+    scriptura_core
+    Qt${QT_VERSION_MAJOR}::Core
+    Qt${QT_VERSION_MAJOR}::Widgets
+)
 
 # Add plugin subdirectory (git plugin has its own CMakeLists.txt)
 add_subdirectory(src/plugins/git)
-
-# External plugins outside the scriptura root (optional)
-if(EXISTS /home/jason/scriptura-plugins/autosave)
-  add_subdirectory(/home/jason/scriptura-plugins/autosave /home/jason/scriptura/build/plugins/autosave)
-endif()
-if(EXISTS /home/jason/scriptura-plugins/wordcount)
-  add_subdirectory(/home/jason/scriptura-plugins/wordcount /home/jason/scriptura/build/plugins/wordcount)
-endif()
-if(EXISTS /home/jason/scriptura-plugins/bracketmatcher)
-  add_subdirectory(/home/jason/scriptura-plugins/bracketmatcher /home/jason/scriptura/build/plugins/bracketmatcher)
-endif()
-if(EXISTS /home/jason/scriptura-plugins/whitespacecleaner)
-  add_subdirectory(/home/jason/scriptura-plugins/whitespacecleaner /home/jason/scriptura/build/plugins/whitespacecleaner)
-endif()
-if(EXISTS /home/jason/scriptura-plugins/fileheader)
-  add_subdirectory(/home/jason/scriptura-plugins/fileheader /home/jason/scriptura/build/plugins/fileheader)
-endif()
-if(EXISTS /home/jason/scriptura-plugins/zoomindicator)
-  add_subdirectory(/home/jason/scriptura-plugins/zoomindicator /home/jason/scriptura/build/plugins/zoomindicator)
-endif()
-if(EXISTS /home/jason/scriptura-plugins/linenumberstoggle)
-  add_subdirectory(/home/jason/scriptura-plugins/linenumberstoggle /home/jason/scriptura/build/plugins/linenumberstoggle)
-endif()
-if(EXISTS /home/jason/scriptura-plugins/clipboardhistory)
-  add_subdirectory(/home/jason/scriptura-plugins/clipboardhistory /home/jason/scriptura/build/plugins/clipboardhistory)
-endif()
-if(EXISTS /home/jason/scriptura-plugins/caseconverter)
-  add_subdirectory(/home/jason/scriptura-plugins/caseconverter /home/jason/scriptura/build/plugins/caseconverter)
-endif()
-if(EXISTS /home/jason/scriptura-plugins/duplicatelines)
-  add_subdirectory(/home/jason/scriptura-plugins/duplicatelines /home/jason/scriptura/build/plugins/duplicatelines)
-endif()
-
-# Plugin system configuration
+add_subdirectory(tests)
 
 # Qt for iOS sets MACOSX_BUNDLE_GUI_IDENTIFIER automatically since Qt 6.1.
 # If you are developing for iOS or macOS you should consider setting an
