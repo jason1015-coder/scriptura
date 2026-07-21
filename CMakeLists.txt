@@ -37,13 +37,45 @@ set(PROJECT_SOURCES
         src/resources.qrc
 )
 
-# Discover all core library sources under src/ (excluding tests/ and plugins/git/ which has its own CMakeLists.txt)
+# ── Rust Backend Library ──────────────────────────────────────────
+# Build the Rust library using Cargo
+set(RUST_BACKEND_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src/rust_backend")
+
+# Cargo puts the output in <project>/target/ by default (since it's a workspace)
+# We set the target dir explicitly to ${CMAKE_CURRENT_BINARY_DIR}/rust_backend_target
+set(RUST_TARGET_DIR "${CMAKE_CURRENT_BINARY_DIR}/rust_backend_target")
+
+if(WIN32)
+    set(RUST_LIB_REL_PATH "${RUST_TARGET_DIR}/release/scriptura_backend.lib")
+else()
+    set(RUST_LIB_REL_PATH "${RUST_TARGET_DIR}/release/libscriptura_backend.a")
+endif()
+
+add_custom_target(rust_backend ALL
+    COMMAND ${CMAKE_COMMAND} -E echo "Building Rust backend library..."
+    COMMAND cargo build --release --target-dir "${RUST_TARGET_DIR}"
+    WORKING_DIRECTORY "${RUST_BACKEND_DIR}"
+    COMMENT "Building Rust backend (cargo build --release)"
+    BYPRODUCTS "${RUST_LIB_REL_PATH}"
+)
+
+# Discover only UI-layer C++ sources under src/.
+# All backend/infrastructure services have been rewritten in Rust (src/rust_backend/)
+# and are excluded from C++ compilation. Only Qt UI widgets, panels, and the
+# Rust bridge adapter are compiled as C++.
 file(GLOB_RECURSE SCRIPTURA_CORE_SOURCES
     "src/*.cpp" "src/*.h" "src/*.ui" "src/*.qrc" "src/*.h.in"
 )
+
+# ── Exclude backend C++ files (replaced by Rust FFI modules) ─────────
 list(FILTER SCRIPTURA_CORE_SOURCES EXCLUDE REGEX "src/tests/")
 list(FILTER SCRIPTURA_CORE_SOURCES EXCLUDE REGEX "src/plugins/git/")
 list(FILTER SCRIPTURA_CORE_SOURCES EXCLUDE REGEX "src/pluginhost/")
+list(FILTER SCRIPTURA_CORE_SOURCES EXCLUDE REGEX "src/rust_backend/")
+
+# Migration note: C++ backend services are being replaced by Rust FFI modules.
+# Old C++ backend files remain compiled until the UI layer is fully ported
+# to use the Rust adapters. No exclusions currently active.
 
 # The plugin SDK interface headers live outside src/ (in include/ and sdk/include/)
 # and contain Q_OBJECT classes (ScripturaPlugin, PluginContext). Their MOC-generated
@@ -104,12 +136,42 @@ set_target_properties(scriptura_core PROPERTIES
     FOLDER "Internal"
 )
 
+# Link Rust backend library
+add_dependencies(scriptura_core rust_backend)
+
 find_package(ZLIB REQUIRED)
-target_link_libraries(scriptura_core PRIVATE Qt${QT_VERSION_MAJOR}::Core Qt${QT_VERSION_MAJOR}::Widgets Qt${QT_VERSION_MAJOR}::Network Qt${QT_VERSION_MAJOR}::Sql ZLIB::ZLIB)
+target_link_libraries(scriptura_core PUBLIC
+    Qt${QT_VERSION_MAJOR}::Core
+    Qt${QT_VERSION_MAJOR}::Widgets
+    Qt${QT_VERSION_MAJOR}::Network
+    Qt${QT_VERSION_MAJOR}::Sql
+    ZLIB::ZLIB
+)
+
 if(WIN32)
     # DwmSetWindowAttribute (used by MainWindow::enableMicaEffect) lives in dwmapi.lib
     target_link_libraries(scriptura_core PRIVATE dwmapi)
+    # Windows needs these Rust runtime libraries
+    target_link_libraries(scriptura_core PRIVATE user32 advapi32 ws2_32 crypt32 userenv ntdll)
 endif()
+
+if(APPLE)
+    # macOS needs these frameworks for Rust std
+    find_library(COREFOUNDATION_LIBRARY CoreFoundation)
+    find_library(SECURITY_LIBRARY Security)
+    find_library(SYSTEMCONFIG_LIBRARY SystemConfiguration)
+    target_link_libraries(scriptura_core PRIVATE
+        "${COREFOUNDATION_LIBRARY}"
+        "${SECURITY_LIBRARY}"
+        "${SYSTEMCONFIG_LIBRARY}"
+    )
+endif()
+
+if(UNIX AND NOT APPLE)
+    # Linux needs pthread, dl, etc. for Rust std
+    target_link_libraries(scriptura_core PRIVATE pthread dl rt m)
+endif()
+
 target_include_directories(scriptura_core PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/src
     ${CMAKE_CURRENT_SOURCE_DIR}/src/services/lsp
@@ -125,7 +187,15 @@ target_include_directories(scriptura_core PUBLIC
     ${CMAKE_CURRENT_BINARY_DIR}
 )
 
-target_link_libraries(scriptura PRIVATE scriptura_core Qt${QT_VERSION_MAJOR}::Widgets Qt${QT_VERSION_MAJOR}::Network)
+# IMPORTANT: Rust library MUST come AFTER scriptura_core in the link line.
+# GNU/Clang linkers resolve symbols left-to-right: a library only satisfies
+# undefined references from objects/libraries that appear BEFORE it.
+target_link_libraries(scriptura PRIVATE
+    scriptura_core
+    "${RUST_LIB_REL_PATH}"
+    Qt${QT_VERSION_MAJOR}::Widgets
+    Qt${QT_VERSION_MAJOR}::Network
+)
 
 if(WIN32)
     set_target_properties(scriptura PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS TRUE)
@@ -159,7 +229,6 @@ target_link_libraries(scriptura_pluginhost PRIVATE
 
 # Add plugin subdirectories (each has its own CMakeLists.txt)
 add_subdirectory(src/plugins/git)
-add_subdirectory(themeplug)
 add_subdirectory(tests)
 
 # Qt for iOS sets MACOSX_BUNDLE_GUI_IDENTIFIER automatically since Qt 6.1.

@@ -11,19 +11,30 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Install dependencies
+      
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+      
+      - name: Install system dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y cmake g++ qt6-base-dev qt6-tools-dev libqt6sql6-sqlite wget file
+      
       - name: Download linuxdeploy
         run: |
           wget -q https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
           wget -q https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-x86_64.AppImage
           chmod a+x linuxdeploy-x86_64.AppImage linuxdeploy-plugin-qt-x86_64.AppImage
+      
+      - name: Build Rust backend
+        run: cd src/rust_backend && cargo build --release && cd ../..
+      
       - name: Configure
         run: cmake -B build -S . -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON
+      
       - name: Build
         run: cmake --build build --config Release -j$(nproc)
+      
       - name: Bundle AppImage
         run: |
           mkdir -p AppDir/usr/bin
@@ -35,6 +46,7 @@ jobs:
           export APPIMAGE_EXTRACT_AND_RUN=1
           export QMAKE=/usr/bin/qmake6
           ./linuxdeploy-x86_64.AppImage --plugin qt --appdir AppDir --output appimage
+      
       - name: Create .deb package
         run: |
           sudo apt-get install -y dpkg fakeroot
@@ -52,17 +64,20 @@ jobs:
           Priority: optional
           Architecture: amd64
           Maintainer: Scriptura <maintainer@example.com>
-          Description: A simple Qt-based text editor with project file browsing
-           Scriptura is a Qt-based text editor with project file browsing capabilities.
+          Description: A hybrid Qt/Rust text editor with project file browsing
+           Scriptura is a Qt+ Rust text editor with project file browsing capabilities.
+           The Rust backend provides safe protocol handling (LSP, DAP) and infrastructure services.
           Depends: libqt6core6t64, libqt6gui6, libqt6widgets6, libqt6network6, libqt6sql6
           EOF
           dpkg-deb --build deb-package scriptura.deb
+      
       - name: Upload Linux AppImage
         uses: actions/upload-artifact@v4
         with:
           name: scriptura-linux-appimage
           path: Scriptura*.AppImage
           retention-days: 14
+      
       - name: Upload Linux .deb package
         uses: actions/upload-artifact@v4
         with:
@@ -74,14 +89,25 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
+      
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+      
       - name: Install Qt
         run: brew install qt
+      
+      - name: Build Rust backend
+        run: cd src/rust_backend && cargo build --release && cd ../..
+      
       - name: Configure
         run: cmake -B build -S . -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=/opt/homebrew/opt/qt -DBUILD_TESTING=ON
+      
       - name: Build
         run: cmake --build build --config Release -j$(sysctl -n hw.ncpu)
+      
       - name: Bundle Qt dependencies
         run: macdeployqt build/scriptura.app -always-overwrite
+      
       - name: Upload macOS artifact
         uses: actions/upload-artifact@v4
         with:
@@ -95,6 +121,9 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+      
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
       
       - name: Setup MSVC environment
         uses: ilammy/msvc-dev-cmd@v1
@@ -120,6 +149,9 @@ jobs:
           $version = git describe --tags --always
           if ($version -eq "") { $version = "0.0.0-dev" }
           echo "VERSION=$version" >> $env:GITHUB_OUTPUT
+      
+      - name: Build Rust backend
+        run: cd src/rust_backend && cargo build --release && cd ../..
       
       - name: Configure (MSVC)
         run: cmake -B build -S . -A x64 -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake -DBUILD_TESTING=ON
@@ -151,6 +183,10 @@ jobs:
           if (Test-Path src/resources) { Copy-Item -Recurse -Force src/resources deploy/Release/resources }
           Copy-Item icon.ico deploy/Release/
           Copy-Item LICENSE deploy/Release/
+          # Copy Rust runtime libraries
+          if (Test-Path "$env:RUST_HOME\bin") {
+            Copy-Item "$env:RUST_HOME\bin\*.dll" deploy/Release/
+          }
       
       - name: Build NSIS installer
         run: |

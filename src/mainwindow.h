@@ -183,6 +183,7 @@ private slots:
     void on_action_go_to_implementation_triggered();
     void on_action_show_document_symbols_triggered();
     void on_fileTreeView_clicked(const QModelIndex &index);
+    void on_fileTreeView_contextMenu(const QPoint &pos);
     void on_tabWidget_tabCloseRequested(int index);
     void goUpClicked();
     void on_action_open_file_triggered();

@@ -78,6 +78,7 @@
 #include <QEasingCurve>
 #include <QAbstractAnimation>
 #include <QFrame>
+#include <QMenu>
 #include "customtitlebar.h"
 #include "windowanimator.h"
 #include "thememanager.h"
@@ -89,7 +90,6 @@
 #include <QTimer>
 #include <QPainter>
 #include <QDebug>
-#include <QMenu>
 
 // Linux blur support - uses KWin's KWindowEffects if available
 // This provides a blur behind the window similar to Windows Acrylic
@@ -169,27 +169,6 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
         }
     });
     connect(m_titleBar, &CustomTitleBar::closeRequest, this, &QWidget::close);
-    connect(m_titleBar, &CustomTitleBar::menuRequested, this, [this]() {
-        // Create a dropdown menu from the menu bar actions
-        QMenu dropdownMenu(this);
-        dropdownMenu.setObjectName("titleBarMenu");
-
-        // Add all menu bar actions to the dropdown
-        const QList<QMenu*> menus = ui->menubar->findChildren<QMenu*>();
-        for (QMenu *menu : menus) {
-            if (!menu->title().isEmpty()) {
-                QAction *menuAction = menu->menuAction();
-                if (menuAction) {
-                    dropdownMenu.addAction(menuAction);
-                    dropdownMenu.addSeparator();
-                }
-            }
-        }
-
-        // Show menu below the button
-        QPoint menuPos = m_titleBar->menuButton->mapToGlobal(QPoint(0, m_titleBar->menuButton->height()));
-        dropdownMenu.exec(menuPos);
-    });
 
     // Connect unified title bar signals
     connect(m_titleBar, &CustomTitleBar::sidebarToggleClicked, this, [this]() {
@@ -331,6 +310,10 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
     ui->fileTreeView->setColumnHidden(1, true);
     ui->fileTreeView->setColumnHidden(2, true);
     ui->fileTreeView->setColumnHidden(3, true);
+    // Enable right-click context menu on the file tree
+    ui->fileTreeView->setContextMenuPolicy(Qt::CustomContextMenu);
+    connect(ui->fileTreeView, &QTreeView::customContextMenuRequested,
+            this, &MainWindow::on_fileTreeView_contextMenu);
 
     // Wire file model into universal search for file name searching
     if (m_universalSearch) {
@@ -794,91 +777,25 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
     QShortcut *shortcutCloseWindow = new QShortcut(QKeySequence("Ctrl+W"), this);
     connect(shortcutCloseWindow, &QShortcut::activated, this, &QWidget::close);
 
-    QMenu *searchMenu = ui->menubar->addMenu(tr("&Search"));
-    QAction *actionFind = searchMenu->addAction(tr("&Find..."));
-    connect(actionFind, &QAction::triggered, this, &MainWindow::on_action_find_triggered);
-    QAction *actionReplace = searchMenu->addAction(tr("&Replace..."));
-    connect(actionReplace, &QAction::triggered, this, &MainWindow::on_action_replace_triggered);
-    searchMenu->addSeparator();
-    QAction *actionProjectSearch = searchMenu->addAction(tr("Search in &Project..."));
-    connect(actionProjectSearch, &QAction::triggered, this, &MainWindow::on_action_project_search_triggered);
-    QAction *actionCommandPalette = searchMenu->addAction(tr("&Command Palette..."));
-    connect(actionCommandPalette, &QAction::triggered, this, &MainWindow::on_action_command_palette_triggered);
+    // Keyboard shortcuts previously defined on .ui action shortcuts (now removed with menus)
+    QShortcut *shortcutSave = new QShortcut(QKeySequence("Ctrl+S"), this);
+    connect(shortcutSave, &QShortcut::activated, this, &MainWindow::on_action_save_triggered);
 
-    QMenu *lspMenu = ui->menubar->addMenu(tr("&Code"));
-    QAction *actionFormat = lspMenu->addAction(tr("&Format Document"));
-    connect(actionFormat, &QAction::triggered, this, &MainWindow::on_action_format_document_triggered);
-    QAction *actionSymbols = lspMenu->addAction(tr("Show &Symbols..."));
-    connect(actionSymbols, &QAction::triggered, this, &MainWindow::on_action_show_document_symbols_triggered);
-    QAction *actionDefinition = lspMenu->addAction(tr("Go to &Definition"));
-    connect(actionDefinition, &QAction::triggered, this, &MainWindow::on_action_go_to_definition_triggered);
-    QAction *actionDeclaration = lspMenu->addAction(tr("Go to &Declaration"));
-    connect(actionDeclaration, &QAction::triggered, this, &MainWindow::on_action_go_to_declaration_triggered);
-    QAction *actionTypeDefinition = lspMenu->addAction(tr("Go to &Type Definition"));
-    connect(actionTypeDefinition, &QAction::triggered, this, &MainWindow::on_action_go_to_type_definition_triggered);
-    QAction *actionImplementation = lspMenu->addAction(tr("Go to &Implementation"));
-    connect(actionImplementation, &QAction::triggered, this, &MainWindow::on_action_go_to_implementation_triggered);
+    QShortcut *shortcutSaveAs = new QShortcut(QKeySequence("Ctrl+Shift+S"), this);
+    connect(shortcutSaveAs, &QShortcut::activated, this, &MainWindow::on_action_save_as_triggered);
 
-    // Debug menu
-    QMenu *debugMenu = ui->menubar->addMenu(tr("&Debug"));
-    QAction *actionRunDebug = debugMenu->addAction(tr("Run / &Debug..."));
-    actionRunDebug->setShortcut(QKeySequence("F5"));
-    connect(actionRunDebug, &QAction::triggered, this, &MainWindow::on_action_run_debug_triggered);
-    QAction *actionStopDebug = debugMenu->addAction(tr("Stop &Debugging"));
-    actionStopDebug->setShortcut(QKeySequence("Shift+F5"));
-    connect(actionStopDebug, &QAction::triggered, this, &MainWindow::on_action_stop_debug_triggered);
-    debugMenu->addSeparator();
-    QAction *actionToggleBreakpoint = debugMenu->addAction(tr("Toggle &Breakpoint"));
-    actionToggleBreakpoint->setShortcut(QKeySequence("F9"));
-    connect(actionToggleBreakpoint, &QAction::triggered, this, &MainWindow::on_action_toggle_breakpoint_triggered);
-    debugMenu->addSeparator();
-    QAction *actionContinue = debugMenu->addAction(tr("&Continue"));
-    actionContinue->setShortcut(QKeySequence("Ctrl+F5"));
-    connect(actionContinue, &QAction::triggered, this, &MainWindow::on_action_continue_debug_triggered);
-    QAction *actionStepOver = debugMenu->addAction(tr("Step &Over"));
-    actionStepOver->setShortcut(QKeySequence("F10"));
-    connect(actionStepOver, &QAction::triggered, this, &MainWindow::on_action_step_over_triggered);
-    QAction *actionStepInto = debugMenu->addAction(tr("Step &Into"));
-    actionStepInto->setShortcut(QKeySequence("F11"));
-    connect(actionStepInto, &QAction::triggered, this, &MainWindow::on_action_step_into_triggered);
-    QAction *actionStepOut = debugMenu->addAction(tr("Step &Out"));
-    actionStepOut->setShortcut(QKeySequence("Shift+F11"));
-    connect(actionStepOut, &QAction::triggered, this, &MainWindow::on_action_step_out_triggered);
+    QShortcut *shortcutOpenProject = new QShortcut(QKeySequence("Ctrl+O"), this);
+    connect(shortcutOpenProject, &QShortcut::activated, this, &MainWindow::on_action_open_project_triggered);
 
-    QMenu *toolsMenu = ui->menubar->addMenu(tr("&Tools"));
-    QAction *actionHttpClient = toolsMenu->addAction(tr("HTTP &Client"));
-    connect(actionHttpClient, &QAction::triggered, this, [this]() {
-        bottomPanelTabs->setCurrentIndex(4);
-        ui->bottomPanelContainer->show();
-    });
-    QAction *actionDbViewer = toolsMenu->addAction(tr("SQLite &Viewer"));
-    connect(actionDbViewer, &QAction::triggered, this, [this]() {
-        bottomPanelTabs->setCurrentIndex(5);
-        ui->bottomPanelContainer->show();
-    });
-    toolsMenu->addSeparator();
-    QAction *actionAICompletions = toolsMenu->addAction(tr("AI &Completions"));
-    actionAICompletions->setCheckable(true);
-    actionAICompletions->setChecked(m_aiInline->isEnabled());
-    connect(actionAICompletions, &QAction::triggered, this, [this, actionAICompletions](bool checked) {
-        QSettings settings;
-        settings.setValue("ai/enabled", checked);
-        m_aiInline->setSettings(
-            settings.value("ai/provider", "ollama").toString(),
-            settings.value("ai/endpoint", "http://localhost:11434/api/chat").toString(),
-            settings.value("ai/model", "codellama").toString(),
-            checked,
-            settings.value("ai/debounceMs", 400).toInt(),
-            settings.value("ai/apiKey", {}).toString()
-        );
-        actionAICompletions->setChecked(checked);
-    });
+    QShortcut *shortcutOpenFile = new QShortcut(QKeySequence("Ctrl+Shift+O"), this);
+    connect(shortcutOpenFile, &QShortcut::activated, this, &MainWindow::on_action_open_file_triggered);
 
     connect(findReplaceBar, &FindReplaceBar::replaceAllComplete, this, [](int count) {
         qDebug() << "Replace all complete:" << count;
     });
 
-    // Hide the native menu bar — menus are accessible via the unified title bar dropdown
+    // The native menu bar is empty and hidden — all actions are accessed via
+    // keyboard shortcuts, command palette (Ctrl+Shift+P), and right-click context menus.
     ui->menubar->hide();
 
     connect(projectSearchPanel, &ProjectSearchPanel::resultActivated, this, [this](const QString &filePath, int line, int column) {
@@ -2203,6 +2120,91 @@ void MainWindow::on_tabWidget_tabCloseRequested(int index)
         showSearchBar(false);
         problemPanel->hide();
         problemsButton->setChecked(false);
+    }
+}
+
+void MainWindow::on_fileTreeView_contextMenu(const QPoint &pos)
+{
+    QModelIndex index = ui->fileTreeView->indexAt(pos);
+    // Select the item under the cursor for visual feedback
+    if (index.isValid()) {
+        ui->fileTreeView->setCurrentIndex(index);
+    }
+
+    QMenu menu(this);
+
+    QAction *newFileAction = menu.addAction(tr("New File..."));
+    newFileAction->setIcon(ThemeIcons::instance()->icon(":/icons/file.svg"));
+    QAction *newFolderAction = menu.addAction(tr("New Folder..."));
+    newFolderAction->setIcon(ThemeIcons::instance()->icon(":/icons/folder.svg"));
+
+    menu.addSeparator();
+
+    QAction *renameAction = menu.addAction(tr("Rename..."));
+    QAction *deleteAction = menu.addAction(tr("Delete"));
+    deleteAction->setIcon(ThemeIcons::instance()->icon(":/icons/close.svg"));
+
+    // Disable rename/delete if nothing selected
+    if (!index.isValid()) {
+        renameAction->setEnabled(false);
+        deleteAction->setEnabled(false);
+    }
+
+    QAction *selected = menu.exec(ui->fileTreeView->mapToGlobal(pos));
+    if (!selected)
+        return;
+
+    if (selected == newFileAction || selected == newFolderAction) {
+        // Determine target directory
+        QString targetDir;
+        if (index.isValid() && fileModel->isDir(index)) {
+            targetDir = fileModel->filePath(index);
+        } else if (index.isValid()) {
+            targetDir = fileModel->fileInfo(index).absolutePath();
+        } else {
+            targetDir = projectDir.isEmpty() ? fileModel->rootPath() : projectDir;
+        }
+
+        if (selected == newFileAction) {
+            QString fileName = QInputDialog::getText(this, tr("New File"),
+                tr("File name:"), QLineEdit::Normal, QString());
+            if (!fileName.isEmpty()) {
+                QString fullPath = targetDir + QDir::separator() + fileName;
+                QFile file(fullPath);
+                if (file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+                    file.close();
+                } else {
+                    QMessageBox::warning(this, tr("Error"),
+                        tr("Cannot create file: %1").arg(fullPath));
+                }
+            }
+        } else {
+            QString dirName = QInputDialog::getText(this, tr("New Folder"),
+                tr("Folder name:"), QLineEdit::Normal, QString());
+            if (!dirName.isEmpty()) {
+                QDir dir(targetDir);
+                if (!dir.mkdir(dirName)) {
+                    QMessageBox::warning(this, tr("Error"),
+                        tr("Cannot create folder: %1").arg(dirName));
+                }
+            }
+        }
+    } else if (selected == renameAction && index.isValid()) {
+        QString oldPath = fileModel->filePath(index);
+        QFileInfo fi(oldPath);
+        QString newName = QInputDialog::getText(this, tr("Rename"),
+            tr("New name:"), QLineEdit::Normal, fi.fileName());
+        if (!newName.isEmpty() && newName != fi.fileName()) {
+            QString newPath = fi.dir().absoluteFilePath(newName);
+            QFile file(oldPath);
+            if (!file.rename(newPath)) {
+                QMessageBox::warning(this, tr("Error"),
+                    tr("Cannot rename to: %1").arg(newName));
+            }
+        }
+    } else if (selected == deleteAction && index.isValid()) {
+        // Reuse the existing delete slot to avoid duplicating logic
+        on_action_delete_file_directory_triggered();
     }
 }
 

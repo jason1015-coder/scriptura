@@ -1,16 +1,20 @@
 # Windows Deployment Guide
 
-This guide explains how to build and package Scriptura for Windows with all Qt dependencies bundled, so users don't need to manually install Qt or configure dependencies.
+This guide explains how to build and package Scriptura for Windows with all Qt and Rust dependencies bundled, so users don't need to manually install Qt or the Rust runtime.
 
 ## Prerequisites
 
 ### For Building on Windows
 
 1. **Visual Studio 2022** (with C++ desktop development workload) or **MSVC Build Tools**
-2. **CMake 3.16+** - [Download](https://cmake.org/download/)
-3. **Qt 6** (with Widgets, Network, Sql, LinguistTools modules) - [Download](https://www.qt.io/download)
-4. **Git** - [Download](https://git-scm.com/download/win)
-5. **NSIS** (for creating installers) - [Download](https://nsis.sourceforge.io/Download)
+2. **CMake 3.16+** — [Download](https://cmake.org/download/)
+3. **Qt 6** (with Widgets, Network, Sql, LinguistTools modules) — [Download](https://www.qt.io/download)
+4. **Rust toolchain** — Install via [rustup](https://rustup.rs/):
+   ```batch
+   curl --proto =https --tlsv1.2 -sSf https://sh.rustup.rs | sh
+   ```
+5. **Git** — [Download](https://git-scm.com/download/win)
+6. **NSIS** (for creating installers) — [Download](https://nsis.sourceforge.io/Download)
 
 ### For Building on Linux/macOS (cross-compilation)
 
@@ -22,24 +26,34 @@ Cross-compilation for Windows is complex. It's recommended to build on Windows u
 
 1. Open **x64 Native Tools Command Prompt for VS 2022** (or similar MSVC command prompt)
 2. Navigate to the Scriptura directory
-3. Run the deployment script:
-
-```batch
-deploy-windows.bat Release
-```
+3. Build the Rust backend first:
+   ```batch
+   cd src\rust_backend
+   cargo build --release
+   cd ..\..
+   ```
+4. Run the deployment script:
+   ```batch
+   deploy-windows.bat Release
+   ```
 
 This will:
-- Build the application in Release mode
+- Build the C++ application in Release mode
 - Use `windeployqt` to copy all Qt dependencies
 - Create a `deploy\Release` folder with all necessary files
 
 ### Option 2: Manual Build and Deploy
 
 ```batch
-REM Configure
+REM Build Rust backend
+cd src\rust_backend
+cargo build --release
+cd ..\..
+
+REM Configure C++ build
 cmake -B build -S . -A x64 -DCMAKE_BUILD_TYPE=Release
 
-REM Build
+REM Build C++ project
 cmake --build build --config Release -j
 
 REM Deploy Qt dependencies
@@ -94,6 +108,10 @@ The `windeployqt` tool automatically copies:
 - **Network SSL libraries**: OpenSSL DLLs (if used)
 - **Microsoft Visual C++ Redistributable**: Required runtime libraries
 
+The Rust backend is compiled **statically** into `scriptura.exe` via `libscriptura_backend.lib`,
+so no separate Rust runtime DLLs are needed. The Rust standard library is linked statically
+by default when building with `cargo build --release`.
+
 ## Installer Features
 
 The NSIS installer (`Scriptura-Setup.exe`) provides:
@@ -102,15 +120,17 @@ The NSIS installer (`Scriptura-Setup.exe`) provides:
 - **Start Menu shortcuts** for Scriptura and Uninstaller
 - **Automatic uninstallation** via Windows Add/Remove Programs
 - **Version detection** from git tags
-- **Upgrade support** - detects existing installations
+- **Upgrade support** — detects existing installations
 
 ## Portable Version
 
 For a portable version (no installation required):
 
-1. Run `deploy-windows.bat Release`
-2. Zip the contents of `deploy\Release\`
-3. Users can extract and run `scriptura.exe` directly
+1. Build the Rust backend: `cd src\rust_backend && cargo build --release`
+2. Build the C++ project: `cmake --build build --config Release -j`
+3. Run `windeployqt build\Release\scriptura.exe`
+4. Zip the contents of `build\Release\`
+5. Users can extract and run `scriptura.exe` directly
 
 ## Troubleshooting
 
@@ -130,15 +150,18 @@ For a portable version (no installation required):
 - Run from command prompt to see error messages
 - Check that all plugins are in the correct `plugins` subdirectory
 - Verify Qt plugin paths are correct
+- If the Rust backend fails, run `rust_last_error()` from a debugger to get the error message
 
 ## GitHub Actions CI/CD
 
 The project includes a GitHub Actions workflow (`.github/workflows/build.yml`) that automatically:
 
-1. Builds Scriptura for Windows on every push
-2. Deploys Qt dependencies using `windeployqt`
-3. Creates an NSIS installer
-4. Uploads both the installer and portable version as artifacts
+1. Installs the Rust toolchain via `dtolnay/rust-toolchain`
+2. Builds the Rust backend library (`cargo build --release`)
+3. Builds Scriptura for Windows on every push
+4. Deploys Qt dependencies using `windeployqt`
+5. Creates an NSIS installer
+6. Uploads both the installer and portable version as artifacts
 
 To enable automated builds:
 1. Push your code to GitHub
@@ -180,6 +203,7 @@ xcopy /E /I /Y build\Release\qsqlite deploy\Release\
 | Qt6Network.dll | Networking | Yes |
 | Qt6Sql.dll | SQL database support | Yes |
 | platforms/qwindows.dll | Windows platform plugin | Yes |
+| scriptura_backend.lib | Rust backend (statically linked) | Compiled into executable |
 | MSVC Runtime | C++ runtime library | Yes (via windeployqt) |
 | OpenSSL | HTTPS support | If used |
 

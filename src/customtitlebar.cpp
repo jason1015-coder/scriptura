@@ -16,13 +16,11 @@ CustomTitleBar::CustomTitleBar(QWidget *parent)
     , maximizeButton(nullptr)
     , closeButton(nullptr)
     , titleLabel(nullptr)
-    , menuButton(nullptr)
     , sidebarToggleButton(nullptr)
     , inspectorToggleButton(nullptr)
     , searchField(nullptr)
     , m_isDragging(false)
     , m_dragPosition(QPoint())
-    , m_dropdownMenu(nullptr)
 {
     setFixedHeight(52);
     setAttribute(Qt::WA_TranslucentBackground, false);
@@ -37,16 +35,7 @@ void CustomTitleBar::setupLayout()
     layout->setContentsMargins(8, 0, 8, 0);
     layout->setSpacing(2);
 
-    // -- Leading: menu button + sidebar toggle --
-    menuButton = new QPushButton(this);
-    menuButton->setObjectName("TitleBarMenu");
-    menuButton->setFixedSize(36, 36);
-    menuButton->setToolTip(tr("Menu"));
-    menuButton->setIcon(ThemeIcons::instance()->icon(":/icons/menu.svg"));
-    menuButton->setIconSize(QSize(18, 18));
-    connect(menuButton, &QPushButton::clicked, this, &CustomTitleBar::showMenu);
-    layout->addWidget(menuButton);
-
+    // -- Leading: sidebar toggle --
     sidebarToggleButton = new QPushButton(this);
     sidebarToggleButton->setObjectName("TitleBarSidebarToggle");
     sidebarToggleButton->setFixedSize(36, 36);
@@ -159,7 +148,6 @@ void CustomTitleBar::styleButtons()
     minimizeButton->setStyleSheet(buttonStyle);
     maximizeButton->setStyleSheet(buttonStyle);
     closeButton->setStyleSheet(buttonStyle);
-    menuButton->setStyleSheet(checkableButtonStyle);
     sidebarToggleButton->setStyleSheet(checkableButtonStyle);
     inspectorToggleButton->setStyleSheet(checkableButtonStyle);
 
@@ -244,26 +232,4 @@ void CustomTitleBar::handleMouseMove(QMouseEvent *event)
 void CustomTitleBar::stopDrag()
 {
     m_isDragging = false;
-}
-
-void CustomTitleBar::showMenu()
-{
-    if (!m_dropdownMenu) {
-        m_dropdownMenu = new QMenu(this);
-        m_dropdownMenu->setObjectName("titleBarMenu");
-
-        m_dropdownMenu->addAction(tr("&Open Project..."), this, []() {});
-        m_dropdownMenu->addAction(tr("&Open File..."), this, []() {});
-        m_dropdownMenu->addSeparator();
-        m_dropdownMenu->addAction(tr("&Save"), this, []() {});
-        m_dropdownMenu->addAction(tr("Save &As..."), this, []() {});
-        m_dropdownMenu->addSeparator();
-        m_dropdownMenu->addAction(tr("&Undo"), this, []() {});
-        m_dropdownMenu->addAction(tr("&Redo"), this, []() {});
-        m_dropdownMenu->addSeparator();
-        m_dropdownMenu->addAction(tr("&Preferences..."), this, []() {});
-    }
-
-    QPoint menuPos = mapToGlobal(QPoint(0, height()));
-    m_dropdownMenu->exec(menuPos);
 }

@@ -7,7 +7,6 @@
 #include <QLineEdit>
 #include <QMouseEvent>
 #include <QHBoxLayout>
-#include <QMenu>
 #include <QPainter>
 #include <QStyleOption>
 
@@ -25,7 +24,6 @@ public:
     QPushButton* maximizeButton;
     QPushButton* closeButton;
     QLabel* titleLabel;
-    QPushButton* menuButton;
     QPushButton* sidebarToggleButton;
     QPushButton* inspectorToggleButton;
     QLineEdit* searchField;
@@ -35,13 +33,9 @@ signals:
     void maximizeRequest();
     void minimizeRequest();
     void closeRequest();
-    void menuRequested();
     void sidebarToggleClicked();
     void inspectorToggleClicked();
     void searchRequested();
-
-public slots:
-    void showMenu();
 
 protected:
     void paintEvent(QPaintEvent *event) override;
@@ -49,7 +43,6 @@ protected:
 private:
     bool m_isDragging = false;
     QPoint m_dragPosition;
-    QMenu* m_dropdownMenu;
 
     void styleButtons();
     void setupLayout();

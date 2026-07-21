@@ -149,6 +149,11 @@ lcov.info
 # Qt generated translation binaries (source-of-truth is *.ts)
 *.qm
 
+# Rust backend build artifacts
+src/rust_backend/target/
+src/rust_backend/Cargo.lock
+rust_backend_target/
+
 # Python (used by tooling/helpers such as src/mainwindow.py)
 __pycache__/
 *.py[cod]
