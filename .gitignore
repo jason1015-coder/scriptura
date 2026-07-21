@@ -83,7 +83,7 @@ CMakeLists.txt.user*
 *.Release
 
 # Binaries
-scriptura
+/scriptura
 scriptura.exe
 *.dll
 *.exe
