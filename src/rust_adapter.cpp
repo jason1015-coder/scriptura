@@ -535,7 +535,7 @@ bool RustPluginManagerAdapter::isLoaded(const QString &id) const
 QString RustPluginManagerAdapter::pluginVersion(const QString &id) const
 {
     QByteArray i = id.toUtf8();
-    const char *ver = rust_pm_plugin_version(m_manager, i.constData());
+    char *ver = rust_pm_plugin_version(m_manager, i.constData());
     if (!ver) return {};
     QString result = QString::fromUtf8(ver);
     rust_free_string(ver);
@@ -640,7 +640,7 @@ void RustWorkspaceAdapter::setFolders(const QStringList &folders)
 
 QJsonObject RustWorkspaceAdapter::settings() const
 {
-    const char *json = rust_workspace_get_settings(m_workspace);
+    char *json = rust_workspace_get_settings(m_workspace);
     QJsonObject result = QJsonDocument::fromJson(QByteArray(json)).object();
     rust_free_string(json);
     return result;
@@ -672,7 +672,7 @@ void RustWorkspaceAdapter::addRecentFile(const QString &file)
 
 QString RustWorkspaceAdapter::path() const
 {
-    const char *p = rust_workspace_path(m_workspace);
+    char *p = rust_workspace_path(m_workspace);
     QString result = QString::fromUtf8(p);
     rust_free_string(p);
     return result;
