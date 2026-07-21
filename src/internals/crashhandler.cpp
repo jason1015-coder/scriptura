@@ -35,26 +35,31 @@ QString CrashHandler::dumpPath()
 }
 
 // Async-signal-safe crash dump writing for Linux/macOS
+//
+// WARNING: backtrace_symbols() and free() are NOT async-signal-safe because
+// they call malloc() internally.  We must use backtrace_symbols_fd() instead,
+// which writes directly to a file descriptor without allocating memory.
+
 #ifdef Q_OS_LINUX
 static void writeCrashDumpSafe(int sig) {
     void *buffer[100];
     int nptrs = backtrace(buffer, 100);
-    char **strings = backtrace_symbols(buffer, nptrs);
 
-    // Use async-signal-safe functions only
     const char *path = "/tmp/scriptura-crash.log";
     int fd = open(path, O_WRONLY | O_CREAT | O_TRUNC, 0644);
     if (fd >= 0) {
         const char *header = "Scriptura Crash Report\nStack trace:\n";
         ssize_t written = write(fd, header, strlen(header));
         Q_UNUSED(written)
-        for (int i = 0; i < nptrs && strings; i++) {
-            written = write(fd, strings[i], strlen(strings[i]));
-            written = write(fd, "\n", 1);
-        }
+
+        // backtrace_symbols_fd() is async-signal-safe – it formats the
+        // addresses directly into the fd without calling malloc.
+        backtrace_symbols_fd(buffer, nptrs, fd);
+
+        written = write(fd, "\n", 1);
+        Q_UNUSED(written)
         close(fd);
     }
-    if (strings) free(strings);
 
     // Restore default handler and re-raise
     signal(sig, SIG_DFL);
@@ -66,7 +71,6 @@ static void writeCrashDumpSafe(int sig) {
 static void writeCrashDumpSafe(int sig) {
     void *buffer[100];
     int nptrs = backtrace(buffer, 100);
-    char **strings = backtrace_symbols(buffer, nptrs);
 
     const char *path = "/tmp/scriptura-crash.log";
     int fd = open(path, O_WRONLY | O_CREAT | O_TRUNC, 0644);
@@ -74,13 +78,13 @@ static void writeCrashDumpSafe(int sig) {
         const char *header = "Scriptura Crash Report\nStack trace:\n";
         ssize_t written = write(fd, header, strlen(header));
         Q_UNUSED(written)
-        for (int i = 0; i < nptrs && strings; i++) {
-            written = write(fd, strings[i], strlen(strings[i]));
-            written = write(fd, "\n", 1);
-        }
+
+        backtrace_symbols_fd(buffer, nptrs, fd);
+
+        written = write(fd, "\n", 1);
+        Q_UNUSED(written)
         close(fd);
     }
-    if (strings) free(strings);
 
     signal(sig, SIG_DFL);
     raise(sig);

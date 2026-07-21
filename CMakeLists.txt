@@ -157,8 +157,9 @@ target_link_libraries(scriptura_pluginhost PRIVATE
     Qt${QT_VERSION_MAJOR}::Widgets
 )
 
-# Add plugin subdirectory (git plugin has its own CMakeLists.txt)
+# Add plugin subdirectories (each has its own CMakeLists.txt)
 add_subdirectory(src/plugins/git)
+add_subdirectory(themeplug)
 add_subdirectory(tests)
 
 # Qt for iOS sets MACOSX_BUNDLE_GUI_IDENTIFIER automatically since Qt 6.1.
