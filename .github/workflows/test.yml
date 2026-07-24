@@ -115,7 +115,8 @@ jobs:
         run: cd src\rust_backend && cargo test && cd ..\..
 
       - name: Build Rust backend
-        run: cd src\rust_backend && cargo build && cd ..\..
+        run: cargo build --release --target-dir "${{ github.workspace }}\build\rust_backend_target"
+        working-directory: src\rust_backend
       
       - name: Configure (MSVC)
         run: cmake -B build -S . -A x64 -DCMAKE_BUILD_TYPE=Debug -DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake -DBUILD_TESTING=ON

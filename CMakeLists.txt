@@ -145,16 +145,10 @@ set_target_properties(scriptura_core PROPERTIES
 )
 
 # Build Rust backend before scriptura_core.
-# Windows (MSBuild): PRE_BUILD event works correctly with MSBuild.
-# Linux/macOS (Ninja/Make): custom target dependency ensures build order.
-if(WIN32)
-    # CI builds Rust in a separate step before CMake, so cargo is near-instant here.
-    add_custom_command(TARGET scriptura_core PRE_BUILD
-        COMMAND cargo build --release --target-dir "${RUST_TARGET_DIR}"
-        WORKING_DIRECTORY "${RUST_BACKEND_DIR}"
-        COMMENT "Building Rust backend (cargo build --release)"
-    )
-else()
+# On Linux/macOS (Ninja/Make generators): custom target dependency ensures build order.
+# On Windows (MSBuild): CI builds Rust in a separate step before CMake configuration,
+# so the library must be pre-built at the expected path.
+if(NOT WIN32)
     add_dependencies(scriptura_core rust_backend)
 endif()
 
