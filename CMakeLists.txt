@@ -51,12 +51,18 @@ else()
     set(RUST_LIB_REL_PATH "${RUST_TARGET_DIR}/release/libscriptura_backend.a")
 endif()
 
-add_custom_target(rust_backend ALL
-    COMMAND ${CMAKE_COMMAND} -E echo "Building Rust backend library..."
+# Build the Rust library via cargo.
+# Uses add_custom_command(OUTPUT ...) so MSBuild can track the generated file properly
+# (the ALL + BYPRODUCTS pattern does not work reliably with the Visual Studio generator).
+add_custom_command(
+    OUTPUT "${RUST_LIB_REL_PATH}"
     COMMAND cargo build --release --target-dir "${RUST_TARGET_DIR}"
     WORKING_DIRECTORY "${RUST_BACKEND_DIR}"
     COMMENT "Building Rust backend (cargo build --release)"
-    BYPRODUCTS "${RUST_LIB_REL_PATH}"
+)
+
+add_custom_target(rust_backend
+    DEPENDS "${RUST_LIB_REL_PATH}"
 )
 
 # Discover only UI-layer C++ sources under src/.
