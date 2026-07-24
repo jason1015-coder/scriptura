@@ -40,10 +40,7 @@ if(UNIX AND NOT APPLE)
 endif()
 
 # Ensure the Rust library is built before the test executable links
-# (rust_backend target only exists on non-Windows platforms)
-if(NOT WIN32)
-    add_dependencies(scriptura_tests rust_backend)
-endif()
+add_dependencies(scriptura_tests rust_backend)
 
 target_include_directories(scriptura_tests PRIVATE
     ${CMAKE_SOURCE_DIR}/src

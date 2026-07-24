@@ -150,10 +150,6 @@ jobs:
           if ($version -eq "") { $version = "0.0.0-dev" }
           echo "VERSION=$version" >> $env:GITHUB_OUTPUT
       
-      - name: Build Rust backend
-        run: cargo build --release --target-dir "${{ github.workspace }}\build\rust_backend_target"
-        working-directory: src/rust_backend
-      
       - name: Configure (MSVC)
         run: cmake -B build -S . -A x64 -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake -DBUILD_TESTING=ON
       

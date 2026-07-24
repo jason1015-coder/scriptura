@@ -143,13 +143,8 @@ set_target_properties(scriptura_core PROPERTIES
     FOLDER "Internal"
 )
 
-# Build Rust backend before scriptura_core.
-# On Linux/macOS (Ninja/Make generators): custom target dependency ensures build order.
-# On Windows (MSBuild): CI builds Rust in a separate step before CMake configuration,
-# so the library must be pre-built at the expected path.
-if(NOT WIN32)
-    add_dependencies(scriptura_core rust_backend)
-endif()
+# Build Rust backend before scriptura_core and tests on ALL platforms
+add_dependencies(scriptura_core rust_backend)
 
 find_package(ZLIB REQUIRED)
 target_link_libraries(scriptura_core PUBLIC
