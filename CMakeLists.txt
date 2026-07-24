@@ -52,20 +52,19 @@ else()
 endif()
 
 # Build the Rust library via cargo.
-# On Linux/macOS (Ninja/Make generators), define a custom command + target.
-# On Windows (MSBuild), PRE_BUILD on scriptura_core is used instead
-# (defined later, after the target exists).
-if(NOT WIN32)
-    add_custom_command(
-        OUTPUT "${RUST_LIB_REL_PATH}"
-        COMMAND cargo build --release --target-dir "${RUST_TARGET_DIR}"
-        WORKING_DIRECTORY "${RUST_BACKEND_DIR}"
-        COMMENT "Building Rust backend (cargo build --release)"
-    )
-    add_custom_target(rust_backend
-        DEPENDS "${RUST_LIB_REL_PATH}"
-    )
-endif()
+# Define a custom command + target for all platforms (Linux, macOS, and Windows).
+add_custom_command(
+    OUTPUT "${RUST_LIB_REL_PATH}"
+    COMMAND cargo build --release --target-dir "${RUST_TARGET_DIR}"
+    WORKING_DIRECTORY "${RUST_BACKEND_DIR}"
+    COMMENT "Building Rust backend (cargo build --release)"
+)
+add_custom_target(rust_backend
+    DEPENDS "${RUST_LIB_REL_PATH}"
+)
+
+# On Windows (MSBuild), the rust_backend target will be added as a dependency
+# to all targets that need it, ensuring it's built before they're linked.
 
 # Discover only UI-layer C++ sources under src/.
 # All backend/infrastructure services have been rewritten in Rust (src/rust_backend/)
