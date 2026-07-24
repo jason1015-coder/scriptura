@@ -52,18 +52,20 @@ else()
 endif()
 
 # Build the Rust library via cargo.
-# Uses add_custom_command(OUTPUT ...) so MSBuild can track the generated file properly
-# (the ALL + BYPRODUCTS pattern does not work reliably with the Visual Studio generator).
-add_custom_command(
-    OUTPUT "${RUST_LIB_REL_PATH}"
-    COMMAND cargo build --release --target-dir "${RUST_TARGET_DIR}"
-    WORKING_DIRECTORY "${RUST_BACKEND_DIR}"
-    COMMENT "Building Rust backend (cargo build --release)"
-)
-
-add_custom_target(rust_backend
-    DEPENDS "${RUST_LIB_REL_PATH}"
-)
+# On Linux/macOS (Ninja/Make generators), define a custom command + target.
+# On Windows (MSBuild), PRE_BUILD on scriptura_core is used instead
+# (defined later, after the target exists).
+if(NOT WIN32)
+    add_custom_command(
+        OUTPUT "${RUST_LIB_REL_PATH}"
+        COMMAND cargo build --release --target-dir "${RUST_TARGET_DIR}"
+        WORKING_DIRECTORY "${RUST_BACKEND_DIR}"
+        COMMENT "Building Rust backend (cargo build --release)"
+    )
+    add_custom_target(rust_backend
+        DEPENDS "${RUST_LIB_REL_PATH}"
+    )
+endif()
 
 # Discover only UI-layer C++ sources under src/.
 # All backend/infrastructure services have been rewritten in Rust (src/rust_backend/)
@@ -142,8 +144,19 @@ set_target_properties(scriptura_core PROPERTIES
     FOLDER "Internal"
 )
 
-# Link Rust backend library
-add_dependencies(scriptura_core rust_backend)
+# Build Rust backend before scriptura_core.
+# Windows (MSBuild): PRE_BUILD event works correctly with MSBuild.
+# Linux/macOS (Ninja/Make): custom target dependency ensures build order.
+if(WIN32)
+    # CI builds Rust in a separate step before CMake, so cargo is near-instant here.
+    add_custom_command(TARGET scriptura_core PRE_BUILD
+        COMMAND cargo build --release --target-dir "${RUST_TARGET_DIR}"
+        WORKING_DIRECTORY "${RUST_BACKEND_DIR}"
+        COMMENT "Building Rust backend (cargo build --release)"
+    )
+else()
+    add_dependencies(scriptura_core rust_backend)
+endif()
 
 find_package(ZLIB REQUIRED)
 target_link_libraries(scriptura_core PUBLIC
