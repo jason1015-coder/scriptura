@@ -151,10 +151,11 @@ mod tests {
     }
 
     #[test]
+    #[cfg(not(target_os = "windows"))]
     fn test_extract_to_nonwritable_path() {
         let ae = ArchiveExtractor::new();
         let zip_data = create_test_zip("data", "file.txt");
-        // An absolute path under /nonexistent should fail on all systems
+        // An absolute path under /nonexistent should fail on Unix systems
         let result = ae.extract(&zip_data, "/nonexistent_scriptura_test_dir");
         assert!(result.is_err());
     }
