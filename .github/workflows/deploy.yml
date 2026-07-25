@@ -86,7 +86,13 @@ jobs:
         with:
           workflow: build.yml
           name: scriptura-macos-app
-          path: build/
+          path: ./
+
+      - name: Extract app bundle
+        run: |
+          mkdir -p build
+          tar xzf scriptura-macos.tar.gz -C build
+          ls -la build/
 
       - name: Install Qt
         run: brew install qt

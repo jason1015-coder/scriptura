@@ -56,11 +56,23 @@ jobs:
       - name: Build
         run: cmake --build build -j$(sysctl -n hw.ncpu)
 
+      - name: Verify build output
+        run: ls -la build/
+
+      - name: Package app bundle
+        run: |
+          if [ ! -d "build/scriptura.app" ] && [ ! -f "build/scriptura.app" ]; then
+            echo "Error: scriptura.app not found in build/"
+            find build -maxdepth 4 -name "*.app" -o -type f -executable 2>/dev/null || true
+            exit 1
+          fi
+          tar czf scriptura-macos.tar.gz -C build scriptura.app
+
       - name: Upload macOS app bundle
         uses: actions/upload-artifact@v4
         with:
           name: scriptura-macos-app
-          path: build/scriptura.app
+          path: scriptura-macos.tar.gz
           retention-days: 14
 
   build-windows:
@@ -185,7 +197,13 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: scriptura-macos-app
-          path: build/
+          path: ./
+
+      - name: Extract app bundle
+        run: |
+          mkdir -p build
+          tar xzf scriptura-macos.tar.gz -C build
+          ls -la build/
 
       - name: Install Qt
         run: brew install qt
