@@ -26,9 +26,6 @@ jobs:
       - name: Configure
         run: cmake -B build -S . -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTING=ON -DCMAKE_CXX_FLAGS="--coverage" -DCMAKE_EXE_LINKER_FLAGS="--coverage"
       
-      - name: Build Rust backend
-        run: cd src/rust_backend && cargo build && cd ../..
-      
       - name: Build C++ tests
         run: cmake --build build --config Debug -j$(nproc) --target scriptura_tests
       
@@ -67,9 +64,6 @@ jobs:
       
       - name: Run Rust tests
         run: cd src/rust_backend && cargo test && cd ../..
-      
-      - name: Build Rust backend
-        run: cd src/rust_backend && cargo build && cd ../..
       
       - name: Configure
         run: cmake -B build -S . -DCMAKE_BUILD_TYPE=Debug -DCMAKE_PREFIX_PATH=/opt/homebrew/opt/qt -DBUILD_TESTING=ON

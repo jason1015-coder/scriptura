@@ -18,71 +18,19 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y cmake g++ qt6-base-dev qt6-tools-dev libqt6sql6-sqlite wget file
-      
-      - name: Download linuxdeploy
-        run: |
-          wget -q https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
-          wget -q https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-x86_64.AppImage
-          chmod a+x linuxdeploy-x86_64.AppImage linuxdeploy-plugin-qt-x86_64.AppImage
-      
-      - name: Build Rust backend
-        run: cd src/rust_backend && cargo build --release && cd ../..
+          sudo apt-get install -y cmake g++ qt6-base-dev qt6-tools-dev libqt6sql6-sqlite
       
       - name: Configure
-        run: cmake -B build -S . -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON
+        run: cmake -B build -S . -DCMAKE_BUILD_TYPE=Release
       
       - name: Build
         run: cmake --build build --config Release -j$(nproc)
       
-      - name: Bundle AppImage
-        run: |
-          mkdir -p AppDir/usr/bin
-          mkdir -p AppDir/usr/share/applications
-          mkdir -p AppDir/usr/share/icons/hicolor/256x256/apps
-          cp build/scriptura AppDir/usr/bin/
-          cp deployment/linux/scriptura.desktop AppDir/usr/share/applications/ || echo "No desktop file found"
-          cp src/icon.png AppDir/usr/share/icons/hicolor/256x256/apps/scriptura.png || echo "No icon found"
-          export APPIMAGE_EXTRACT_AND_RUN=1
-          export QMAKE=/usr/bin/qmake6
-          ./linuxdeploy-x86_64.AppImage --plugin qt --appdir AppDir --output appimage
-      
-      - name: Create .deb package
-        run: |
-          sudo apt-get install -y dpkg fakeroot
-          mkdir -p deb-package/DEBIAN
-          mkdir -p deb-package/usr/bin
-          mkdir -p deb-package/usr/share/applications
-          mkdir -p deb-package/usr/share/icons/hicolor/256x256/apps
-          cp build/scriptura deb-package/usr/bin/
-          cp deployment/linux/scriptura.desktop deb-package/usr/share/applications/ || echo "No desktop file found"
-          cp src/icon.png deb-package/usr/share/icons/hicolor/256x256/apps/scriptura.png || echo "No icon found"
-          cat > deb-package/DEBIAN/control << EOF
-          Package: scriptura
-          Version: 0.0.0-dev
-          Section: editors
-          Priority: optional
-          Architecture: amd64
-          Maintainer: Scriptura <maintainer@example.com>
-          Description: A hybrid Qt/Rust text editor with project file browsing
-           Scriptura is a Qt+ Rust text editor with project file browsing capabilities.
-           The Rust backend provides safe protocol handling (LSP, DAP) and infrastructure services.
-          Depends: libqt6core6t64, libqt6gui6, libqt6widgets6, libqt6network6, libqt6sql6
-          EOF
-          dpkg-deb --build deb-package scriptura.deb
-      
-      - name: Upload Linux AppImage
+      - name: Upload Linux executable
         uses: actions/upload-artifact@v4
         with:
-          name: scriptura-linux-appimage
-          path: Scriptura*.AppImage
-          retention-days: 14
-      
-      - name: Upload Linux .deb package
-        uses: actions/upload-artifact@v4
-        with:
-          name: scriptura-linux-deb
-          path: scriptura.deb
+          name: scriptura-linux-executable
+          path: build/scriptura
           retention-days: 14
 
   build-macos:
@@ -96,22 +44,16 @@ jobs:
       - name: Install Qt
         run: brew install qt
       
-      - name: Build Rust backend
-        run: cd src/rust_backend && cargo build --release && cd ../..
-      
       - name: Configure
-        run: cmake -B build -S . -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=/opt/homebrew/opt/qt -DBUILD_TESTING=ON
+        run: cmake -B build -S . -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=/opt/homebrew/opt/qt
       
       - name: Build
         run: cmake --build build --config Release -j$(sysctl -n hw.ncpu)
       
-      - name: Bundle Qt dependencies
-        run: macdeployqt build/scriptura.app -always-overwrite
-      
-      - name: Upload macOS artifact
+      - name: Upload macOS app bundle
         uses: actions/upload-artifact@v4
         with:
-          name: scriptura-macos
+          name: scriptura-macos-app
           path: build/scriptura.app
           retention-days: 14
 
@@ -119,11 +61,11 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
       
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable      - name: Setup MSVC environment
+        uses: dtolnay/rust-toolchain@stable
+      
+      - name: Setup MSVC environment
         uses: ilammy/msvc-dev-cmd@v1
       
       - name: Install Qt
@@ -135,82 +77,18 @@ jobs:
           arch: 'win64_msvc2022_64'
           setup-python: 'true'
       
-      - name: Install NSIS and ImageMagick
-        run: choco install nsis imagemagick -y
-      
       - name: Install vcpkg dependencies
         run: vcpkg install zlib:x64-windows
       
-      - name: Get version from git tag
-        id: get_version
-        run: |
-          $version = git describe --tags --always
-          if ($version -eq "") { $version = "0.0.0-dev" }
-          echo "VERSION=$version" >> $env:GITHUB_OUTPUT
-      
       - name: Configure (MSVC)
-        run: cmake -B build -S . -A x64 -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake -DBUILD_TESTING=ON
+        run: cmake -B build -S . -A x64 -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake
       
       - name: Build
         run: cmake --build build --config Release -j
       
-      - name: Convert icon to ICO
-        run: |
-          if (Test-Path "src/icon.png") {
-            magick src/icon.png -resize 256x256 icon.ico
-          } else {
-            Write-Host "src/icon.png not found, skipping icon conversion"
-          }
-      
-      - name: Deploy Qt dependencies
-        run: |
-          windeployqt --release --no-translations --no-system-d3d-compiler --no-opengl-sw build/Release/scriptura.exe
-      
-      - name: Package for installer
-        run: |
-          New-Item -ItemType Directory -Force -Path deploy/Release | Out-Null
-          Copy-Item build/Release/scriptura.exe deploy/Release/
-          Copy-Item build/Release/*.dll deploy/Release/
-          Copy-Item -Recurse -Force build/Release/platforms deploy/Release/
-          Copy-Item -Recurse -Force build/Release/styles deploy/Release/
-          Copy-Item -Recurse -Force build/Release/imageformats deploy/Release/
-          if (Test-Path build/Release/plugins) { Copy-Item -Recurse -Force build/Release/plugins deploy/Release/plugins }
-          if (Test-Path src/resources) { Copy-Item -Recurse -Force src/resources deploy/Release/resources }
-          Copy-Item icon.ico deploy/Release/
-          Copy-Item LICENSE deploy/Release/
-          # Copy Rust runtime libraries
-          if (Test-Path "$env:RUST_HOME\bin") {
-            Copy-Item "$env:RUST_HOME\bin\*.dll" deploy/Release/
-          }
-      
-      - name: Build NSIS installer
-        run: |
-          cd deploy\Release
-          $nsiContent = Get-Content "$env:GITHUB_WORKSPACE\deployment\windows\scriptura.nsi"
-          $nsiContent = $nsiContent -replace '0\.0\.0-dev', '${{ steps.get_version.outputs.VERSION }}'
-          Set-Content scriptura-temp.nsi $nsiContent
-          if (Get-Command makensis -ErrorAction SilentlyContinue) {
-            makensis scriptura-temp.nsi
-          } else {
-            $makensis = Get-ChildItem 'C:\Program Files','C:\Program Files (x86)','C:\ProgramData' -Recurse -Filter makensis.exe -ErrorAction SilentlyContinue | Select-Object -First 1
-            if (-not $makensis) { throw "makensis.exe not found. Install NSIS via choco or manually." }
-            & $makensis.FullName scriptura-temp.nsi
-          }
-      
-      - name: Create portable ZIP
-        run: |
-          Compress-Archive -Path deploy\Release\* -DestinationPath Scriptura-Portable.zip
-      
-      - name: Upload Windows installer
+      - name: Upload Windows executable
         uses: actions/upload-artifact@v4
         with:
-          name: scriptura-windows-installer
-          path: deploy/Release/Scriptura-Setup.exe
-          retention-days: 14
-      
-      - name: Upload Windows portable
-        uses: actions/upload-artifact@v4
-        with:
-          name: scriptura-windows-portable
-          path: Scriptura-Portable.zip
+          name: scriptura-windows-executable
+          path: build/Release/scriptura.exe
           retention-days: 14
