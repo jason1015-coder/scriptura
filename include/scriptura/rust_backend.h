@@ -229,6 +229,10 @@ void                    rust_crash_handler_free(RustPluginCrashHandler* h);
 void rust_crash_handler_on_crash(RustPluginCrashHandler* h,
                                  OnPluginEvent cb, void* user_data);
 
+void rust_crash_handler_report_crash(RustPluginCrashHandler* h,
+                                     const char* plugin_id,
+                                     const char* error);
+
 /* ══════════════════════════════════════════════════════════════════
  *  Plugin Registry
  * ══════════════════════════════════════════════════════════════════ */

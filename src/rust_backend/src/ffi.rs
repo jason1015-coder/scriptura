@@ -704,6 +704,31 @@ pub extern "C" fn rust_crash_handler_on_crash(
     unsafe { (&mut *(h as *mut PluginCrashHandler)).set_on_crash(cb, u); }
 }
 
+#[no_mangle]
+pub extern "C" fn rust_crash_handler_report_crash(
+    h: *mut RustPluginCrashHandler,
+    plugin_id: *const c_char,
+    error: *const c_char,
+) {
+    if h.is_null() || plugin_id.is_null() || error.is_null() {
+        return;
+    }
+    unsafe {
+        let handler = &*(h as *mut PluginCrashHandler);
+        let id = if !plugin_id.is_null() {
+            std::ffi::CStr::from_ptr(plugin_id).to_str().unwrap_or("")
+        } else {
+            ""
+        };
+        let err = if !error.is_null() {
+            std::ffi::CStr::from_ptr(error).to_str().unwrap_or("")
+        } else {
+            ""
+        };
+        handler.report_crash(id, err);
+    }
+}
+
 // ═══════════════════════════════════════════════════════════════════════
 //  Plugin Registry
 // ═══════════════════════════════════════════════════════════════════════
