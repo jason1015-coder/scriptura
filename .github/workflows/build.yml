@@ -51,16 +51,16 @@ jobs:
         run: brew install qt
 
       - name: Configure
-        run: cmake -B build -S . -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=/opt/homebrew/opt/qt
+        run: cmake -B build -S . -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=/opt/homebrew/opt/qt
 
       - name: Build
-        run: cmake --build build --config Release -j$(sysctl -n hw.ncpu)
+        run: cmake --build build -j$(sysctl -n hw.ncpu)
 
       - name: Upload macOS app bundle
         uses: actions/upload-artifact@v4
         with:
           name: scriptura-macos-app
-          path: build/Release/scriptura.app
+          path: build/scriptura.app
           retention-days: 14
 
   build-windows:
