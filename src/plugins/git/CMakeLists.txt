@@ -30,6 +30,19 @@ target_link_libraries(gitplugin PRIVATE
     Qt${QT_VERSION_MAJOR}::Widgets
 )
 
+# On Windows, the plugin DLL must link the Rust backend directly to resolve
+# FFI symbols from rust_adapter (compiled into scriptura_core).
+# The Rust backend is a staticlib (scriptura_backend.lib).
+if(WIN32)
+    # Ensure the Rust backend is built before the plugin links
+    add_dependencies(gitplugin rust_backend)
+    # RUST_LIB_REL_PATH is inherited from the parent CMakeLists.txt scope
+    target_link_libraries(gitplugin PRIVATE
+        "${RUST_LIB_REL_PATH}"
+        bcrypt dwmapi user32 advapi32 ws2_32 crypt32 userenv ntdll
+    )
+endif()
+
 # Ensure ScripturaPlugin symbols are visible on macOS
 if(APPLE)
     set_target_properties(gitplugin PROPERTIES

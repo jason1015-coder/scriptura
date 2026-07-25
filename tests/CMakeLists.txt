@@ -25,7 +25,8 @@ target_link_libraries(scriptura_tests PRIVATE
 )
 
 if(WIN32)
-    target_link_libraries(scriptura_tests PRIVATE user32 advapi32 ws2_32 crypt32 userenv ntdll)
+    # Rust FFI needs bcrypt (BCryptGenRandom from getrandom crate) plus other system libs
+    target_link_libraries(scriptura_tests PRIVATE user32 advapi32 ws2_32 crypt32 userenv ntdll bcrypt)
 endif()
 
 if(APPLE)

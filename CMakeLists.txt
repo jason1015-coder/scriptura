@@ -215,6 +215,8 @@ target_link_libraries(scriptura PRIVATE
 )
 
 if(WIN32)
+    # Rust FFI needs bcrypt (BCryptGenRandom from getrandom crate), dwmapi, etc.
+    target_link_libraries(scriptura PRIVATE bcrypt dwmapi)
     set_target_properties(scriptura PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS TRUE)
 endif()
 
