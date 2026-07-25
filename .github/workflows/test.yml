@@ -124,14 +124,18 @@ jobs:
         run: |
           $exe = "build/tests/Debug/scriptura_tests.exe"
           if (-not (Test-Path $exe)) { $exe = "build/tests/scriptura_tests.exe" }
+          if (-not (Test-Path $exe)) { throw "Test executable not found" }
           ls $exe 2>&1
           echo "=== Running test binary directly ==="
           $env:PATH = "${env:Qt6_DIR}\bin;$env:PATH"
+          $env:QT_QPA_PLATFORM = "offscreen"
           & $exe 2>&1
-          if ($LASTEXITCODE -ne 0) { echo "Exit code: $LASTEXITCODE" }
+          if ($LASTEXITCODE -ne 0) { throw "Tests failed with exit code $LASTEXITCODE" }
       
       - name: Run C++ unit tests
         run: |
           $env:PATH = "${env:Qt6_DIR}\bin;$env:PATH"
+          $env:QT_QPA_PLATFORM = "offscreen"
           cd build
           ctest --output-on-failure -C Debug
+          if ($LASTEXITCODE -ne 0) { throw "Ctest failed with exit code $LASTEXITCODE" }

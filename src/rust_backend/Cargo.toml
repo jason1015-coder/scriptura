@@ -6,7 +6,7 @@ description = "Rust backend library for Scriptura editor - replaces C++ backend 
 
 [lib]
 name = "scriptura_backend"
-crate-type = ["staticlib", "cdylib"]
+crate-type = ["staticlib"]
 
 [dependencies]
 serde = { version = "1", features = ["derive"] }

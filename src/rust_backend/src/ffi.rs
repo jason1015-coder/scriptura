@@ -5,6 +5,7 @@
 //! Callbacks use C function pointers for async notification.
 
 use std::ffi::{c_void, CString};
+use std::mem;
 use std::os::raw::c_char;
 
 // ── C callback type aliases (must match rust_backend.h) ───────────────
@@ -636,17 +637,25 @@ pub extern "C" fn rust_pm_list_loaded(pm: *const RustPluginManager, out_len: *mu
     for s in list {
         arr.push(crate::str_to_cstring(&s));
     }
-    arr.as_mut_ptr()
+    arr.shrink_to_fit();
+    let ptr = arr.as_mut_ptr();
+    mem::forget(arr);
+    ptr
 }
 
 #[no_mangle]
 pub extern "C" fn rust_pm_free_strings(strs: *mut *mut c_char, len: usize) {
     if strs.is_null() { return; }
-    for i in 0..len {
-        let ptr = unsafe { *strs.add(i) };
-        if !ptr.is_null() {
-            unsafe { let _ = CString::from_raw(ptr); }
+    unsafe {
+        // Free each individual CString
+        for i in 0..len {
+            let ptr = *strs.add(i);
+            if !ptr.is_null() {
+                let _ = CString::from_raw(ptr);
+            }
         }
+        // Free the outer array buffer (reconstruct Vec to drop it)
+        let _ = Vec::from_raw_parts(strs, len, len);
     }
 }
 
@@ -673,7 +682,10 @@ pub extern "C" fn rust_pm_topological_sort(
     let mut arr: Vec<*mut c_char> = order.into_iter()
         .map(|s| crate::str_to_cstring(&s))
         .collect();
-    arr.as_mut_ptr()
+    arr.shrink_to_fit();
+    let ptr = arr.as_mut_ptr();
+    mem::forget(arr);
+    ptr
 }
 
 // ── Plugin Manager Callback Setters ──────────────────────────────────
@@ -811,7 +823,10 @@ pub extern "C" fn rust_service_locator_list(
     let mut arr: Vec<*mut c_char> = list.into_iter()
         .map(|s| crate::str_to_cstring(&s))
         .collect();
-    arr.as_mut_ptr()
+    arr.shrink_to_fit();
+    let ptr = arr.as_mut_ptr();
+    mem::forget(arr);
+    ptr
 }
 
 #[no_mangle]
@@ -846,7 +861,10 @@ pub extern "C" fn rust_dep_resolver_order(
     let mut arr: Vec<*mut c_char> = order.into_iter()
         .map(|s| crate::str_to_cstring(&s))
         .collect();
-    arr.as_mut_ptr()
+    arr.shrink_to_fit();
+    let ptr = arr.as_mut_ptr();
+    mem::forget(arr);
+    ptr
 }
 
 #[no_mangle]
@@ -891,7 +909,10 @@ pub extern "C" fn rust_task_runner_available(
     let mut arr: Vec<*mut c_char> = avail.into_iter()
         .map(|s| crate::str_to_cstring(&s))
         .collect();
-    arr.as_mut_ptr()
+    arr.shrink_to_fit();
+    let ptr = arr.as_mut_ptr();
+    mem::forget(arr);
+    ptr
 }
 
 #[no_mangle]
@@ -1013,7 +1034,10 @@ pub extern "C" fn rust_workspace_folders(ws: *mut RustWorkspace, out_len: *mut u
     let mut arr: Vec<*mut c_char> = folders.into_iter()
         .map(|s| crate::str_to_cstring(&s))
         .collect();
-    arr.as_mut_ptr()
+    arr.shrink_to_fit();
+    let ptr = arr.as_mut_ptr();
+    mem::forget(arr);
+    ptr
 }
 
 #[no_mangle]
@@ -1047,7 +1071,10 @@ pub extern "C" fn rust_workspace_recent_files(ws: *mut RustWorkspace, out_len: *
     let mut arr: Vec<*mut c_char> = files.into_iter()
         .map(|s| crate::str_to_cstring(&s))
         .collect();
-    arr.as_mut_ptr()
+    arr.shrink_to_fit();
+    let ptr = arr.as_mut_ptr();
+    mem::forget(arr);
+    ptr
 }
 
 #[no_mangle]
@@ -1189,7 +1216,10 @@ pub extern "C" fn rust_debug_config_manager_list(
     let mut arr: Vec<*mut c_char> = list.into_iter()
         .map(|s| crate::str_to_cstring(&s))
         .collect();
-    arr.as_mut_ptr()
+    arr.shrink_to_fit();
+    let ptr = arr.as_mut_ptr();
+    mem::forget(arr);
+    ptr
 }
 
 #[no_mangle]

@@ -45,15 +45,18 @@ pub(crate) fn take_last_error() -> Option<String> {
 }
 
 /// Get the last error message from any Rust backend (thread-local).
+/// Returns a C string that the caller MUST free with rust_free_string().
+/// Returns null if no error is available.
 #[no_mangle]
-pub extern "C" fn rust_last_error() -> *const c_char {
+pub extern "C" fn rust_last_error() -> *mut c_char {
     match take_last_error() {
         Some(msg) => CString::new(msg).unwrap_or_default().into_raw(),
-        None => std::ptr::null(),
+        None => std::ptr::null_mut(),
     }
 }
 
 /// Free a string returned by Rust (all strings are heap-allocated).
+/// Safe to call with null pointer (no-op).
 #[no_mangle]
 pub extern "C" fn rust_free_string(s: *mut c_char) {
     if !s.is_null() {

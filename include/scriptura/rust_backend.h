@@ -44,8 +44,8 @@ typedef void (*OnPluginEvent)(const char* plugin_id, const char* json_data, void
 typedef void (*OnProgress)(const char* task_id, int current, int total, void* user_data);
 
 /* ── Global helpers ────────────────────────────────────────────── */
-const char* rust_last_error(void);
-void        rust_free_string(char* s);
+char* rust_last_error(void);
+void  rust_free_string(char* s);
 
 /* ══════════════════════════════════════════════════════════════════
  *  EventBus
