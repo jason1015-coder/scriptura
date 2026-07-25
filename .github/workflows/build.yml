@@ -123,9 +123,7 @@ jobs:
           fetch-depth: 0
       
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-      
-      - name: Setup MSVC environment
+        uses: dtolnay/rust-toolchain@stable      - name: Setup MSVC environment
         uses: ilammy/msvc-dev-cmd@v1
       
       - name: Install Qt

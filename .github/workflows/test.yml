@@ -107,10 +107,10 @@ jobs:
           target: 'desktop'
           arch: 'win64_msvc2022_64'
           setup-python: 'true'
-      
+
       - name: Install vcpkg dependencies
         run: vcpkg install zlib:x64-windows
-      
+
       - name: Run Rust tests
         run: cd src\rust_backend && cargo test && cd ..\..
       
