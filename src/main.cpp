@@ -1,14 +1,6 @@
 #include "mainwindow.h"
 #include "crashhandler.h"
 #include "splashscreen.h"
-#include "welcomemenuscreen.h"
-
-#include <QFileDialog>
-#include <QInputDialog>
-#include <QLineEdit>
-#include <QUrl>
-#include <QProcess>
-#include <QMessageBox>
 
 #include <QApplication>
 #include <QLocale>
@@ -704,145 +696,34 @@ QDialogButtonBox > QPushButton {
 #endif
         });
     } else {
-        // Show splash, then the welcome menu screen
+        // Show splash, then open the main window directly (menu screen removed)
         SplashScreen *splash = new SplashScreen;
         splash->setThemeBackground(themeWindowColor);
         splash->showWithDelay(2000);
 
-        QTimer::singleShot(2000, [splash, themeWindowColor]() {
-            qDebug() << "[DIAG] splash timer fired; creating WelcomeMenuScreen...";
+        QTimer::singleShot(2000, [splash]() {
+            qDebug() << "[DIAG] splash timer fired; creating MainWindow...";
 
-            WelcomeMenuScreen *menuScreen = new WelcomeMenuScreen();
-            menuScreen->setThemeBackground(themeWindowColor);
+            MainWindow *mainWindow = new MainWindow();
+            mainWindow->show();
 
             QScreen *screen = QApplication::primaryScreen();
             if (screen) {
-                QRect screenGeometry = screen->availableGeometry();
-                int x = (screenGeometry.width() - menuScreen->width()) / 2;
-                int y = (screenGeometry.height() - menuScreen->height()) / 2;
-                menuScreen->move(x, y);
+                QRect available = screen->availableGeometry();
+                mainWindow->resize(qMin(available.width() * 7 / 10, 900),
+                                   qMin(available.height() * 7 / 10, 800));
+                int x = (available.width() - mainWindow->width()) / 2;
+                int y = (available.height() - mainWindow->height()) / 2;
+                mainWindow->move(x, y);
             }
 
-            // Show the menu BEFORE closing splash so Qt doesn't quit
-            menuScreen->show();
             splash->close();
             splash->deleteLater();
-            qDebug() << "[DIAG] splash closed; menu screen shown.";
-
-            // Helper lambda to create MainWindow and transition
-            auto launchMainWindow = [menuScreen](const QString &projectPath, const QStringList &files) {
-                qDebug() << "[DIAG] creating MainWindow from menu screen...";
-                MainWindow *mainWindow = new MainWindow(projectPath, files);
-                mainWindow->show();
-
-                QScreen *screen = QApplication::primaryScreen();
-                if (screen) {
-                    QRect available = screen->availableGeometry();
-                    mainWindow->resize(qMin(available.width() * 7 / 10, 900),
-                                       qMin(available.height() * 7 / 10, 800));
-                    int x = (available.width() - mainWindow->width()) / 2;
-                    int y = (available.height() - mainWindow->height()) / 2;
-                    mainWindow->move(x, y);
-                }
-
-                // Mark launch so next time shows "Welcome Back"
-                WelcomeMenuScreen::markLaunched();
-
-                menuScreen->close();
-                menuScreen->deleteLater();
 
 #ifdef Q_OS_WIN
-                HWND hwnd = reinterpret_cast<HWND>(mainWindow->winId());
-                mainWindow->enableMicaEffect(hwnd, mainWindow->isDarkModeEnabled());
+            HWND hwnd = reinterpret_cast<HWND>(mainWindow->winId());
+            mainWindow->enableMicaEffect(hwnd, mainWindow->isDarkModeEnabled());
 #endif
-            };
-
-            // Connect menu signals
-            QObject::connect(menuScreen, &WelcomeMenuScreen::openProjectRequested, menuScreen,
-                [launchMainWindow, menuScreen]() {
-                    QString dirName = QFileDialog::getExistingDirectory(
-                        menuScreen,
-                        QObject::tr("Open Project"),
-                        QString(),
-                        QFileDialog::DontUseNativeDialog);
-                    if (!dirName.isEmpty()) {
-                        QSettings settings;
-                        QStringList recent = settings.value("recentProjects").toStringList();
-                        if (!recent.contains(dirName)) {
-                            recent.prepend(dirName);
-                            while (recent.size() > 10)
-                                recent.removeLast();
-                            settings.setValue("recentProjects", recent);
-                        }
-                        launchMainWindow(dirName, QStringList());
-                    }
-                });
-
-            QObject::connect(menuScreen, &WelcomeMenuScreen::cloneRequested, menuScreen,
-                [launchMainWindow, menuScreen](const QString &gitUrl) {
-                    QString repoName = QUrl(gitUrl).fileName();
-                    if (repoName.endsWith(".git"))
-                        repoName.chop(4);
-                    QString clonePath = QDir::homePath() + "/" + repoName;
-
-                    bool ok;
-                    QString targetDir = QInputDialog::getText(
-                        menuScreen,
-                        QObject::tr("Clone Destination"),
-                        QObject::tr("Directory to clone into:"),
-                        QLineEdit::Normal,
-                        clonePath,
-                        &ok);
-                    if (!ok || targetDir.isEmpty())
-                        return;
-
-                    QProcess *gitProcess = new QProcess();
-                    gitProcess->setWorkingDirectory(QDir::homePath());
-                    gitProcess->setProcessChannelMode(QProcess::MergedChannels);
-
-                    QMessageBox *statusBox = new QMessageBox(menuScreen);
-                    statusBox->setWindowTitle(QObject::tr("Cloning Repository..."));
-                    statusBox->setText(QObject::tr("Cloning %1 into %2...").arg(gitUrl, targetDir));
-                    statusBox->setStandardButtons(QMessageBox::NoButton);
-                    statusBox->show();
-                    QApplication::processEvents();
-
-                    QObject::connect(gitProcess, &QProcess::finished, statusBox,
-                        [launchMainWindow, targetDir, statusBox, gitProcess](int exitCode, QProcess::ExitStatus) {
-                            statusBox->close();
-                            statusBox->deleteLater();
-
-                            if (exitCode == 0) {
-                                QSettings settings;
-                                QStringList recent = settings.value("recentProjects").toStringList();
-                                if (!recent.contains(targetDir)) {
-                                    recent.prepend(targetDir);
-                                    while (recent.size() > 10)
-                                        recent.removeLast();
-                                    settings.setValue("recentProjects", recent);
-                                }
-                                launchMainWindow(targetDir, QStringList());
-                            } else {
-                                QMessageBox::warning(nullptr,
-                                    QObject::tr("Clone Failed"),
-                                    QObject::tr("Failed to clone repository.\n") +
-                                    QString::fromUtf8(gitProcess->readAllStandardError()));
-                            }
-                            gitProcess->deleteLater();
-                        });
-
-                    gitProcess->start("git", {"clone", gitUrl, targetDir});
-                });
-
-            QObject::connect(menuScreen, &WelcomeMenuScreen::recentProjectSelected, menuScreen,
-                [launchMainWindow](const QString &path) {
-                    launchMainWindow(path, QStringList());
-                });
-
-            QObject::connect(menuScreen, &WelcomeMenuScreen::newFileRequested, menuScreen,
-                [launchMainWindow]() {
-                    launchMainWindow(QString(), QStringList());
-                });
         });
     }
 
