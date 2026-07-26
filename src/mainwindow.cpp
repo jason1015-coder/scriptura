@@ -1118,15 +1118,21 @@ CodeEditor* MainWindow::getCurrentCodeEditor()
     return qobject_cast<CodeEditor*>(ui->tabWidget->currentWidget());
 }
 
-QPushButton* MainWindow::createTabCloseButton(int tabIndex)
+QPushButton* MainWindow::createTabCloseButton(const QString &filePath)
 {
     QPushButton *closeBtn = new QPushButton();
     ThemeIcons::instance()->setIcon(closeBtn, ":/icons/close.svg");
     closeBtn->setFixedSize(20, 20);
     closeBtn->setFlat(true);
     closeBtn->setCursor(Qt::ArrowCursor);
-    connect(closeBtn, &QPushButton::clicked, this, [this, tabIndex]() {
-        on_tabWidget_tabCloseRequested(tabIndex);
+    connect(closeBtn, &QPushButton::clicked, this, [this, filePath]() {
+        // Look up the file's index in openFiles by path (not tabBar index)
+        for (int i = 0; i < openFiles.size(); ++i) {
+            if (openFiles[i].filePath == filePath) {
+                on_tabWidget_tabCloseRequested(i);
+                return;
+            }
+        }
     });
     return closeBtn;
 }
@@ -1801,7 +1807,7 @@ void MainWindow::openFileInTab(const QString &fileName)
     int tabBarIndex = tabBar->addTab(QFileInfo(fileName).fileName());
     tabBar->setTabData(tabBarIndex, fileName);
     tabBar->setTabToolTip(tabBarIndex, fileName);
-    tabBar->setTabButton(tabBarIndex, QTabBar::RightSide, createTabCloseButton(tabBarIndex));
+    tabBar->setTabButton(tabBarIndex, QTabBar::RightSide, createTabCloseButton(fileName));
     ui->tabWidget->setCurrentWidget(editor);
     tabBar->setCurrentIndex(tabBarIndex);
     currentFile = fileName;
@@ -2003,7 +2009,7 @@ void MainWindow::on_fileTreeView_clicked(const QModelIndex &index)
         ui->tabWidget->addTab(editor, openFile.fileName);
         int tabBarIndex = tabBar->addTab(openFile.fileName);
         tabBar->setTabData(tabBarIndex, path);
-        tabBar->setTabButton(tabBarIndex, QTabBar::RightSide, createTabCloseButton(tabBarIndex));
+        tabBar->setTabButton(tabBarIndex, QTabBar::RightSide, createTabCloseButton(path));
         ui->tabWidget->setCurrentWidget(editor);
         tabBar->setCurrentIndex(tabBarIndex);
 

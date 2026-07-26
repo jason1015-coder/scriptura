@@ -310,7 +310,7 @@ private:
     void updateBottomTabBar();
     void updateTabBarVisibility();
     QIcon createSymbolIcon(QChar symbol) const;
-    QPushButton* createTabCloseButton(int tabIndex);
+    QPushButton* createTabCloseButton(const QString &filePath);
     QPushButton* createSettingsTabCloseButton(int tabIndex);
     QString findTerminal();
     QPlainTextEdit* getCurrentEditor();
