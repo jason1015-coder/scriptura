@@ -11,8 +11,13 @@
 #include <QTimer>
 #include <functional>
 #include <memory>
+#include <QMutex>
+#include <QPointer>
 
 #include "rust_backend.h"
+#include "permission.h"
+#include "plugincrashhandler.h"
+#include "dependencyresolver.h"
 
 // ─────────────────────────────────────────────────────────────────────
 //  RustLspClientAdapter — bridges LSP protocol to Qt signals
@@ -171,8 +176,12 @@ public:
 
     SubscriptionId subscribe(const QString &event,
                              std::function<void(const QString&)> callback);
+    SubscriptionId subscribe(const QString &event, QObject *receiver,
+                             std::function<void(const QVariant&)> callback);
     void unsubscribe(const QString &event, SubscriptionId id);
-    void publish(const QString &event, const QJsonObject &data = {});
+    void unsubscribeReceiver(QObject *receiver);
+    void publish(const QString &event, const QVariant &data = {});
+    void publishJson(const QString &event, const QJsonObject &data = {});
     bool hasSubscribers(const QString &event) const;
 
 signals:
@@ -180,6 +189,14 @@ signals:
 
 private:
     static void onEventCb(const char *event, const char *jsonData, void *userData);
+
+    struct V8nSubscriptionEntry {
+        SubscriptionId id;
+        QString event;
+        std::function<void(const QVariant&)> callback;
+        QPointer<QObject> receiver;
+        bool hasReceiver = false;
+    };
 
     struct SubscriptionEntry {
         SubscriptionId id;
@@ -189,6 +206,9 @@ private:
 
     RustEventBus *m_bus = nullptr;
     QHash<QString, QList<SubscriptionEntry>> m_subscriptions;
+    QHash<QString, QList<V8nSubscriptionEntry>> m_v8nSubscriptions;
+    SubscriptionId m_nextId = 1;
+    mutable QMutex m_mutex;
 };
 
 // ─────────────────────────────────────────────────────────────────────
@@ -350,6 +370,117 @@ private:
 };
 
 // ─────────────────────────────────────────────────────────────────────
+//  RustPermissionManagerAdapter — wraps Rust FFI PermissionManager
+// ─────────────────────────────────────────────────────────────────────
+class RustPermissionManagerAdapter : public QObject
+{
+    Q_OBJECT
+public:
+    explicit RustPermissionManagerAdapter(QObject *parent = nullptr);
+    ~RustPermissionManagerAdapter() override;
+
+    bool checkPermission(const QString &pluginId, Permission permission);
+    void requestPermission(const QString &pluginId, Permission permission);
+    void grantPermission(const QString &pluginId, Permission permission);
+    void revokePermission(const QString &pluginId, Permission permission);
+    QList<Permission> grantedPermissions(const QString &pluginId) const;
+    void setDeclaredPermissions(const QString &pluginId, const QList<Permission> &permissions);
+    QList<Permission> declaredPermissions(const QString &pluginId) const;
+
+private:
+    RustPermissionManager *m_rustPm = nullptr;
+    QHash<QString, QList<Permission>> m_declaredPermissions;
+};
+
+// ─────────────────────────────────────────────────────────────────────
+//  RustServiceLocatorAdapter — wraps Rust FFI ServiceLocator
+// ─────────────────────────────────────────────────────────────────────
+class RustServiceLocatorAdapter : public QObject
+{
+    Q_OBJECT
+public:
+    explicit RustServiceLocatorAdapter(QObject *parent = nullptr);
+    ~RustServiceLocatorAdapter() override;
+
+    template<typename T>
+    void registerService(const QString &id, T *service);
+    template<typename T>
+    T *getService(const QString &id) const;
+    void unregisterService(const QString &id);
+    bool hasService(const QString &id) const;
+    QStringList registeredServices() const;
+
+private:
+    RustServiceLocator *m_rustSl = nullptr;
+    mutable QMutex m_mutex;
+};
+
+template<typename T>
+void RustServiceLocatorAdapter::registerService(const QString &id, T *service)
+{
+    QMutexLocker locker(&m_mutex);
+    QByteArray idBytes = id.toUtf8();
+    rust_service_locator_register(m_rustSl, idBytes.constData(), static_cast<void*>(service));
+}
+
+template<typename T>
+T *RustServiceLocatorAdapter::getService(const QString &id) const
+{
+    QMutexLocker locker(&m_mutex);
+    QByteArray idBytes = id.toUtf8();
+    void *ptr = rust_service_locator_get(m_rustSl, idBytes.constData());
+    if (!ptr) return nullptr;
+    return qobject_cast<T*>(static_cast<QObject*>(ptr));
+}
+
+// ─────────────────────────────────────────────────────────────────────
+//  RustPluginCrashHandlerAdapter — wraps Rust FFI crash handler
+// ─────────────────────────────────────────────────────────────────────
+class RustPluginCrashHandlerAdapter : public QObject
+{
+    Q_OBJECT
+public:
+    explicit RustPluginCrashHandlerAdapter(QObject *parent = nullptr);
+    ~RustPluginCrashHandlerAdapter() override;
+
+    void handleCrash(const QString &pluginId);
+    void disablePlugin(const QString &pluginId);
+    bool isPluginDisabled(const QString &pluginId) const;
+    void enablePlugin(const QString &pluginId);
+    QList<CrashInfo> recentCrashes(int limit = 10) const;
+
+signals:
+    void pluginCrashed(const QString &pluginId, const CrashInfo &info);
+
+private:
+    static void onCrashCb(const char *pluginId, const char *error, void *userData);
+
+    RustPluginCrashHandler *m_rustH = nullptr;
+    QList<CrashInfo> m_crashHistory;
+    QHash<QString, bool> m_disabledPlugins;
+    QString m_crashLogPath;
+};
+
+// ─────────────────────────────────────────────────────────────────────
+//  RustDependencyResolverAdapter — wraps C++ DependencyResolver
+// ─────────────────────────────────────────────────────────────────────
+class RustDependencyResolverAdapter : public QObject
+{
+    Q_OBJECT
+public:
+    explicit RustDependencyResolverAdapter(QObject *parent = nullptr);
+    ~RustDependencyResolverAdapter() override;
+
+    QList<DependencyResolver::DependencyError> validate(
+        const QList<QJsonObject> &plugins, const QSet<QString> &actuallyLoaded);
+    QStringList topologicalSort(const QList<QJsonObject> &plugins);
+    bool hasCircularDependency(const QList<QJsonObject> &plugins);
+
+private:
+    DependencyResolver m_resolver;
+};
+
+// ─────────────────────────────────────────────────────────────────────
 //  RustBackend — singleton root that owns all Rust backend instances
 // ─────────────────────────────────────────────────────────────────────
 class RustBackend : public QObject
@@ -368,6 +499,10 @@ public:
     RustUpdaterAdapter*               updater() const { return m_updater; }
     RustConfigValidatorAdapter*       configValidator() const { return m_configValidator; }
     RustPluginRegistryAdapter*        pluginRegistry() const { return m_pluginRegistry; }
+    RustPermissionManagerAdapter*      permissionManager() const { return m_permissionManager; }
+    RustServiceLocatorAdapter*         serviceLocator() const { return m_serviceLocator; }
+    RustPluginCrashHandlerAdapter*     crashHandler() const { return m_crashHandler; }
+    RustDependencyResolverAdapter*     dependencyResolver() const { return m_dependencyResolver; }
 
 private:
     RustBackend(QObject *parent = nullptr);
@@ -384,6 +519,10 @@ private:
     RustUpdaterAdapter*               m_updater = nullptr;
     RustConfigValidatorAdapter*       m_configValidator = nullptr;
     RustPluginRegistryAdapter*        m_pluginRegistry = nullptr;
+    RustPermissionManagerAdapter*      m_permissionManager = nullptr;
+    RustServiceLocatorAdapter*         m_serviceLocator = nullptr;
+    RustPluginCrashHandlerAdapter*     m_crashHandler = nullptr;
+    RustDependencyResolverAdapter*     m_dependencyResolver = nullptr;
 
     static RustBackend* s_instance;
 };

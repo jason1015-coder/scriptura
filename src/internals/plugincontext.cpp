@@ -1,15 +1,15 @@
 #include "plugincontext.h"
-#include "eventbus.h"
-#include "servicelocator.h"
+#include "rust_adapter.h"
 #include "pluginmanager.h"
 #include "mainwindow.h"
-#include "permission.h"
 #include "plugins/api/uiapi.h"
 #include "plugins/api/editorapi.h"
 #include "plugins/api/notificationapi.h"
 #include "plugins/api/themeapi.h"
 #include <QDebug>
 #include <QApplication>
+
+#define RUST_BACKEND RustBackend::instance()
 
 PluginContext::PluginContext(MainWindow* mainWindow, QObject* parent)
     : QObject(parent)
@@ -57,9 +57,9 @@ PluginThemeApi* PluginContext::theme() const
 
 MainWindow* PluginContext::mainWindow() const
 {
-    if (!m_permissionManager || !m_currentPluginId.isEmpty()) {
+    if (!m_currentPluginId.isEmpty()) {
         QString pid = m_currentPluginId;
-        if (m_permissionManager && !m_permissionManager->checkPermission(pid, Permission::SystemSettings)) {
+        if (!RUST_BACKEND->permissionManager()->checkPermission(pid, Permission::SystemSettings)) {
             qWarning() << "Plugin" << pid << "denied access to mainWindow (SystemSettings)";
             return nullptr;
         }
@@ -69,8 +69,8 @@ MainWindow* PluginContext::mainWindow() const
 
 QSettings* PluginContext::settings() const
 {
-    if (m_permissionManager && !m_currentPluginId.isEmpty()) {
-        if (!m_permissionManager->checkPermission(m_currentPluginId, Permission::SystemSettings)) {
+    if (!m_currentPluginId.isEmpty()) {
+        if (!RUST_BACKEND->permissionManager()->checkPermission(m_currentPluginId, Permission::SystemSettings)) {
             qWarning() << "Plugin" << m_currentPluginId << "denied access to settings (SystemSettings)";
             return nullptr;
         }
@@ -81,8 +81,8 @@ QSettings* PluginContext::settings() const
 CodeEditor* PluginContext::currentEditor() const
 {
     if (!m_mainWindow) return nullptr;
-    if (m_permissionManager && !m_currentPluginId.isEmpty()) {
-        if (!m_permissionManager->checkPermission(m_currentPluginId, Permission::FileRead)) {
+    if (!m_currentPluginId.isEmpty()) {
+        if (!RUST_BACKEND->permissionManager()->checkPermission(m_currentPluginId, Permission::FileRead)) {
             qWarning() << "Plugin" << m_currentPluginId << "denied access to currentEditor (FileRead)";
             return nullptr;
         }
@@ -93,8 +93,8 @@ CodeEditor* PluginContext::currentEditor() const
 LspClient* PluginContext::lspClient() const
 {
     if (!m_mainWindow) return nullptr;
-    if (m_permissionManager && !m_currentPluginId.isEmpty()) {
-        if (!m_permissionManager->checkPermission(m_currentPluginId, Permission::ProcessExecution)) {
+    if (!m_currentPluginId.isEmpty()) {
+        if (!RUST_BACKEND->permissionManager()->checkPermission(m_currentPluginId, Permission::ProcessExecution)) {
             qWarning() << "Plugin" << m_currentPluginId << "denied access to lspClient (ProcessExecution)";
             return nullptr;
         }
@@ -111,8 +111,8 @@ ProblemPanel* PluginContext::problemPanel() const
 TerminalPanel* PluginContext::terminalPanel() const
 {
     if (!m_mainWindow) return nullptr;
-    if (m_permissionManager && !m_currentPluginId.isEmpty()) {
-        if (!m_permissionManager->checkPermission(m_currentPluginId, Permission::ProcessExecution)) {
+    if (!m_currentPluginId.isEmpty()) {
+        if (!RUST_BACKEND->permissionManager()->checkPermission(m_currentPluginId, Permission::ProcessExecution)) {
             qWarning() << "Plugin" << m_currentPluginId << "denied access to terminalPanel (ProcessExecution)";
             return nullptr;
         }
@@ -123,8 +123,8 @@ TerminalPanel* PluginContext::terminalPanel() const
 GitPanel* PluginContext::gitPanel() const
 {
     if (!m_mainWindow) return nullptr;
-    if (m_permissionManager && !m_currentPluginId.isEmpty()) {
-        if (!m_permissionManager->checkPermission(m_currentPluginId, Permission::ProcessExecution)) {
+    if (!m_currentPluginId.isEmpty()) {
+        if (!RUST_BACKEND->permissionManager()->checkPermission(m_currentPluginId, Permission::ProcessExecution)) {
             qWarning() << "Plugin" << m_currentPluginId << "denied access to gitPanel (ProcessExecution)";
             return nullptr;
         }
@@ -135,8 +135,8 @@ GitPanel* PluginContext::gitPanel() const
 QString PluginContext::currentProjectPath() const
 {
     if (!m_mainWindow) return QString();
-    if (m_permissionManager && !m_currentPluginId.isEmpty()) {
-        if (!m_permissionManager->checkPermission(m_currentPluginId, Permission::FileRead)) {
+    if (!m_currentPluginId.isEmpty()) {
+        if (!RUST_BACKEND->permissionManager()->checkPermission(m_currentPluginId, Permission::FileRead)) {
             qWarning() << "Plugin" << m_currentPluginId << "denied access to currentProjectPath (FileRead)";
             return QString();
         }
@@ -158,26 +158,26 @@ QObject* PluginContext::getPlugin(const QString& id) const
 
 void PluginContext::notify(const QString& event, const QVariant& data)
 {
-    EventBus::instance()->publish(event, data);
+    RUST_BACKEND->eventBus()->publish(event, data);
 }
 
-EventBus::SubscriptionId PluginContext::subscribe(const QString& event, std::function<void(const QVariant&)> callback, QObject* owner)
+quint64 PluginContext::subscribe(const QString& event, std::function<void(const QVariant&)> callback, QObject* owner)
 {
-    EventBus::SubscriptionId id = EventBus::instance()->subscribe(event, owner, callback);
+    quint64 id = RUST_BACKEND->eventBus()->subscribe(event, owner, callback);
     m_eventHandlers[event].append({id, callback});
     return id;
 }
 
-EventBus::SubscriptionId PluginContext::subscribe(const QString& event, std::function<void(const QVariant&)> callback)
+quint64 PluginContext::subscribe(const QString& event, std::function<void(const QVariant&)> callback)
 {
-    EventBus::SubscriptionId id = EventBus::instance()->subscribe(event, nullptr, callback);
+    quint64 id = RUST_BACKEND->eventBus()->subscribe(event, nullptr, callback);
     m_eventHandlers[event].append({id, callback});
     return id;
 }
 
-void PluginContext::unsubscribe(const QString& event, EventBus::SubscriptionId subscriptionId)
+void PluginContext::unsubscribe(const QString& event, quint64 subscriptionId)
 {
-    EventBus::instance()->unsubscribe(event, subscriptionId);
+    RUST_BACKEND->eventBus()->unsubscribe(event, subscriptionId);
     
     auto& subscriptions = m_eventHandlers[event];
     for (auto it = subscriptions.begin(); it != subscriptions.end(); ++it) {
@@ -192,11 +192,6 @@ void PluginContext::unsubscribe(const QString& event, EventBus::SubscriptionId s
     }
 }
 
-void PluginContext::setPermissionManager(PermissionManager* manager)
-{
-    m_permissionManager = manager;
-}
-
 QString PluginContext::currentPluginId() const
 {
     return m_currentPluginId;
@@ -209,14 +204,10 @@ void PluginContext::setCurrentPluginId(const QString& pluginId)
 
 bool PluginContext::hasPermission(const QString& pluginId, Permission permission) const
 {
-    if (!m_permissionManager)
-        return true;
-    return m_permissionManager->checkPermission(pluginId, permission);
+    return RUST_BACKEND->permissionManager()->checkPermission(pluginId, permission);
 }
 
 void PluginContext::requestPermission(const QString& pluginId, Permission permission)
 {
-    if (!m_permissionManager)
-        return;
-    m_permissionManager->requestPermission(pluginId, permission);
+    RUST_BACKEND->permissionManager()->requestPermission(pluginId, permission);
 }

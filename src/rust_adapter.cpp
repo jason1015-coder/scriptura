@@ -4,6 +4,11 @@
 #include <QJsonArray>
 #include <QMetaObject>
 #include <QDebug>
+#include <QDir>
+#include <QFile>
+#include <QTextStream>
+#include <QStandardPaths>
+#include <QDateTime>
 
 // ═══════════════════════════════════════════════════════════════════════
 //  RustLspClientAdapter
@@ -414,8 +419,6 @@ RustEventBusAdapter::RustEventBusAdapter(QObject *parent)
     : QObject(parent)
 {
     m_bus = rust_eventbus_new();
-    // Subscribe to all events from Rust and forward to Qt signal
-    // (Actually Rust callbacks fire per-event; we handle this in onEventCb)
 }
 
 RustEventBusAdapter::~RustEventBusAdapter()
@@ -431,8 +434,31 @@ auto RustEventBusAdapter::subscribe(const QString &event,
     SubscriptionId id = rust_eventbus_subscribe(m_bus, e.constData(),
                                                  &onEventCb, this);
 
-    // Track subscription for management
     m_subscriptions[event].append({id, event, callback});
+    return id;
+}
+
+auto RustEventBusAdapter::subscribe(const QString &event, QObject *receiver,
+                                     std::function<void(const QVariant&)> callback)
+    -> SubscriptionId
+{
+    QMutexLocker locker(&m_mutex);
+    SubscriptionId id = m_nextId++;
+
+    V8nSubscriptionEntry entry;
+    entry.id = id;
+    entry.event = event;
+    entry.callback = std::move(callback);
+    entry.receiver = receiver;
+    entry.hasReceiver = (receiver != nullptr);
+    m_v8nSubscriptions[event].append(entry);
+
+    if (receiver) {
+        connect(receiver, &QObject::destroyed, this, [this, event, id]() {
+            unsubscribe(event, id);
+        });
+    }
+
     return id;
 }
 
@@ -449,9 +475,88 @@ void RustEventBusAdapter::unsubscribe(const QString &event, SubscriptionId id)
         if (list.isEmpty())
             m_subscriptions.remove(event);
     }
+
+    QMutexLocker locker(&m_mutex);
+    if (m_v8nSubscriptions.contains(event)) {
+        auto &list = m_v8nSubscriptions[event];
+        list.erase(std::remove_if(list.begin(), list.end(),
+                                   [id](const V8nSubscriptionEntry &s) { return s.id == id; }),
+                   list.end());
+        if (list.isEmpty())
+            m_v8nSubscriptions.remove(event);
+    }
 }
 
-void RustEventBusAdapter::publish(const QString &event, const QJsonObject &data)
+void RustEventBusAdapter::unsubscribeReceiver(QObject *receiver)
+{
+    if (!receiver) return;
+
+    QMutexLocker locker(&m_mutex);
+    for (auto it = m_v8nSubscriptions.begin(); it != m_v8nSubscriptions.end();) {
+        auto &entries = it.value();
+        for (auto eit = entries.begin(); eit != entries.end();) {
+            if (eit->receiver.data() == receiver) {
+                eit = entries.erase(eit);
+            } else {
+                ++eit;
+            }
+        }
+        if (entries.isEmpty()) {
+            it = m_v8nSubscriptions.erase(it);
+        } else {
+            ++it;
+        }
+    }
+}
+
+void RustEventBusAdapter::publish(const QString &event, const QVariant &data)
+{
+    // Convert QVariant to JSON string
+    QByteArray jsonData;
+    if (data.isValid()) {
+        if (data.canConvert<QJsonObject>()) {
+            jsonData = QJsonDocument(data.toJsonObject()).toJson(QJsonDocument::Compact);
+        } else if (data.canConvert<QJsonArray>()) {
+            jsonData = QJsonDocument(data.toJsonArray()).toJson(QJsonDocument::Compact);
+        } else if (data.canConvert<QString>()) {
+            jsonData = data.toString().toUtf8();
+        } else if (data.canConvert<int>()) {
+            jsonData = QByteArray::number(data.toInt());
+        } else {
+            // Fallback: serialize as JSON
+            QJsonValue val = QJsonValue::fromVariant(data);
+            if (!val.isUndefined()) {
+                jsonData = QJsonDocument(QJsonObject{{"value", val}}).toJson(QJsonDocument::Compact);
+            }
+        }
+    }
+
+    // Publish to RustEventBus
+    QByteArray e = event.toUtf8();
+    rust_eventbus_publish(m_bus, e.constData(), jsonData.constData());
+
+    // Call local QVariant subscribers
+    QList<V8nSubscriptionEntry> callbacks;
+    {
+        QMutexLocker locker(&m_mutex);
+        if (m_v8nSubscriptions.contains(event)) {
+            callbacks = m_v8nSubscriptions[event];
+        }
+    }
+
+    for (const auto &entry : callbacks) {
+        if (entry.hasReceiver && entry.receiver.isNull()) continue;
+        try {
+            entry.callback(data);
+        } catch (const std::exception &e) {
+            qWarning() << "EventBus: Exception in callback for" << event << ":" << e.what();
+        } catch (...) {
+            qWarning() << "EventBus: Unknown exception";
+        }
+    }
+}
+
+void RustEventBusAdapter::publishJson(const QString &event, const QJsonObject &data)
 {
     QByteArray e = event.toUtf8();
     QByteArray d = QJsonDocument(data).toJson(QJsonDocument::Compact);
@@ -470,12 +575,10 @@ void RustEventBusAdapter::onEventCb(const char *event, const char *jsonData, voi
     QString ev = QString::fromUtf8(event);
     QJsonObject data = QJsonDocument::fromJson(QByteArray(jsonData)).object();
 
-    // Forward to Qt signal
     QMetaObject::invokeMethod(self, [self, ev, data]() {
         emit self->eventPublished(ev, data);
     }, Qt::QueuedConnection);
 
-    // Also call tracked C++ callbacks
     if (self->m_subscriptions.contains(ev)) {
         QString dataStr = QString::fromUtf8(jsonData);
         for (const auto &sub : self->m_subscriptions[ev]) {
@@ -912,6 +1015,234 @@ void RustPluginRegistryAdapter::onInstallFailedCb(const char *id, const char *er
 }
 
 // ═══════════════════════════════════════════════════════════════════════
+//  RustPermissionManagerAdapter
+// ═══════════════════════════════════════════════════════════════════════
+
+RustPermissionManagerAdapter::RustPermissionManagerAdapter(QObject *parent)
+    : QObject(parent)
+    , m_rustPm(rust_permission_manager_new())
+{
+}
+
+RustPermissionManagerAdapter::~RustPermissionManagerAdapter()
+{
+    if (m_rustPm) {
+        rust_permission_manager_free(m_rustPm);
+        m_rustPm = nullptr;
+    }
+}
+
+bool RustPermissionManagerAdapter::checkPermission(const QString &pluginId, Permission permission)
+{
+    if (!m_rustPm) return false;
+    QByteArray idBytes = pluginId.toUtf8();
+    return rust_permission_manager_check(m_rustPm, idBytes.constData(), static_cast<int>(permission));
+}
+
+void RustPermissionManagerAdapter::requestPermission(const QString &pluginId, Permission permission)
+{
+    if (!m_rustPm) return;
+    QByteArray idBytes = pluginId.toUtf8();
+    rust_permission_manager_request(m_rustPm, idBytes.constData(), static_cast<int>(permission));
+}
+
+void RustPermissionManagerAdapter::grantPermission(const QString &pluginId, Permission permission)
+{
+    if (!m_rustPm) return;
+    QByteArray idBytes = pluginId.toUtf8();
+    rust_permission_manager_grant(m_rustPm, idBytes.constData(), static_cast<int>(permission));
+}
+
+void RustPermissionManagerAdapter::revokePermission(const QString &pluginId, Permission permission)
+{
+    if (!m_rustPm) return;
+    QByteArray idBytes = pluginId.toUtf8();
+    rust_permission_manager_revoke(m_rustPm, idBytes.constData(), static_cast<int>(permission));
+}
+
+QList<Permission> RustPermissionManagerAdapter::grantedPermissions(const QString &pluginId) const
+{
+    if (!m_declaredPermissions.contains(pluginId))
+        return {};
+    return m_declaredPermissions[pluginId];
+}
+
+void RustPermissionManagerAdapter::setDeclaredPermissions(const QString &pluginId, const QList<Permission> &permissions)
+{
+    m_declaredPermissions[pluginId] = permissions;
+}
+
+QList<Permission> RustPermissionManagerAdapter::declaredPermissions(const QString &pluginId) const
+{
+    if (!m_declaredPermissions.contains(pluginId))
+        return {};
+    return m_declaredPermissions[pluginId];
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  RustServiceLocatorAdapter
+// ═══════════════════════════════════════════════════════════════════════
+
+RustServiceLocatorAdapter::RustServiceLocatorAdapter(QObject *parent)
+    : QObject(parent)
+    , m_rustSl(rust_service_locator_new())
+{
+}
+
+RustServiceLocatorAdapter::~RustServiceLocatorAdapter()
+{
+    if (m_rustSl) {
+        rust_service_locator_free(m_rustSl);
+        m_rustSl = nullptr;
+    }
+}
+
+void RustServiceLocatorAdapter::unregisterService(const QString &id)
+{
+    QByteArray idBytes = id.toUtf8();
+    rust_service_locator_unregister(m_rustSl, idBytes.constData());
+}
+
+bool RustServiceLocatorAdapter::hasService(const QString &id) const
+{
+    QByteArray idBytes = id.toUtf8();
+    return rust_service_locator_has(m_rustSl, idBytes.constData());
+}
+
+QStringList RustServiceLocatorAdapter::registeredServices() const
+{
+    size_t len = 0;
+    char **list = rust_service_locator_list(m_rustSl, &len);
+    if (!list) return {};
+    QStringList result;
+    for (size_t i = 0; i < len; ++i)
+        result << QString::fromUtf8(list[i]);
+    rust_service_locator_free_list(list, len);
+    return result;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  RustPluginCrashHandlerAdapter
+// ═══════════════════════════════════════════════════════════════════════
+
+RustPluginCrashHandlerAdapter::RustPluginCrashHandlerAdapter(QObject *parent)
+    : QObject(parent)
+    , m_rustH(rust_crash_handler_new())
+    , m_crashLogPath(QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + "/plugin_crashes.log")
+{
+    QDir().mkpath(QFileInfo(m_crashLogPath).absolutePath());
+    rust_crash_handler_on_crash(m_rustH, &RustPluginCrashHandlerAdapter::onCrashCb, this);
+}
+
+RustPluginCrashHandlerAdapter::~RustPluginCrashHandlerAdapter()
+{
+    if (m_rustH) {
+        rust_crash_handler_free(m_rustH);
+        m_rustH = nullptr;
+    }
+}
+
+void RustPluginCrashHandlerAdapter::handleCrash(const QString &pluginId)
+{
+    QByteArray idBytes = pluginId.toUtf8();
+    QString errorStr = QStringLiteral("Process crashed");
+    QByteArray errorBytes = errorStr.toUtf8();
+    rust_crash_handler_report_crash(m_rustH, idBytes.constData(), errorBytes.constData());
+
+    CrashInfo info;
+    info.pluginId = pluginId;
+    info.timestamp = QDateTime::currentDateTime();
+    info.errorType = errorStr;
+    info.stackTrace = QString();
+    info.autoDisabled = true;
+
+    m_crashHistory.prepend(info);
+    if (m_crashHistory.size() > 100) m_crashHistory.removeLast();
+
+    QString logEntry = QString("[%1] Plugin crashed: %2\n")
+                           .arg(info.timestamp.toString(Qt::ISODate))
+                           .arg(pluginId);
+    QFile logFile(m_crashLogPath);
+    if (logFile.open(QIODevice::Append | QIODevice::Text)) {
+        QTextStream out(&logFile);
+        out << logEntry;
+    }
+
+    disablePlugin(pluginId);
+    emit pluginCrashed(pluginId, info);
+    qWarning() << "Plugin crashed:" << pluginId << "at" << info.timestamp;
+}
+
+void RustPluginCrashHandlerAdapter::disablePlugin(const QString &pluginId)
+{
+    m_disabledPlugins[pluginId] = true;
+}
+
+bool RustPluginCrashHandlerAdapter::isPluginDisabled(const QString &pluginId) const
+{
+    return m_disabledPlugins.value(pluginId, false);
+}
+
+void RustPluginCrashHandlerAdapter::enablePlugin(const QString &pluginId)
+{
+    m_disabledPlugins.remove(pluginId);
+}
+
+QList<CrashInfo> RustPluginCrashHandlerAdapter::recentCrashes(int limit) const
+{
+    if (limit <= 0 || limit >= m_crashHistory.size())
+        return m_crashHistory;
+    return m_crashHistory.mid(0, limit);
+}
+
+void RustPluginCrashHandlerAdapter::onCrashCb(const char *pluginId, const char *error, void *userData)
+{
+    auto *self = static_cast<RustPluginCrashHandlerAdapter*>(userData);
+    if (!self) return;
+    QString id = QString::fromUtf8(pluginId);
+    QString err = QString::fromUtf8(error);
+    QMetaObject::invokeMethod(self, [self, id, err]() {
+        CrashInfo info;
+        info.pluginId = id;
+        info.timestamp = QDateTime::currentDateTime();
+        info.errorType = err;
+        info.stackTrace = QString();
+        info.autoDisabled = true;
+        self->m_crashHistory.prepend(info);
+        if (self->m_crashHistory.size() > 100) self->m_crashHistory.removeLast();
+        self->disablePlugin(id);
+        emit self->pluginCrashed(id, info);
+    }, Qt::QueuedConnection);
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  RustDependencyResolverAdapter
+// ═══════════════════════════════════════════════════════════════════════
+
+RustDependencyResolverAdapter::RustDependencyResolverAdapter(QObject *parent)
+    : QObject(parent)
+{
+}
+
+RustDependencyResolverAdapter::~RustDependencyResolverAdapter() = default;
+
+QList<DependencyResolver::DependencyError> RustDependencyResolverAdapter::validate(
+    const QList<QJsonObject> &plugins, const QSet<QString> &actuallyLoaded)
+{
+    return m_resolver.validate(plugins, actuallyLoaded);
+}
+
+QStringList RustDependencyResolverAdapter::topologicalSort(const QList<QJsonObject> &plugins)
+{
+    return m_resolver.topologicalSort(plugins);
+}
+
+bool RustDependencyResolverAdapter::hasCircularDependency(const QList<QJsonObject> &plugins)
+{
+    return m_resolver.hasCircularDependency(plugins);
+}
+
+// ═══════════════════════════════════════════════════════════════════════
 //  RustBackend singleton
 // ═══════════════════════════════════════════════════════════════════════
 
@@ -929,6 +1260,10 @@ RustBackend::RustBackend(QObject *parent)
     m_updater = new RustUpdaterAdapter(this);
     m_configValidator = new RustConfigValidatorAdapter(this);
     m_pluginRegistry = new RustPluginRegistryAdapter(this);
+    m_permissionManager = new RustPermissionManagerAdapter(this);
+    m_serviceLocator = new RustServiceLocatorAdapter(this);
+    m_crashHandler = new RustPluginCrashHandlerAdapter(this);
+    m_dependencyResolver = new RustDependencyResolverAdapter(this);
 }
 
 RustBackend::~RustBackend()

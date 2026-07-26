@@ -1,7 +1,5 @@
 #include "pluginmanager.h"
-#include "eventbus.h"
-#include "servicelocator.h"
-#include "plugincrashhandler.h"
+#include "rust_adapter.h"
 #include "plugincontext.h"
 #include "version.h"
 #include <QDebug>
@@ -12,17 +10,23 @@
 #include <QDir>
 #include <QMessageBox>
 
+// Convenience accessors for the RustBackend adapters
+#define RUST_BACKEND RustBackend::instance()
+#define EVENT_BUS   RUST_BACKEND->eventBus()
+#define PERM_MGR    RUST_BACKEND->permissionManager()
+#define DEP_RES     RUST_BACKEND->dependencyResolver()
+
 const QString PluginManager::DISABLED_PLUGINS_FILE = "disabled_plugins.json";
 
 PluginManager::PluginManager(QObject* parent)
     : QObject(parent)
     , m_context(nullptr)
-    , m_crashHandler(new PluginCrashHandler(this))
 {
     QMutexLocker locker(&m_mutex);
     loadDisabledPlugins();
 
-    connect(m_crashHandler.data(), &PluginCrashHandler::pluginCrashed,
+    // Connect to the RustBackend's crash handler signal
+    connect(RUST_BACKEND->crashHandler(), &RustPluginCrashHandlerAdapter::pluginCrashed,
             this, &PluginManager::onPluginCrashed);
 }
 
@@ -39,24 +43,9 @@ void PluginManager::setContext(PluginContext* context)
     m_context = context;
 }
 
-void PluginManager::setPermissionManager(PermissionManager* manager)
-{
-    QMutexLocker locker(&m_mutex);
-    m_permissionManager = manager;
-}
-
-void PluginManager::setCrashHandler(PluginCrashHandler* handler)
-{
-    QMutexLocker locker(&m_mutex);
-    m_crashHandler.reset(handler);
-}
-
 bool PluginManager::checkPermission(const QString& pluginId, Permission permission) const
 {
-    QMutexLocker locker(&m_mutex);
-    if (!m_permissionManager)
-        return true;
-    return m_permissionManager->checkPermission(pluginId, permission);
+    return PERM_MGR->checkPermission(pluginId, permission);
 }
 
 void PluginManager::onPluginCrashed(const QString& pluginId, const CrashInfo& info)
@@ -105,7 +94,7 @@ bool PluginManager::loadPlugins(const QString& pluginPath)
         }
     }
     
-    QList<DependencyResolver::DependencyError> errors = m_resolver.validate(pluginMetadata, QSet<QString>());
+    QList<DependencyResolver::DependencyError> errors = DEP_RES->validate(pluginMetadata, QSet<QString>());
     for (const auto& error : errors) {
         if (!error.isOptional) {
             qWarning() << "Missing required dependency:" << error.missingDependency
@@ -152,7 +141,7 @@ bool PluginManager::loadPlugins(const QString& pluginPath)
         }
     }
     
-    QList<DependencyResolver::DependencyError> finalErrors = m_resolver.validate(pluginMetadata, loadedIds);
+    QList<DependencyResolver::DependencyError> finalErrors = DEP_RES->validate(pluginMetadata, loadedIds);
     for (const auto& error : finalErrors) {
         if (!error.isOptional) {
             qWarning() << "Dependency not loaded:" << error.missingDependency
@@ -309,7 +298,7 @@ void PluginManager::unloadPluginImpl(const QString& id)
 
     // 同時移除該插件實例在 EventBus 上的所有訂閱 (不依賴插件是否傳入 owner)
     if (info.instance) {
-        EventBus::instance()->unsubscribeReceiver(info.instance);
+        EVENT_BUS->unsubscribeReceiver(info.instance);
     }
 
     if (info.loader) {
@@ -390,7 +379,7 @@ void PluginManager::publishEvent(const QString& event, const QVariant& data)
         }
     }
     
-    EventBus::instance()->publish(event, data);
+    EVENT_BUS->publish(event, data);
 }
 
 quint64 PluginManager::subscribeToEvent(const QString& event, 
@@ -473,10 +462,10 @@ void PluginManager::initializePlugins()
         if (it->instance && !it->initialized) {
             if (m_context) {
                 m_context->setCurrentPluginId(it.key());
-                if (m_permissionManager) {
-                    QList<Permission> declared = m_permissionManager->declaredPermissions(it.key());
+                {
+                    QList<Permission> declared = PERM_MGR->declaredPermissions(it.key());
                     for (Permission p : declared) {
-                        m_permissionManager->grantPermission(it.key(), p);
+                        PERM_MGR->grantPermission(it.key(), p);
                     }
                 }
                 bool ok = false;
@@ -548,7 +537,7 @@ QStringList PluginManager::topologicalSort()
         plugins.append(obj);
     }
     
-    return m_resolver.topologicalSort(plugins);
+    return DEP_RES->topologicalSort(plugins);
 }
 
 bool PluginManager::loadPluginById(const QString& pluginId)

@@ -6,8 +6,9 @@
 #include <QSettings>
 #include <functional>
 #include "plugininterface.h"
-#include "eventbus.h"
 #include "permission.h"
+class RustPermissionManagerAdapter;
+class RustEventBusAdapter;
 
 class MainWindow;
 class CodeEditor;
@@ -45,14 +46,14 @@ public:
     explicit PluginContext(MainWindow* mainWindow, QObject* parent = nullptr);
     ~PluginContext() override;
 
-    void setPermissionManager(PermissionManager* manager);
-    QString currentPluginId() const;
-    void setCurrentPluginId(const QString& pluginId);
-    bool hasPermission(const QString& pluginId, Permission permission) const;
-    void requestPermission(const QString& pluginId, Permission permission);
+
 
     MainWindow* mainWindow() const;
+    bool hasPermission(const QString& pluginId, Permission permission) const;
+    void requestPermission(const QString& pluginId, Permission permission);
     QSettings* settings() const;
+    QString currentPluginId() const;
+    void setCurrentPluginId(const QString& pluginId);
     CodeEditor* currentEditor() const;
     LspClient* lspClient() const;
     ProblemPanel* problemPanel() const;
@@ -65,8 +66,8 @@ public:
     T getPlugin(const QString& id) const;
 
     void notify(const QString& event, const QVariant& data = QVariant());
-    EventBus::SubscriptionId subscribe(const QString& event, std::function<void(const QVariant&)> callback, QObject* owner = nullptr);
-    void unsubscribe(const QString& event, EventBus::SubscriptionId subscriptionId);
+    quint64 subscribe(const QString& event, std::function<void(const QVariant&)> callback, QObject* owner = nullptr);
+    void unsubscribe(const QString& event, quint64 subscriptionId);
 
     // ── Developer API (UI, Editor, Notifications, Theme) ───────
     PluginUIApi*            ui() const;
@@ -77,14 +78,13 @@ public:
 private:
     MainWindow* m_mainWindow;
     QSettings* m_settings;
-    PermissionManager* m_permissionManager = nullptr;
     QString m_currentPluginId;
     mutable PluginUIApi*            m_uiApi = nullptr;
     mutable PluginEditorApi*        m_editorApi = nullptr;
     mutable PluginNotificationApi*  m_notificationApi = nullptr;
     mutable PluginThemeApi*         m_themeApi = nullptr;
 
-    EventBus::SubscriptionId subscribe(const QString& event, std::function<void(const QVariant&)> callback);
+    quint64 subscribe(const QString& event, std::function<void(const QVariant&)> callback);
 
     QHash<QString, QList<Subscription>> m_eventHandlers;
 };

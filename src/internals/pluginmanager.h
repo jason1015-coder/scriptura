@@ -16,9 +16,10 @@
 #include <memory>
 #include <functional>
 #include "plugininterface.h"
-#include "dependencyresolver.h"
 #include "permission.h"
-#include "plugincrashhandler.h"
+
+struct CrashInfo;
+class RustBackend;
 
 /**
  * @file pluginmanager.h
@@ -232,25 +233,7 @@ public:
       */
      void loadDisabledPlugins();
 
-     /**
-      * @brief 檢查插件是否有足夠權限執行操作
-      * @param pluginId 插件 ID
-      * @param permission 要檢查的權限
-      * @return 有權限返回 true
-      */
      bool checkPermission(const QString& pluginId, Permission permission) const;
-     
-     /**
-      * @brief 設定權限管理器
-      * @param manager 權限管理器指標
-      */
-     void setPermissionManager(PermissionManager* manager);
-     
-     /**
-      * @brief 設定外掛程序當機處理器
-      * @param handler 處理器指標
-      */
-     void setCrashHandler(PluginCrashHandler* handler);
     void onPluginCrashed(const QString& pluginId, const CrashInfo& info);
 
      // 功能查詢
@@ -410,12 +393,9 @@ signals:
     QHash<QString, QList<quint64>> m_pluginSubscriptions;            ///< 插件ID -> 訂閱ID 列表
     QSet<QString> m_allowedPlugins;                                 ///< 允許載入的插件 ID
     QSet<QString> m_disabledPlugins;                                ///< 手動停用的插件 ID
-    DependencyResolver m_resolver;                                  ///< 依賴解析器
-    quint64 m_nextSubscriptionId = 1;                               ///< 下一個訂閱 ID
-    PluginContext* m_context = nullptr;                             ///< 插件上下文
-    mutable QRecursiveMutex m_mutex;                               ///< 執行緒安全鎖（遞歸，避免內部呼叫重入死鎖）
-    QScopedPointer<PluginCrashHandler> m_crashHandler;             ///< 外掛程式崩潰處理器
-    PermissionManager* m_permissionManager = nullptr;              ///< 權限管理器
+    quint64 m_nextSubscriptionId = 1;
+    PluginContext* m_context = nullptr;
+    mutable QRecursiveMutex m_mutex;
     
     static const QString DISABLED_PLUGINS_FILE;                      ///< 停用插件列表檔案名稱
     static const QString DISABLED_PLUGINS_INI;                       ///< 停用插件列表 INI 檔案名稱（已棄用）
