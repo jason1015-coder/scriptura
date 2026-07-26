@@ -7,7 +7,7 @@
 #include <QJsonArray>
 #include <QStandardPaths>
 #include "pluginmanager.h"
-#include "versionfetcher.h"
+#include "version.h"
 #include "test_pluginmanager.h"
 
 static void writeJson(const QString &dir, const QString &fileName, const QJsonObject &obj)
@@ -81,7 +81,7 @@ void TestPluginManager::testCheckVersionCompatibilityMatching()
 {
     PluginManager pm;
     QJsonObject meta;
-    meta["incompatible_with"] = QJsonArray{VersionFetcher::coreVersion()};
+    meta["incompatible_with"] = QJsonArray{QString(SCRIPTURA_VERSION)};
     QVERIFY(!pm.checkVersionCompatibility(meta));
 }
 
