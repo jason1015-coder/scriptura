@@ -7,6 +7,8 @@
 #include <QList>
 #include <QHash>
 
+struct RustPermissionManager;
+
 /**
  * @file permission.h
  * @brief 定義插件權限系統
@@ -44,6 +46,13 @@ Q_DECLARE_METATYPE(Permission)
 class PermissionManager
 {
 public:
+    PermissionManager();
+    ~PermissionManager();
+    PermissionManager(const PermissionManager&) = delete;
+    PermissionManager& operator=(const PermissionManager&) = delete;
+    PermissionManager(PermissionManager&& other) noexcept;
+    PermissionManager& operator=(PermissionManager&& other) noexcept;
+
     /**
      * @brief 檢查插件是否有權限
      * @param pluginId 插件 ID
@@ -95,8 +104,8 @@ public:
     QList<Permission> declaredPermissions(const QString& pluginId) const;
 
 private:
-    QHash<QString, QList<Permission>> m_grantedPermissions;  ///< 已授予權限
-    QHash<QString, QList<Permission>> m_declaredPermissions;  ///< 宣告權限
+    RustPermissionManager* m_rustPm = nullptr;
+    QHash<QString, QList<Permission>> m_declaredPermissions;  ///< 宣告權限 (Rust doesn't expose this via FFI)
 };
 
 #endif // PERMISSION_H

@@ -769,6 +769,149 @@ void RustTaskRunnerAdapter::onTaskErrorCb(const char *data, void *userData)
 }
 
 // ═══════════════════════════════════════════════════════════════════════
+//  RustUpdaterAdapter
+// ═══════════════════════════════════════════════════════════════════════
+
+RustUpdaterAdapter::RustUpdaterAdapter(QObject *parent)
+    : QObject(parent)
+{
+    m_updater = rust_updater_new();
+    rust_updater_on_update_available(m_updater, &onUpdateAvailableCb, this);
+}
+
+RustUpdaterAdapter::~RustUpdaterAdapter()
+{
+    rust_updater_free(m_updater);
+}
+
+void RustUpdaterAdapter::checkForUpdates(const QString &currentVersion, const QString &updateUrl)
+{
+    QByteArray ver = currentVersion.toUtf8();
+    QByteArray url = updateUrl.toUtf8();
+    rust_updater_check(m_updater, ver.constData(), url.constData());
+}
+
+bool RustUpdaterAdapter::isUpdateAvailable() const
+{
+    return rust_updater_is_update_available(m_updater);
+}
+
+QString RustUpdaterAdapter::latestVersion() const
+{
+    char *ver = rust_updater_latest_version(m_updater);
+    QString result = QString::fromUtf8(ver);
+    rust_free_string(ver);
+    return result;
+}
+
+void RustUpdaterAdapter::onUpdateAvailableCb(const char *data, void *userData)
+{
+    auto *self = static_cast<RustUpdaterAdapter*>(userData);
+    QString version = QString::fromUtf8(data);
+    self->m_latestVersion = version;
+    QMetaObject::invokeMethod(self, [self, version]() {
+        emit self->updateAvailable(version, QString());
+    }, Qt::QueuedConnection);
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  RustConfigValidatorAdapter
+// ═══════════════════════════════════════════════════════════════════════
+
+RustConfigValidatorAdapter::RustConfigValidatorAdapter(QObject *parent)
+    : QObject(parent)
+{
+    m_validator = rust_config_validator_new();
+    rust_config_validator_on_error(m_validator, &onValidationErrorCb, this);
+}
+
+RustConfigValidatorAdapter::~RustConfigValidatorAdapter()
+{
+    rust_config_validator_free(m_validator);
+}
+
+QString RustConfigValidatorAdapter::validate(const QString &jsonConfig, const QString &schemaJson)
+{
+    QByteArray config = jsonConfig.toUtf8();
+    QByteArray schema = schemaJson.toUtf8();
+    char *result = rust_config_validator_validate(m_validator, config.constData(), schema.constData());
+    QString error = QString::fromUtf8(result);
+    rust_free_string(result);
+    return error;
+}
+
+void RustConfigValidatorAdapter::onValidationErrorCb(const char *data, void *userData)
+{
+    auto *self = static_cast<RustConfigValidatorAdapter*>(userData);
+    QString error = QString::fromUtf8(data);
+    QMetaObject::invokeMethod(self, [self, error]() {
+        emit self->validationError(error);
+    }, Qt::QueuedConnection);
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  RustPluginRegistryAdapter
+// ═══════════════════════════════════════════════════════════════════════
+
+RustPluginRegistryAdapter::RustPluginRegistryAdapter(QObject *parent)
+    : QObject(parent)
+{
+    m_registry = rust_plugin_registry_new();
+    rust_plugin_registry_on_update(m_registry, &onRegistryUpdatedCb, this);
+    rust_plugin_registry_on_install_failed(m_registry, &onInstallFailedCb, this);
+}
+
+RustPluginRegistryAdapter::~RustPluginRegistryAdapter()
+{
+    rust_plugin_registry_free(m_registry);
+}
+
+void RustPluginRegistryAdapter::setRegistryUrl(const QString &url)
+{
+    QByteArray u = url.toUtf8();
+    rust_plugin_registry_set_url(m_registry, u.constData());
+}
+
+QString RustPluginRegistryAdapter::registryUrl() const
+{
+    char *url = rust_plugin_registry_get_url(m_registry);
+    QString result = QString::fromUtf8(url);
+    rust_free_string(url);
+    return result;
+}
+
+void RustPluginRegistryAdapter::checkForUpdates()
+{
+    rust_plugin_registry_check_updates(m_registry);
+}
+
+bool RustPluginRegistryAdapter::upgradeAvailable(const QString &pluginId, const QString &currentVersion) const
+{
+    QByteArray id = pluginId.toUtf8();
+    QByteArray ver = currentVersion.toUtf8();
+    return rust_plugin_registry_upgrade_available(m_registry, id.constData(), ver.constData());
+}
+
+void RustPluginRegistryAdapter::onRegistryUpdatedCb(const char *data, void *userData)
+{
+    auto *self = static_cast<RustPluginRegistryAdapter*>(userData);
+    QString json = QString::fromUtf8(data);
+    QMetaObject::invokeMethod(self, [self, json]() {
+        emit self->registryUpdated(json);
+    }, Qt::QueuedConnection);
+}
+
+void RustPluginRegistryAdapter::onInstallFailedCb(const char *id, const char *error, void *userData)
+{
+    auto *self = static_cast<RustPluginRegistryAdapter*>(userData);
+    QString pluginId = QString::fromUtf8(id);
+    QString err = QString::fromUtf8(error);
+    QMetaObject::invokeMethod(self, [self, pluginId, err]() {
+        emit self->installFailed(pluginId, err);
+    }, Qt::QueuedConnection);
+}
+
+// ═══════════════════════════════════════════════════════════════════════
 //  RustBackend singleton
 // ═══════════════════════════════════════════════════════════════════════
 
@@ -783,6 +926,9 @@ RustBackend::RustBackend(QObject *parent)
     m_pluginManager = new RustPluginManagerAdapter(this);
     m_workspace = new RustWorkspaceAdapter(this);
     m_taskRunner = new RustTaskRunnerAdapter(this);
+    m_updater = new RustUpdaterAdapter(this);
+    m_configValidator = new RustConfigValidatorAdapter(this);
+    m_pluginRegistry = new RustPluginRegistryAdapter(this);
 }
 
 RustBackend::~RustBackend()

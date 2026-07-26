@@ -1,29 +1,27 @@
 #include "updater.h"
-#include <QNetworkRequest>
+#include "rust_backend.h"
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonArray>
 #include <QSettings>
 #include <QDebug>
 #include <QTimerEvent>
+#include <QtConcurrent/QtConcurrent>
+#include <QFutureWatcher>
 
 Updater::Updater(QObject *parent)
     : QObject(parent)
-    , m_networkManager(new QNetworkAccessManager(this))
     , m_timer(new QTimer(this))
     , m_updateCheckEnabled(true)
     , m_updateCheckInterval(7) // Check weekly by default
     , m_lastCheckedType(Stable)
 {
-    connect(m_networkManager, &QNetworkAccessManager::finished,
-            this, &Updater::onNetworkReply);
-
     // Load settings
     QSettings settings;
     m_updateCheckEnabled = settings.value("updater/checkEnabled", true).toBool();
     m_updateCheckInterval = settings.value("updater/checkInterval", 7).toInt();
 
-    // Setup periodic check
+    // Setup periodic check — delegates to Rust backend for version fetching
     connect(m_timer, &QTimer::timeout, this, [this]() { checkForUpdates(Stable); });
     m_timer->start(m_updateCheckInterval * 24 * 60 * 60 * 1000); // Convert days to milliseconds
 }
@@ -45,11 +43,43 @@ void Updater::checkForUpdates(ReleaseType type)
 {
     m_lastCheckedType = type;
 
-    QNetworkRequest request;
-    request.setUrl(QUrl(getGitHubApiUrl(type)));
-    request.setHeader(QNetworkRequest::UserAgentHeader, "Scriptura-Updater");
-
-    m_networkManager->get(request);
+    // Delegate to Rust backend for version checking in a background thread.
+    // The Rust updater handles HTTP fetch + JSON parsing + semver comparison.
+    // Qt plumbing (timers, settings, signals) stays in C++.
+    
+    QSettings settings;
+    QString currentVersion = settings.value("updater/currentVersion", "0.0.0").toString();
+    QString apiUrl = getGitHubApiUrl(type);
+    
+    // Create a Rust updater instance for this check
+    RustUpdater *rustUpdater = rust_updater_new();
+    
+    // Run check on background thread using QtConcurrent
+    auto *watcher = new QFutureWatcher<void>(this);
+    connect(watcher, &QFutureWatcher<void>::finished, this, [this, watcher, rustUpdater]() {
+        // Results are stored in the Rust Updater struct after background thread completes
+        bool available = rust_updater_is_update_available(rustUpdater);
+        if (available) {
+            char *ver = rust_updater_latest_version(rustUpdater);
+            m_latestVersion = QString::fromUtf8(ver);
+            rust_free_string(ver);
+            if (!m_latestVersion.isEmpty())
+                emit updateAvailable(m_latestVersion, m_downloadUrl);
+        } else {
+            // No update available (or network error — Rust logs the error internally)
+            emit noUpdateAvailable();
+        }
+        rust_updater_free(rustUpdater);
+        watcher->deleteLater();
+    });
+    
+    QFuture<void> future = QtConcurrent::run([rustUpdater, currentVersion, apiUrl]() {
+        // Blocking Rust call on background thread — handles HTTP fetch + JSON parsing + semver comparison
+        QByteArray ver = currentVersion.toUtf8();
+        QByteArray url = apiUrl.toUtf8();
+        rust_updater_check(rustUpdater, ver.constData(), url.constData());
+    });
+    watcher->setFuture(future);
 }
 
 void Updater::setUpdateCheckEnabled(bool enabled)
@@ -91,81 +121,7 @@ QString Updater::getLatestReleaseUrl() const
 QString Updater::getGitHubApiUrl(ReleaseType type) const
 {
     if (type == PreRelease) {
-        // Fetch all releases and filter for pre-releases
         return "https://api.github.com/repos/jasonblanchard/scriptura/releases?per_page=10";
     }
     return "https://api.github.com/repos/jasonblanchard/scriptura/releases/latest";
-}
-
-void Updater::onNetworkReply(QNetworkReply *reply)
-{
-    if (reply->error() != QNetworkReply::NoError) {
-        qDebug() << "Update check failed:" << reply->errorString();
-        emit updateCheckFailed(reply->errorString());
-        reply->deleteLater();
-        return;
-    }
-
-    QByteArray data = reply->readAll();
-    reply->deleteLater();
-
-    QJsonParseError error;
-    QJsonDocument doc = QJsonDocument::fromJson(data, &error);
-
-    if (error.error != QJsonParseError::NoError) {
-        qDebug() << "Failed to parse update response:" << error.errorString();
-        emit updateCheckFailed(error.errorString());
-        return;
-    }
-
-    if (m_lastCheckedType == PreRelease) {
-        // For pre-release, the response is an array of releases
-        if (!doc.isArray()) {
-            emit updateCheckFailed("Invalid response format for pre-release");
-            return;
-        }
-
-        QJsonArray releases = doc.array();
-        if (releases.isEmpty()) {
-            emit noUpdateAvailable();
-            return;
-        }
-
-        // Find the first pre-release
-        for (const QJsonValue &value : releases) {
-            if (!value.isObject()) continue;
-            QJsonObject obj = value.toObject();
-            if (obj.value("prerelease").toBool()) {
-                m_latestVersion = obj.value("tag_name").toString();
-                m_downloadUrl = obj.value("html_url").toString();
-                break;
-            }
-        }
-
-        if (m_latestVersion.isEmpty()) {
-            emit noUpdateAvailable();
-            return;
-        }
-    } else {
-        // For stable release, the response is a single object
-        if (!doc.isObject()) {
-            emit updateCheckFailed("Invalid response format");
-            return;
-        }
-
-        QJsonObject obj = doc.object();
-        m_latestVersion = obj["tag_name"].toString();
-        m_downloadUrl = obj["html_url"].toString();
-    }
-
-    // Get current version from settings (or use a default)
-    QSettings settings;
-    QString currentVersion = settings.value("updater/currentVersion", "0.0.0").toString();
-
-    // Compare versions (simple string comparison, works for semver)
-    if (m_latestVersion != currentVersion && !m_latestVersion.isEmpty()) {
-        emit updateAvailable(m_latestVersion, m_downloadUrl);
-    } else {
-        emit noUpdateAvailable();
-    }
 }

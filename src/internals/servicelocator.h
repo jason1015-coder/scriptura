@@ -5,6 +5,9 @@
 #include <QHash>
 #include <QMutex>
 #include <QMutexLocker>
+#include <QByteArray>
+
+#include "rust_backend.h"
 
 /**
  * @file servicelocator.h
@@ -91,7 +94,7 @@ private:
     ServiceLocator(const ServiceLocator&) = delete;
     ServiceLocator& operator=(const ServiceLocator&) = delete;
     
-    QHash<QString, QObject*> m_services;
+    RustServiceLocator* m_rustSl = nullptr;
     mutable QMutex m_mutex;
     
     static ServiceLocator* s_instance;
@@ -102,17 +105,18 @@ template<typename T>
 void ServiceLocator::registerService(const QString& id, T* service)
 {
     QMutexLocker locker(&m_mutex);
-    m_services[id] = service;
+    QByteArray idBytes = id.toUtf8();
+    rust_service_locator_register(m_rustSl, idBytes.constData(), static_cast<void*>(service));
 }
 
 template<typename T>
 T* ServiceLocator::getService(const QString& id) const
 {
     QMutexLocker locker(&m_mutex);
-    if (!m_services.contains(id)) {
-        return nullptr;
-    }
-    return qobject_cast<T*>(m_services[id]);
+    QByteArray idBytes = id.toUtf8();
+    void* ptr = rust_service_locator_get(m_rustSl, idBytes.constData());
+    if (!ptr) return nullptr;
+    return qobject_cast<T*>(static_cast<QObject*>(ptr));
 }
 
 #endif // SERVICELOCATOR_H

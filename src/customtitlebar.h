@@ -25,6 +25,7 @@ public:
     QPushButton* closeButton;
     QLabel* titleLabel;
     QPushButton* sidebarToggleButton;
+    QPushButton* settingsButton;
     QPushButton* inspectorToggleButton;
     QLineEdit* searchField;
 
@@ -34,6 +35,7 @@ signals:
     void minimizeRequest();
     void closeRequest();
     void sidebarToggleClicked();
+    void settingsClicked();
     void inspectorToggleClicked();
     void searchRequested();
 

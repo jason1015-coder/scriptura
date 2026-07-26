@@ -7,6 +7,8 @@
 #include <QJsonObject>
 #include <QTimer>
 
+#include "rust_backend.h"
+
 class PluginRegistry : public QObject
 {
     Q_OBJECT
@@ -32,11 +34,16 @@ signals:
     void updateAvailable(const QString &pluginId, const QString &latestVersion);
 
 private:
+    // Rust FFI callbacks
+    static void onRustRegistryUpdated(const char *data, void *userData);
+    static void onRustInstallFailed(const char *id, const char *error, void *userData);
+
     QUrl m_registryUrl;
     QJsonObject m_manifest;
     QNetworkAccessManager *m_network;
     QTimer *m_timer;
     int m_checkIntervalDays;
+    RustPluginRegistry *m_rustRegistry = nullptr;  // Rust backend for registry fetch + JSON parsing
 };
 
 #endif // PLUGINREGISTRY_H

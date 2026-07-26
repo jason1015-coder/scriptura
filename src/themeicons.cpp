@@ -1,4 +1,5 @@
 #include "themeicons.h"
+#include "thememanager.h"
 
 #include <QApplication>
 #include <QAbstractButton>
@@ -20,8 +21,18 @@ ThemeIcons::ThemeIcons(QObject* parent)
 {
 }
 
+void ThemeIcons::setThemeManager(const ThemeManager *mgr)
+{
+    m_themeManager = mgr;
+}
+
 QColor ThemeIcons::colorForRole(Role role) const
 {
+    // Svg role uses the theme's dedicated SVG colour (more subtle than text)
+    if (role == Role::Svg && m_themeManager) {
+        return m_themeManager->svgColor();
+    }
+
     const QPalette palette = qApp ? qApp->palette() : QPalette();
     switch (role) {
     case Role::Selected:
@@ -30,6 +41,9 @@ QColor ThemeIcons::colorForRole(Role role) const
         return palette.color(QPalette::Disabled, QPalette::WindowText);
     case Role::Accent:
         return palette.color(QPalette::Highlight);
+    case Role::Svg:
+        // Fallback: use a slightly dimmed window text
+        return palette.color(QPalette::WindowText).darker(140);
     case Role::Normal:
     default:
         return palette.color(QPalette::WindowText);

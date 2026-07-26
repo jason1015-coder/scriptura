@@ -37,11 +37,11 @@ bool DependencyResolver::detectCycle(const QHash<QString, QStringList>& graph,
     }
     
     if (recStack.contains(node)) {
-        return true; // 發現循環
+        return true; // Found cycle
     }
     
     if (visited.contains(node)) {
-        return false; // 已經處理過
+        return false; // Already processed
     }
     
     visited.insert(node);
@@ -77,7 +77,7 @@ QList<DependencyResolver::DependencyError> DependencyResolver::validate(const QL
     QList<DependencyError> errors;
     QSet<QString> availablePlugins;
     
-    // 收集所有可用插件 ID
+    // Collect all available plugin IDs
     for (const QJsonObject& plugin : plugins) {
         QString id = plugin["id"].toString();
         if (!id.isEmpty()) {
@@ -85,14 +85,14 @@ QList<DependencyResolver::DependencyError> DependencyResolver::validate(const QL
         }
     }
     
-    // 檢查每個插件的依賴
+    // Check each plugin's dependencies
     for (const QJsonObject& plugin : plugins) {
         QString pluginId = plugin["id"].toString();
         if (pluginId.isEmpty()) {
             continue;
         }
         
-        // 檢查必需依賴 - 使用 actuallyLoaded 而非 availablePlugins
+        // Check required dependencies against actuallyLoaded
         if (plugin.contains("dependencies")) {
             QJsonArray depArray = plugin["dependencies"].toArray();
             for (const QJsonValue& val : depArray) {
@@ -103,13 +103,12 @@ QList<DependencyResolver::DependencyError> DependencyResolver::validate(const QL
             }
         }
         
-        // 檢查可選依賴 (僅記錄警告，不加入錯誤列表)
+        // Check optional dependencies
         if (plugin.contains("optionalDependencies")) {
             QJsonArray optDepArray = plugin["optionalDependencies"].toArray();
             for (const QJsonValue& val : optDepArray) {
                 QString depId = val.toString();
                 if (!availablePlugins.contains(depId)) {
-                    // 可選依賴缺失不視為錯誤，僅記錄
                     qInfo() << "Optional dependency not found:" << depId << "for plugin" << pluginId;
                 }
             }
@@ -125,7 +124,7 @@ QStringList DependencyResolver::dfsSort(const QHash<QString, QStringList>& graph
     QSet<QString> visited;
     QSet<QString> inResult;
     
-    // 遞迴訪問函數
+    // Recursive visit function
     std::function<void(const QString&)> visit = [&](const QString& node) {
         if (inResult.contains(node) || !graph.contains(node)) {
             return;
@@ -143,7 +142,7 @@ QStringList DependencyResolver::dfsSort(const QHash<QString, QStringList>& graph
         result.append(node);
     };
     
-    // 訪問所有節點
+    // Visit all nodes
     for (auto it = graph.constBegin(); it != graph.constEnd(); ++it) {
         if (!visited.contains(it.key())) {
             visit(it.key());
@@ -157,7 +156,7 @@ QStringList DependencyResolver::topologicalSort(const QList<QJsonObject>& plugin
 {
     QHash<QString, QStringList> graph = buildGraph(plugins);
     
-    // 檢查循環依賴
+    // Check for circular dependencies
     if (hasCircularDependency(plugins)) {
         qCritical() << "Circular dependency detected, cannot perform topological sort";
         return QStringList();
