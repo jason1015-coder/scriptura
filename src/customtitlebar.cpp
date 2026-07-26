@@ -17,6 +17,7 @@ CustomTitleBar::CustomTitleBar(QWidget *parent)
     , closeButton(nullptr)
     , titleLabel(nullptr)
     , sidebarToggleButton(nullptr)
+    , settingsButton(nullptr)
     , inspectorToggleButton(nullptr)
     , searchField(nullptr)
     , m_isDragging(false)
@@ -42,7 +43,7 @@ void CustomTitleBar::setupLayout()
     sidebarToggleButton->setToolTip(tr("Toggle Sidebar"));
     sidebarToggleButton->setCheckable(true);
     sidebarToggleButton->setChecked(true);
-    sidebarToggleButton->setIcon(ThemeIcons::instance()->icon(":/icons/sidebar-toggle.svg"));
+    ThemeIcons::instance()->setIcon(sidebarToggleButton, ":/icons/sidebar-toggle.svg");
     sidebarToggleButton->setIconSize(QSize(18, 18));
     connect(sidebarToggleButton, &QPushButton::clicked, this, &CustomTitleBar::sidebarToggleClicked);
     layout->addWidget(sidebarToggleButton);
@@ -79,10 +80,20 @@ void CustomTitleBar::setupLayout()
     inspectorToggleButton->setFixedSize(36, 36);
     inspectorToggleButton->setToolTip(tr("Toggle Inspector"));
     inspectorToggleButton->setCheckable(true);
-    inspectorToggleButton->setIcon(ThemeIcons::instance()->icon(":/icons/inspector.svg"));
+    ThemeIcons::instance()->setIcon(inspectorToggleButton, ":/icons/inspector.svg");
     inspectorToggleButton->setIconSize(QSize(18, 18));
     connect(inspectorToggleButton, &QPushButton::clicked, this, &CustomTitleBar::inspectorToggleClicked);
     layout->addWidget(inspectorToggleButton);
+
+    // -- Settings toggle --
+    settingsButton = new QPushButton(this);
+    settingsButton->setObjectName("TitleBarSettings");
+    settingsButton->setFixedSize(36, 36);
+    settingsButton->setToolTip(tr("Editor Settings"));
+    ThemeIcons::instance()->setIcon(settingsButton, ":/icons/settings.svg");
+    settingsButton->setIconSize(QSize(18, 18));
+    connect(settingsButton, &QPushButton::clicked, this, &CustomTitleBar::settingsClicked);
+    layout->addWidget(settingsButton);
 
     layout->addSpacing(8);
 
@@ -119,10 +130,10 @@ void CustomTitleBar::styleButtons()
             padding: 0px;
         }
         QPushButton:hover {
-            background-color: rgba(255, 255, 255, 0.10);
+            background-color: rgba(128, 128, 128, 0.15);
         }
         QPushButton:pressed {
-            background-color: rgba(255, 255, 255, 0.18);
+            background-color: rgba(128, 128, 128, 0.25);
         }
     )";
 
@@ -135,13 +146,13 @@ void CustomTitleBar::styleButtons()
             padding: 0px;
         }
         QPushButton:hover {
-            background-color: rgba(255, 255, 255, 0.10);
+            background-color: rgba(128, 128, 128, 0.15);
         }
         QPushButton:checked {
-            background-color: rgba(255, 255, 255, 0.12);
+            background-color: rgba(128, 128, 128, 0.20);
         }
         QPushButton:pressed {
-            background-color: rgba(255, 255, 255, 0.18);
+            background-color: rgba(128, 128, 128, 0.25);
         }
     )";
 
@@ -149,13 +160,14 @@ void CustomTitleBar::styleButtons()
     maximizeButton->setStyleSheet(buttonStyle);
     closeButton->setStyleSheet(buttonStyle);
     sidebarToggleButton->setStyleSheet(checkableButtonStyle);
+    settingsButton->setStyleSheet(buttonStyle);
     inspectorToggleButton->setStyleSheet(checkableButtonStyle);
 
     // Search field styling
     searchField->setStyleSheet(R"(
         QLineEdit#unifiedSearchField {
-            background-color: rgba(255, 255, 255, 0.06);
-            border: 1px solid rgba(255, 255, 255, 0.08);
+            background-color: rgba(128, 128, 128, 0.08);
+            border: 1px solid rgba(128, 128, 128, 0.12);
             border-radius: 6px;
             padding: 4px 10px;
             color: palette(text);
@@ -163,11 +175,11 @@ void CustomTitleBar::styleButtons()
             font-family: "Inter", "SF Pro Text", sans-serif;
         }
         QLineEdit#unifiedSearchField:focus {
-            background-color: rgba(255, 255, 255, 0.10);
-            border: 1px solid rgba(255, 255, 255, 0.18);
+            background-color: rgba(128, 128, 128, 0.14);
+            border: 1px solid rgba(128, 128, 128, 0.25);
         }
         QLineEdit#unifiedSearchField:hover {
-            background-color: rgba(255, 255, 255, 0.08);
+            background-color: rgba(128, 128, 128, 0.10);
         }
     )");
 }
@@ -178,9 +190,7 @@ void CustomTitleBar::paintEvent(QPaintEvent *event)
     QPainter p(this);
     p.setRenderHint(QPainter::Antialiasing, true);
 
-    QColor iconColor = palette().color(foregroundRole());
-
-    // Window control glyphs
+    // Window control glyphs — color is read from palette() inside paintWindowControls
     paintWindowControls(p, minimizeButton->geometry(), minimizeButton->underMouse(), minimizeButton->isDown(), QStringLiteral("\u2014"));
     paintWindowControls(p, maximizeButton->geometry(), maximizeButton->underMouse(), maximizeButton->isDown(), QStringLiteral("\u25a1"));
     paintWindowControls(p, closeButton->geometry(), closeButton->underMouse(), closeButton->isDown(), QStringLiteral("\u2715"));

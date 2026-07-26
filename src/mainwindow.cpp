@@ -170,12 +170,22 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
     });
     connect(m_titleBar, &CustomTitleBar::closeRequest, this, &QWidget::close);
 
+    // Enable mouse tracking for resize edge detection
+    setMouseTracking(true);
+    if (centralWidget())
+        centralWidget()->setMouseTracking(true);
+
     // Connect unified title bar signals
     connect(m_titleBar, &CustomTitleBar::sidebarToggleClicked, this, [this]() {
-        setSidebarCollapsed(!ui->sidebarDrawer->isVisible());
+        // sidebarDrawer has zero width when collapsed (not hidden), so check width
+        bool isCollapsed = ui->sidebarDrawer->maximumWidth() == 0 || ui->sidebarDrawer->width() < 10;
+        setSidebarCollapsed(!isCollapsed);
     });
     connect(m_titleBar, &CustomTitleBar::inspectorToggleClicked, this, [this]() {
         toggleInspector();
+    });
+    connect(m_titleBar, &CustomTitleBar::settingsClicked, this, [this]() {
+        on_action_editor_settings_triggered();
     });
     // ---- Universal Search ----
     m_universalSearch = new UniversalSearchPopup(m_titleBar->searchField, this);
@@ -325,8 +335,8 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
     tabBar = ui->tabBar;
     bottomPanelTabs = ui->bottomPanelTabs;
 
-    welcomeWidget = createWelcomeWidget();
-    editorStack->addWidget(welcomeWidget);
+    // In-editor welcome widget removed — replaced by standalone WelcomeMenuScreen
+    // shown between splash and main window startup.
     editorStack->addWidget(ui->tabWidget);
     editorStack->addWidget(todoPanel);
     editorStack->addWidget(terminalPanel);
@@ -373,7 +383,7 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
 
     // Top toolbar setup — buttons now live in the unified title bar or editor area
     sidebarToggleButton = new QToolButton(this);
-    sidebarToggleButton->setIcon(ThemeIcons::instance()->icon(":/icons/sidebar-toggle.svg"));
+    ThemeIcons::instance()->setIcon(sidebarToggleButton, ":/icons/sidebar-toggle.svg");
     sidebarToggleButton->setIconSize(QSize(20, 20));
     sidebarToggleButton->setToolTip(tr("Toggle Sidebar"));
     sidebarToggleButton->setCheckable(true);
@@ -382,7 +392,7 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
     sidebarToggleButton->hide(); // Managed by unified title bar
 
     goUpButton = new QToolButton(this);
-    goUpButton->setIcon(ThemeIcons::instance()->icon(":/icons/go-up.svg"));
+    ThemeIcons::instance()->setIcon(goUpButton, ":/icons/go-up.svg");
     goUpButton->setIconSize(QSize(18, 18));
     goUpButton->setToolTip(tr("Go Up"));
     goUpButton->setEnabled(false);
@@ -402,7 +412,7 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
 
     // Right-side toolbar buttons (settings moved to title bar area)
     settingsButton = new QToolButton(this);
-    settingsButton->setIcon(ThemeIcons::instance()->icon(":/icons/settings.svg"));
+    ThemeIcons::instance()->setIcon(settingsButton, ":/icons/settings.svg");
     settingsButton->setIconSize(QSize(20, 20));
     settingsButton->setToolTip(tr("Editor Settings"));
     settingsButton->setFixedSize(32, 32);
@@ -410,7 +420,7 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
 
     // Sidebar icon buttons (bottom of drawer)
     fileTreeToggleButton = new QToolButton(ui->sidebarDrawer);
-    fileTreeToggleButton->setIcon(ThemeIcons::instance()->icon(":/icons/file-tree.svg"));
+    ThemeIcons::instance()->setIcon(fileTreeToggleButton, ":/icons/file-tree.svg");
     fileTreeToggleButton->setIconSize(QSize(20, 20));
     fileTreeToggleButton->setToolTip(tr("File Tree"));
     fileTreeToggleButton->setCheckable(true);
@@ -426,7 +436,7 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
     iconBarLayout->setAlignment(Qt::AlignCenter);
 
     placeholderButton = new QToolButton(iconBar);
-    placeholderButton->setIcon(ThemeIcons::instance()->icon(":/icons/todo.svg"));
+    ThemeIcons::instance()->setIcon(placeholderButton, ":/icons/todo.svg");
     placeholderButton->setIconSize(QSize(20, 20));
     placeholderButton->setToolTip(tr("Todo"));
     placeholderButton->setCheckable(true);
@@ -434,7 +444,7 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
     iconBarLayout->addWidget(placeholderButton);
 
     terminalButton = new QToolButton(iconBar);
-    terminalButton->setIcon(ThemeIcons::instance()->icon(":/icons/terminal.svg"));
+    ThemeIcons::instance()->setIcon(terminalButton, ":/icons/terminal.svg");
     terminalButton->setIconSize(QSize(20, 20));
     terminalButton->setToolTip(tr("Terminal"));
     terminalButton->setCheckable(true);
@@ -442,7 +452,7 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
     iconBarLayout->addWidget(terminalButton);
 
     problemsButton = new QToolButton(iconBar);
-    problemsButton->setIcon(ThemeIcons::instance()->icon(":/icons/problems.svg"));
+    ThemeIcons::instance()->setIcon(problemsButton, ":/icons/problems.svg");
     problemsButton->setIconSize(QSize(20, 20));
     problemsButton->setToolTip(tr("Problems"));
     problemsButton->setCheckable(true);
@@ -450,7 +460,7 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
     iconBarLayout->addWidget(problemsButton);
 
     gitButton = new QToolButton(iconBar);
-    gitButton->setIcon(ThemeIcons::instance()->icon(":/icons/git.svg"));
+    ThemeIcons::instance()->setIcon(gitButton, ":/icons/git.svg");
     gitButton->setIconSize(QSize(20, 20));
     gitButton->setToolTip(tr("Git"));
     gitButton->setCheckable(true);
@@ -487,7 +497,7 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
     QPushButton *inspectorCloseBtn = new QPushButton(inspectorHeader);
     inspectorCloseBtn->setObjectName("inspectorCloseBtn");
     inspectorCloseBtn->setFixedSize(24, 24);
-    inspectorCloseBtn->setIcon(ThemeIcons::instance()->icon(":/icons/close.svg"));
+    ThemeIcons::instance()->setIcon(inspectorCloseBtn, ":/icons/close.svg");
     inspectorCloseBtn->setFlat(true);
     inspectorCloseBtn->setCursor(Qt::ArrowCursor);
     inspectorCloseBtn->setToolTip(tr("Close inspector"));
@@ -661,7 +671,6 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
     // Tab close requests
     connect(ui->tabWidget, &QTabWidget::tabCloseRequested, this, &MainWindow::on_tabWidget_tabCloseRequested);
 
-    editorStack->addWidget(welcomeWidget);
     editorStack->addWidget(ui->tabWidget);
     editorStack->addWidget(todoPanel);
     editorStack->addWidget(terminalPanel);
@@ -672,10 +681,8 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
             if (QFile::exists(f))
                 openFileInTab(f);
         }
-        showEditorInterface();
-    } else {
-        showWelcomeScreen();
     }
+    showEditorInterface();
 
     // Restore panel layout from previous session
     {
@@ -1114,7 +1121,7 @@ CodeEditor* MainWindow::getCurrentCodeEditor()
 QPushButton* MainWindow::createTabCloseButton(int tabIndex)
 {
     QPushButton *closeBtn = new QPushButton();
-    closeBtn->setIcon(ThemeIcons::instance()->icon(":/icons/close.svg"));
+    ThemeIcons::instance()->setIcon(closeBtn, ":/icons/close.svg");
     closeBtn->setFixedSize(20, 20);
     closeBtn->setFlat(true);
     closeBtn->setCursor(Qt::ArrowCursor);
@@ -1124,78 +1131,8 @@ QPushButton* MainWindow::createTabCloseButton(int tabIndex)
     return closeBtn;
 }
 
- QWidget* MainWindow::createWelcomeWidget()
- {
-     QWidget *widget = new QWidget(this);
-
-     // App icon
-     QLabel *iconLabel = new QLabel(widget);
-     iconLabel->setPixmap(QIcon(":/icons/app-icon.svg").pixmap(64, 64));
-     iconLabel->setAlignment(Qt::AlignCenter);
-
-     QLabel *titleLabel = new QLabel(tr("Welcome to Scriptura"), widget);
-     titleLabel->setObjectName("welcomeTitle");
-     titleLabel->setAlignment(Qt::AlignCenter);
-     QFont titleFont = titleLabel->font();
-     titleFont.setPointSize(28);
-     titleFont.setBold(true);
-     titleLabel->setFont(titleFont);
-
-     QLabel *descriptionLabel = new QLabel(tr("Open a project or create a new file to start editing."), widget);
-     descriptionLabel->setAlignment(Qt::AlignCenter);
-     QFont descFont = descriptionLabel->font();
-     descFont.setPointSize(11);
-     descriptionLabel->setFont(descFont);
-     descriptionLabel->setStyleSheet("color: palette(mid);");
-
-     QPushButton *openProjectButton = new QPushButton(ThemeIcons::instance()->icon(":/icons/folder.svg"), tr("Open Project"), widget);
-     openProjectButton->setObjectName("primaryButton");
-     openProjectButton->setMinimumWidth(160);
-
-     QPushButton *newFileButton = new QPushButton(tr("New File"), widget);
-     newFileButton->setObjectName("primaryButton");
-     newFileButton->setMinimumWidth(160);
-
-     QHBoxLayout *buttonLayout = new QHBoxLayout();
-     buttonLayout->addStretch();
-     buttonLayout->addWidget(openProjectButton);
-     buttonLayout->addSpacing(12);
-     buttonLayout->addWidget(newFileButton);
-     buttonLayout->addStretch();
-
-     QFrame *recentProjectsFrame = new QFrame(widget);
-     recentProjectsFrame->setObjectName("recentProjectsFrame");
-     recentProjectsFrame->setFrameShape(QFrame::StyledPanel);
-     recentProjectsFrame->setFrameShadow(QFrame::Sunken);
-     recentProjectsLayout = new QVBoxLayout(recentProjectsFrame);
-     recentProjectsLayout->setSpacing(6);
-     QLabel *recentLabel = new QLabel(tr("<b>Recent Projects:</b>"), recentProjectsFrame);
-     recentProjectsLayout->addWidget(recentLabel);
-
-     updateRecentProjectsOnWelcome();
-
-     QVBoxLayout *layout = new QVBoxLayout(widget);
-     layout->setSpacing(16);
-     layout->addStretch();
-     layout->addWidget(iconLabel);
-     layout->addWidget(titleLabel);
-     layout->addSpacing(8);
-     layout->addWidget(descriptionLabel);
-     layout->addSpacing(32);
-     layout->addLayout(buttonLayout);
-     layout->addSpacing(40);
-     layout->addWidget(recentProjectsFrame);
-     layout->addSpacing(24);
-     layout->addWidget(createKeyboardShortcutsWidget());
-     layout->addStretch();
-
-    connect(openProjectButton, &QPushButton::clicked, this, &MainWindow::on_action_open_project_triggered);
-    connect(newFileButton, &QPushButton::clicked, this, [this]() {
-        on_action_add_file_directory_triggered();
-    });
-
-    return widget;
-}
+// createWelcomeWidget() removed — replaced by standalone WelcomeMenuScreen
+// shown between splash and main window startup.
 
 QWidget* MainWindow::createKeyboardShortcutsWidget()
 {
@@ -1250,7 +1187,20 @@ QWidget* MainWindow::createThemeSettingsWidget()
         {ThemeColorFamily::Violet,  "Violet"}
     };
 
-    QMap<QPushButton*, Theme> themeMap;
+    // Store theme button data so we can refresh stylesheets on theme change
+    struct ThemeButtonEntry { QPushButton *btn; Theme theme; QString label; };
+    QList<ThemeButtonEntry> themeButtons;
+
+    auto refreshButtonStyle = [](QPushButton *btn, const Theme &t) {
+        ThemeManager::ColorFamily tmFamily = static_cast<ThemeManager::ColorFamily>(static_cast<int>(t.family));
+        ThemeManager::Mode tmMode = static_cast<ThemeManager::Mode>(static_cast<int>(t.mode));
+        ThemeDefinition td = ThemeManager::buildDefinition(tmFamily, tmMode);
+        QPalette p = ThemeManager::buildPalette(td);
+        QColor bg = p.color(QPalette::Window);
+        QColor textColor = p.color(QPalette::WindowText);
+        btn->setStyleSheet(QString("background-color: %1; color: %2; padding: 8px; border: 1px solid %3; border-radius: 4px; text-align: left;")
+                           .arg(bg.name()).arg(textColor.name()).arg(textColor.name()));
+    };
 
     int btnIdx = 0;
     for (int fi = 0; fi < 8; ++fi) {
@@ -1268,18 +1218,11 @@ QWidget* MainWindow::createThemeSettingsWidget()
                 btn->setCheckable(true);
                 btn->setCursor(Qt::PointingHandCursor);
 
-                QPalette p = buildBasePalette(t.family, t.mode);
-                if (features.testFlag(ThemeFeature::HighContrast))
-                    applyHighContrastPalette(p, t.family, t.mode);
-
-                QColor bg = p.color(QPalette::Window);
-                QColor textColor = p.color(QPalette::WindowText);
-                btn->setStyleSheet(QString("background-color: %1; color: %2; padding: 8px; border: 1px solid %3; border-radius: 4px; text-align: left;")
-                                   .arg(bg.name()).arg(textColor.name()).arg(textColor.name()));
+                refreshButtonStyle(btn, t);
 
                 themeGrid->addWidget(btn, btnIdx / 4, btnIdx % 4);
                 themeBtnGroup->addButton(btn, btnIdx);
-                themeMap.insert(btn, t);
+                themeButtons.append({btn, t, label});
 
                 if (t == selectedTheme)
                     btn->setChecked(true);
@@ -1289,15 +1232,33 @@ QWidget* MainWindow::createThemeSettingsWidget()
         }
     }
 
+    // Re-style buttons whenever the global theme changes (handles inconsistent appearance)
+    connect(m_themeManager, &ThemeManager::themeChanged, widget, [themeButtons, refreshButtonStyle]() {
+        for (const auto &entry : themeButtons) {
+            refreshButtonStyle(entry.btn, entry.theme);
+        }
+    });
+
     mainLayout->addWidget(themeGroup);
     mainLayout->addStretch();
 
     connect(themeBtnGroup, static_cast<void (QButtonGroup::*)(QAbstractButton*)>(&QButtonGroup::buttonClicked),
-            this, [this, themeMap](QAbstractButton *button) {
+            this, [this, themeButtons](QAbstractButton *button) {
         QPushButton *btn = qobject_cast<QPushButton*>(button);
-        if (!btn || !themeMap.contains(btn))
+        if (!btn)
             return;
-        Theme t = themeMap.value(btn);
+        // Find the matching theme from the button list
+        Theme t;
+        bool found = false;
+        for (const auto &entry : themeButtons) {
+            if (entry.btn == btn) {
+                t = entry.theme;
+                found = true;
+                break;
+            }
+        }
+        if (!found)
+            return;
         if (t != selectedTheme) {
             selectedTheme = t;
             applyTheme(selectedTheme);
@@ -1582,12 +1543,6 @@ void MainWindow::on_action_check_updates_triggered()
     tabBar->setCurrentIndex(updaterSettingsTabIndex);
 }
 
-void MainWindow::showWelcomeScreen()
-{
-    editorStack->setCurrentWidget(welcomeWidget);
-    tabBar->hide();
-    findReplaceBar->setVisible(false);
-}
 
 void MainWindow::showEditorInterface()
 {
@@ -1618,7 +1573,6 @@ void MainWindow::on_action_open_project_triggered()
         while (recentProjects.size() > maxRecentProjects)
             recentProjects.removeLast();
         saveRecentProjects();
-        updateRecentProjectsOnWelcome();
     }
 
     loadProjectDirectory(dirName);
@@ -1975,9 +1929,8 @@ void MainWindow::on_fileTreeView_clicked(const QModelIndex &index)
     QFileInfo fileInfo(path);
     
     if (fileInfo.isDir()) {
-        rootIndex = index;
-        ui->fileTreeView->setRootIndex(index);
-        goUpButton->setEnabled(rootIndex.parent().isValid());
+        // Expand/collapse the directory inline instead of changing root
+        ui->fileTreeView->setExpanded(index, !ui->fileTreeView->isExpanded(index));
         // Update terminal working directory when folder is clicked
         if (terminalPanel && terminalPanel->isRunning()) {
             terminalPanel->setWorkingDirectory(path);
@@ -2115,7 +2068,7 @@ void MainWindow::on_tabWidget_tabCloseRequested(int index)
         QString newCurrent = QUrl::fromLocalFile(currentFile).toString();
         problemPanel->setCurrentFile(newCurrent);
     } else {
-        showWelcomeScreen();
+        showEditorInterface();
         setWindowTitle(projectDir.isEmpty() ? "Scriptura" : QFileInfo(projectDir).fileName() + " - Scriptura");
         showSearchBar(false);
         problemPanel->hide();
@@ -2131,18 +2084,17 @@ void MainWindow::on_fileTreeView_contextMenu(const QPoint &pos)
         ui->fileTreeView->setCurrentIndex(index);
     }
 
-    QMenu menu(this);
+    QMenu menu(this);    QAction *newFileAction = menu.addAction(tr("New File..."));
+    ThemeIcons::instance()->setIcon(newFileAction, ":/icons/file.svg");
 
-    QAction *newFileAction = menu.addAction(tr("New File..."));
-    newFileAction->setIcon(ThemeIcons::instance()->icon(":/icons/file.svg"));
     QAction *newFolderAction = menu.addAction(tr("New Folder..."));
-    newFolderAction->setIcon(ThemeIcons::instance()->icon(":/icons/folder.svg"));
+    ThemeIcons::instance()->setIcon(newFolderAction, ":/icons/folder.svg");
 
     menu.addSeparator();
 
     QAction *renameAction = menu.addAction(tr("Rename..."));
     QAction *deleteAction = menu.addAction(tr("Delete"));
-    deleteAction->setIcon(ThemeIcons::instance()->icon(":/icons/close.svg"));
+    ThemeIcons::instance()->setIcon(deleteAction, ":/icons/close.svg");
 
     // Disable rename/delete if nothing selected
     if (!index.isValid()) {
@@ -2328,25 +2280,7 @@ void MainWindow::onTopTabChanged(int index)
     updateTabBarVisibility();
 }
 
-void MainWindow::onSettingsTabCloseRequested(int tabIndex)
-{
-    if (tabIndex < 0 || tabIndex >= tabBar->count())
-        return;
 
-    TabType type = static_cast<TabType>(tabBar->tabData(tabIndex).toInt());
-    tabBar->removeTab(tabIndex);
-
-    // If the closed tab was the current one, switch to appropriate view
-    if (tabBar->currentIndex() == -1) {
-        if (ui->tabWidget->count() > 0) {
-            showEditorInterface();
-        } else {
-            showWelcomeScreen();
-        }
-    }
-
-    updateTabBarVisibility();
-}
 
 void MainWindow::updateTabBarVisibility()
 {
@@ -2360,12 +2294,25 @@ void MainWindow::updateTabBarVisibility()
 QPushButton* MainWindow::createSettingsTabCloseButton(int tabIndex)
 {
     QPushButton *closeBtn = new QPushButton();
-    closeBtn->setIcon(ThemeIcons::instance()->icon(":/icons/close.svg"));
+    ThemeIcons::instance()->setIcon(closeBtn, ":/icons/close.svg");
     closeBtn->setFixedSize(20, 20);
     closeBtn->setFlat(true);
     closeBtn->setCursor(Qt::ArrowCursor);
-    connect(closeBtn, &QPushButton::clicked, this, [this, tabIndex]() {
-        onSettingsTabCloseRequested(tabIndex);
+    // Capture the TabType instead of the (stale) index — indices shift after other tabs close
+    TabType type = static_cast<TabType>(tabBar->tabData(tabIndex).toInt());
+    connect(closeBtn, &QPushButton::clicked, this, [this, type]() {
+        // Find the tab's current index by matching its TabType data
+        for (int i = 0; i < tabBar->count(); ++i) {
+            if (tabBar->tabData(i).toInt() == static_cast<int>(type)) {
+                tabBar->removeTab(i);
+                break;
+            }
+        }
+        // If no tabs remain, show editor interface
+        if (tabBar->count() == 0) {
+            showEditorInterface();
+        }
+        updateTabBarVisibility();
     });
     return closeBtn;
 }
@@ -2539,7 +2486,7 @@ void MainWindow::on_action_editor_settings_triggered()
 
 void MainWindow::applyTheme(const Theme &theme)
 {
-    // Delegate base palette and global stylesheet to ThemeManager
+    // Delegate palette, stylesheet, and theme definition to ThemeManager
     ThemeManager::Theme newTheme(
         static_cast<ThemeManager::ColorFamily>(static_cast<int>(theme.family)),
         static_cast<ThemeManager::Mode>(static_cast<int>(theme.mode)),
@@ -2548,26 +2495,40 @@ void MainWindow::applyTheme(const Theme &theme)
     if (m_themeManager) {
         m_themeManager->setCurrentTheme(newTheme);
     }
-    
-    QPalette palette = buildBasePalette(theme.family, theme.mode);
-    bool isDark = theme.isDark();
-    auto syntax = baseSyntaxColors(theme.mode);
 
-    if (theme.features.testFlag(ThemeFeature::HighContrast)) {
-        applyHighContrastPalette(palette, theme.family, theme.mode);
-        applyHighContrastSyntax(syntax, theme.family, theme.mode);
+    // Use the resolved theme definition for all colours
+    ThemeDefinition def = m_themeManager ? m_themeManager->currentDefinition()
+                                         : ThemeManager::buildDefinition(
+                                             static_cast<ThemeManager::ColorFamily>(static_cast<int>(theme.family)),
+                                             static_cast<ThemeManager::Mode>(static_cast<int>(theme.mode)));
+
+    // Wire ThemeIcons to the ThemeManager so SVG icons use the dedicated svgColor
+    ThemeIcons::instance()->setThemeManager(m_themeManager);
+    ThemeIcons::instance()->recolorAll();
+
+    // Apply syntax colours from the theme definition to all open editors
+    QList<QColor> synColors = def.syntaxColorList();
+    if (synColors.size() >= 11) {
+        for (int i = 0; i < ui->tabWidget->count(); ++i) {
+            if (auto *editor = qobject_cast<CodeEditor*>(ui->tabWidget->widget(i))) {
+                editor->setThemeColors(
+                    synColors[0],  synColors[1],  synColors[2],  synColors[3],
+                    synColors[4],  synColors[5],  synColors[6],  synColors[7],
+                    synColors[8],  synColors[9],  synColors[10]);
+            }
+        }
     }
 
-    QApplication::setStyle("Fusion");
-    QApplication::setPalette(palette);
+    QPalette palette = ThemeManager::buildPalette(def);
+    bool isDark = theme.isDark();
 
-    QColor windowColor = palette.color(QPalette::Window);
-    QColor baseColor = palette.color(QPalette::Base);
-    QColor buttonColor = palette.color(QPalette::Button);
-    QColor textColor = palette.color(QPalette::WindowText);
-    QColor accentColor = palette.color(QPalette::Highlight);
-    QColor midColor = palette.color(QPalette::Mid);
-    QColor lightColor = palette.color(QPalette::Light);
+    QColor windowColor = def.bgColor;
+    QColor baseColor = def.baseColor;
+    QColor buttonColor = def.buttonColor;
+    QColor textColor = def.textColor;
+    QColor accentColor = def.highlightColor;
+    QColor midColor = def.midColor;
+    QColor lightColor = def.lightColor;
 
     // Compute glassmorphism translucents
     QColor glassSidebar = isDark ? QColor(42, 44, 47, 217) : QColor(242, 242, 247, 217);
@@ -2990,10 +2951,10 @@ void MainWindow::applyTheme(const Theme &theme)
             editor->viewport()->setAutoFillBackground(true);
             editor->setDarkMode(isDark);
             QColor trailingBg = isDark ? QColor("#7f1d1d") : QColor("#fecaca");
-            editor->setThemeColors(syntax.keyword, syntax.string, syntax.comment, syntax.number,
-                                   syntax.preprocessor, syntax.tag, syntax.attribute,
-                                   syntax.cssProperty, syntax.variable, syntax.function,
-                                   syntax.escape, trailingBg);
+            editor->setThemeColors(def.synKeyword, def.synString, def.synComment, def.synNumber,
+                                   def.synPreprocessor, def.synTag, def.synAttribute,
+                                   def.synCssProperty, def.synVariable, def.synFunction,
+                                   def.synEscape, trailingBg);
         }
     }
 
@@ -3147,12 +3108,13 @@ QString MainWindow::findTerminal()
 
 void MainWindow::updateFamilyButtonPreview(QPushButton *btn, ThemeColorFamily family, ThemeMode mode, ThemeFeatures features)
 {
-    QPalette p = buildBasePalette(family, mode);
-    if (features.testFlag(ThemeFeature::HighContrast))
-        applyHighContrastPalette(p, family, mode);
+    ThemeManager::ColorFamily tmFamily = static_cast<ThemeManager::ColorFamily>(static_cast<int>(family));
+    ThemeManager::Mode tmMode = static_cast<ThemeManager::Mode>(static_cast<int>(mode));
+    ThemeDefinition td = ThemeManager::buildDefinition(tmFamily, tmMode);
+    QPalette p = ThemeManager::buildPalette(td);
 
     QColor bg = p.color(QPalette::Window);
-    QColor accent = highContrastAccentColor(family, mode);
+    QColor accent = td.highlightColor;
     QColor textColor = p.color(QPalette::WindowText);
 
     btn->setStyleSheet(QString("background-color: %1; color: %2; padding: 10px; border: 1px solid %2; border-radius: 4px;")
@@ -3379,135 +3341,6 @@ QPalette MainWindow::buildBasePalette(ThemeColorFamily family, ThemeMode mode)
     return p;
 }
 
-QColor MainWindow::highContrastAccentColor(ThemeColorFamily family, ThemeMode mode)
-{
-    bool isDark = (mode == ThemeMode::Dark);
-    switch (family) {
-    case ThemeColorFamily::Default:
-        return isDark ? QColor("#4d94ff") : QColor("#0055dd");
-    case ThemeColorFamily::Blue:
-        return isDark ? QColor("#80bfff") : QColor("#0044aa");
-    case ThemeColorFamily::Green:
-        return isDark ? QColor("#33ff99") : QColor("#006633");
-    case ThemeColorFamily::Red:
-        return isDark ? QColor("#ff5555") : QColor("#cc0000");
-    case ThemeColorFamily::Yellow:
-        return isDark ? QColor("#ffdd00") : QColor("#997a00");
-    case ThemeColorFamily::Brown:
-        return isDark ? QColor("#ddaa55") : QColor("#885522");
-    case ThemeColorFamily::Cyan:
-        return isDark ? QColor("#00eeff") : QColor("#008899");
-    case ThemeColorFamily::Violet:
-        return isDark ? QColor("#bb88ff") : QColor("#6633cc");
-    }
-    return isDark ? QColor("#4d94ff") : QColor("#0055dd");
-}
-
-void MainWindow::applyHighContrastPalette(QPalette &p, ThemeColorFamily family, ThemeMode mode)
-{
-    bool isDark = (mode == ThemeMode::Dark);
-    QColor accent = highContrastAccentColor(family, mode);
-
-    if (isDark) {
-        p.setColor(QPalette::Window, Qt::black);
-        p.setColor(QPalette::WindowText, accent);
-        p.setColor(QPalette::Base, QColor(20, 20, 20));
-        p.setColor(QPalette::AlternateBase, QColor(30, 30, 30));
-        p.setColor(QPalette::Text, accent);
-        p.setColor(QPalette::Button, Qt::black);
-        p.setColor(QPalette::ButtonText, accent);
-        p.setColor(QPalette::Highlight, accent);
-        p.setColor(QPalette::HighlightedText, Qt::black);
-        p.setColor(QPalette::Link, accent);
-    } else {
-        p.setColor(QPalette::Window, Qt::white);
-        p.setColor(QPalette::WindowText, accent);
-        p.setColor(QPalette::Base, Qt::white);
-        p.setColor(QPalette::AlternateBase, QColor(240, 240, 240));
-        p.setColor(QPalette::Text, accent);
-        p.setColor(QPalette::Button, Qt::white);
-        p.setColor(QPalette::ButtonText, accent);
-        p.setColor(QPalette::Highlight, accent);
-        p.setColor(QPalette::HighlightedText, Qt::white);
-        p.setColor(QPalette::Link, accent);
-    }
-}
-
-MainWindow::SyntaxColors MainWindow::baseSyntaxColors(ThemeMode mode)
-{
-    SyntaxColors c;
-    if (mode == ThemeMode::Dark) {
-        c.keyword = QColor("#93c5fd");
-        c.string = QColor("#86efac");
-        c.comment = QColor("#94a3b8");
-        c.number = QColor("#c084fc");
-        c.preprocessor = QColor("#a855f7");
-        c.tag = QColor("#60a5fa");
-        c.attribute = QColor("#fbbf24");
-        c.cssProperty = QColor("#2dd4bf");
-        c.variable = QColor("#38bdf8");
-        c.function = QColor("#f97316");
-        c.escape = QColor("#22d3ee");
-    } else {
-        c.keyword = QColor("#1d4ed8");
-        c.string = QColor("#15803d");
-        c.comment = QColor("#64748b");
-        c.number = QColor("#9333ea");
-        c.preprocessor = QColor("#7e22ce");
-        c.tag = QColor("#2563eb");
-        c.attribute = QColor("#a16207");
-        c.cssProperty = QColor("#0f766e");
-        c.variable = QColor("#0369a1");
-        c.function = QColor("#d97706");
-        c.escape = QColor("#0e7490");
-    }
-    return c;
-}
-
-MainWindow::SyntaxColors MainWindow::highContrastSyntaxColor(ThemeColorFamily family, ThemeMode mode, const SyntaxColors &base)
-{
-    QColor accent = highContrastAccentColor(family, mode);
-    bool isDark = (mode == ThemeMode::Dark);
-
-    // Blend accent with base colors to create vibrant, family-tinted syntax colors
-    // while maintaining strong contrast against the high contrast background
-    auto blend = [&](const QColor &baseColor, float accentWeight) -> QColor {
-        if (isDark) {
-            // In dark mode, boost saturation and lightness for visibility on near-black
-            int r = qMin(255, baseColor.red() + static_cast<int>(accent.red() * accentWeight));
-            int g = qMin(255, baseColor.green() + static_cast<int>(accent.green() * accentWeight));
-            int b = qMin(255, baseColor.blue() + static_cast<int>(accent.blue() * accentWeight));
-            return QColor(r, g, b);
-        } else {
-            // In light mode, deepen colors for contrast against white
-            int r = qMax(0, baseColor.red() - static_cast<int>((255 - accent.red()) * accentWeight * 0.3f));
-            int g = qMax(0, baseColor.green() - static_cast<int>((255 - accent.green()) * accentWeight * 0.3f));
-            int b = qMax(0, baseColor.blue() - static_cast<int>((255 - accent.blue()) * accentWeight * 0.3f));
-            return QColor(r, g, b);
-        }
-    };
-
-    SyntaxColors result;
-    result.keyword = blend(base.keyword, 0.4f);
-    result.string = blend(base.string, 0.35f);
-    result.comment = isDark ? QColor("#b0b0b0") : QColor("#555555");
-    result.number = blend(base.number, 0.45f);
-    result.preprocessor = blend(base.preprocessor, 0.5f);
-    result.tag = blend(base.tag, 0.4f);
-    result.attribute = blend(base.attribute, 0.45f);
-    result.cssProperty = blend(base.cssProperty, 0.35f);
-    result.variable = blend(base.variable, 0.4f);
-    result.function = blend(base.function, 0.5f);
-    result.escape = blend(base.escape, 0.4f);
-    return result;
-}
-
-void MainWindow::applyHighContrastSyntax(SyntaxColors &c, ThemeColorFamily family, ThemeMode mode)
-{
-    SyntaxColors base = baseSyntaxColors(mode);
-    c = highContrastSyntaxColor(family, mode, base);
-}
-
 void MainWindow::updateStatusBar()
 {
     QPlainTextEdit *editor = getCurrentEditor();
@@ -3598,38 +3431,7 @@ void MainWindow::addRecentFile(const QString &path)
     saveRecentProjects();
 }
 
-void MainWindow::updateRecentProjectsOnWelcome()
-{
-    if (!recentProjectsLayout) return;
 
-    while (recentProjectsLayout->count() > 1) {
-        QLayoutItem *item = recentProjectsLayout->takeAt(recentProjectsLayout->count() - 1);
-        delete item->widget();
-        delete item;
-    }
-
-    for (const QString &project : recentProjects) {
-        QPushButton *btn = new QPushButton(QFileInfo(project).fileName(), this);
-        btn->setToolTip(project);
-        btn->setProperty("projectPath", project);
-        btn->setStyleSheet("QPushButton { text-align: left; padding: 6px 12px; }"
-                          "QPushButton:hover { background-color: palette(highlight); color: palette(highlighted-text); }");
-        connect(btn, &QPushButton::clicked, this, [this, project]() {
-            QDir dir(project);
-            if (dir.exists()) {
-                projectDir = project;
-                rootIndex = fileModel->index(project);
-                ui->fileTreeView->setRootIndex(rootIndex);
-                ui->fileTreeView->hideColumn(1);
-                ui->fileTreeView->hideColumn(2);
-                ui->fileTreeView->hideColumn(3);
-                goUpButton->setEnabled(rootIndex.parent().isValid());
-                setWindowTitle(QFileInfo(project).fileName() + " - Scriptura");
-            }
-        });
-        recentProjectsLayout->addWidget(btn);
-    }
-}
 
 void MainWindow::autoSave()
 {
@@ -3713,6 +3515,77 @@ bool MainWindow::eventFilter(QObject *watched, QEvent *event)
             return true;
         } else if (event->type() == QEvent::MouseButtonRelease) {
             m_titleBar->stopDrag();
+            return true;
+        }
+    }
+
+    // ── Window resize edges (frameless window support) ────────────
+    const int MARGIN = 6;
+    if (event->type() == QEvent::MouseMove && watched == this) {
+        QMouseEvent *me = static_cast<QMouseEvent*>(event);
+        QPoint pos = me->position().toPoint();
+        int w = width(), h = height();
+
+        bool left   = pos.x() < MARGIN;
+        bool right  = pos.x() > w - MARGIN;
+        bool top    = pos.y() < MARGIN;
+        bool bottom = pos.y() > h - MARGIN;
+
+        if (left && top)        setCursor(Qt::SizeFDiagCursor);
+        else if (right && bottom) setCursor(Qt::SizeFDiagCursor);
+        else if (right && top)  setCursor(Qt::SizeBDiagCursor);
+        else if (left && bottom) setCursor(Qt::SizeBDiagCursor);
+        else if (left || right) setCursor(Qt::SizeHorCursor);
+        else if (top || bottom) setCursor(Qt::SizeVerCursor);
+        else                    setCursor(Qt::ArrowCursor);
+
+        m_resizeEdge = 0;
+        if (left)   m_resizeEdge |= Qt::LeftEdge;
+        if (right)  m_resizeEdge |= Qt::RightEdge;
+        if (top)    m_resizeEdge |= Qt::TopEdge;
+        if (bottom) m_resizeEdge |= Qt::BottomEdge;
+        return false; // let other handlers process too
+    }
+
+    if (event->type() == QEvent::MouseButtonPress && watched == this && m_resizeEdge) {
+        QMouseEvent *me = static_cast<QMouseEvent*>(event);
+        if (me->button() == Qt::LeftButton) {
+            m_resizing = true;
+            m_resizeStartPos = me->globalPosition().toPoint();
+            m_resizeStartGeometry = geometry();
+            me->accept();
+            return true;
+        }
+    }
+
+    if (event->type() == QEvent::MouseMove && watched == this && m_resizing) {
+        QMouseEvent *me = static_cast<QMouseEvent*>(event);
+        QPoint delta = me->globalPosition().toPoint() - m_resizeStartPos;
+        QRect g = m_resizeStartGeometry;
+
+        if (m_resizeEdge & Qt::LeftEdge) {
+            g.setLeft(g.left() + delta.x());
+        }
+        if (m_resizeEdge & Qt::RightEdge) {
+            g.setRight(g.right() + delta.x());
+        }
+        if (m_resizeEdge & Qt::TopEdge) {
+            g.setTop(g.top() + delta.y());
+        }
+        if (m_resizeEdge & Qt::BottomEdge) {
+            g.setBottom(g.bottom() + delta.y());
+        }
+
+        setGeometry(g);
+        me->accept();
+        return true;
+    }
+
+    if (event->type() == QEvent::MouseButtonRelease && watched == this) {
+        if (m_resizing) {
+            m_resizing = false;
+            m_resizeEdge = 0;
+            setCursor(Qt::ArrowCursor);
             return true;
         }
     }

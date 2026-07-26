@@ -44,12 +44,11 @@ void EventBus::publish(const QString& event, const QVariant& data)
         if (!m_subscribers.contains(event)) {
             return;
         }
-        callbacks = m_subscribers[event];  // 複製名單
-    }  // 在此釋放鎖
+        callbacks = m_subscribers[event];  // Copy list
+    }  // Release lock here
     
-    // 直接呼叫回調函數 (在鎖外執行，避免死鎖)
+    // Call callbacks outside the lock to avoid deadlocks
     for (const auto& subscription : callbacks) {
-        // 防禦：若訂閱綁定了擁有者且擁有者已被銷毀，跳過以避免 use-after-free
         if (subscription.hasReceiver && subscription.receiver.isNull()) {
             continue;
         }
@@ -67,7 +66,7 @@ EventBus::SubscriptionId EventBus::subscribe(const QString& event,
                                              std::function<void(const QVariant&)> callback,
                                              Qt::ConnectionType type)
 {
-    // 向後相容：未指定擁有者時不綁定生命週期
+    // Backward compat: no receiver means no lifecycle binding
     return subscribe(event, nullptr, std::move(callback), type);
 }
 
@@ -76,7 +75,7 @@ EventBus::SubscriptionId EventBus::subscribe(const QString& event,
                                              std::function<void(const QVariant&)> callback,
                                              Qt::ConnectionType type)
 {
-    Q_UNUSED(type); // Qt::ConnectionType 保留給未來的 Qt 信號連接使用
+    Q_UNUSED(type); // Reserved for future Qt signal connection use
 
     QMutexLocker locker(&m_mutex);
 
@@ -88,7 +87,7 @@ EventBus::SubscriptionId EventBus::subscribe(const QString& event,
     sub.hasReceiver = (receiver != nullptr);
     m_subscribers[event].append(sub);
 
-    // 綁定擁有者生命週期：擁有者銷毀時自動取消訂閱
+    // Bind receiver lifecycle: auto-unsubscribe when destroyed
     if (receiver) {
         connect(receiver, &QObject::destroyed, this, [this, event, id]() {
             unsubscribe(event, id);
@@ -100,9 +99,7 @@ EventBus::SubscriptionId EventBus::subscribe(const QString& event,
 
 void EventBus::unsubscribeReceiver(QObject* receiver)
 {
-    if (!receiver) {
-        return;
-    }
+    if (!receiver) return;
 
     QMutexLocker locker(&m_mutex);
 
@@ -139,7 +136,6 @@ void EventBus::unsubscribe(const QString& event, SubscriptionId subscriptionId)
         }
     }
     
-    // 如果沒有訂閱者了，移除該事件
     if (subscriptions.isEmpty()) {
         m_subscribers.remove(event);
     }

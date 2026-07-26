@@ -21,7 +21,6 @@
 #include <QStandardPaths>
 #include "pluginmanager.h"
 #include "plugincontext.h"
-#include "pluginsettings.h"
 
 class PluginManagerDialog : public QDialog
 {

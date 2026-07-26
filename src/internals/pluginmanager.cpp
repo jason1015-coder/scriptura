@@ -1,9 +1,9 @@
 #include "pluginmanager.h"
 #include "eventbus.h"
 #include "servicelocator.h"
-#include "versionfetcher.h"
 #include "plugincrashhandler.h"
 #include "plugincontext.h"
+#include "version.h"
 #include <QDebug>
 #include <QJsonArray>
 #include <QStandardPaths>
@@ -235,7 +235,7 @@ bool PluginManager::loadPluginImpl(const QString& filePath)
     
     if (!checkVersionCompatibility(metadata)) {
         qWarning() << "Plugin" << pluginId << "is not compatible with current Scriptura version";
-        emit pluginIncompatible(pluginId, VersionFetcher::coreVersion());
+        emit pluginIncompatible(pluginId, QString(SCRIPTURA_VERSION));
         return false;
     }
     
@@ -609,7 +609,7 @@ bool PluginManager::checkVersionCompatibility(const QJsonObject& metadata) const
         return true;  // 沒有標記不相容，視為相容
     }
     
-    QString currentVersion = VersionFetcher::coreVersion();
+    QString currentVersion = QString(SCRIPTURA_VERSION);
     QJsonArray incompatibleArray = metadata["incompatible_with"].toArray();
     QStringList incompatibleVersions;
     for (const QJsonValue& val : incompatibleArray) {

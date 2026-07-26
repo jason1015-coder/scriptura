@@ -26,30 +26,40 @@ void ServiceLocator::destroyInstance()
 
 ServiceLocator::ServiceLocator(QObject* parent)
     : QObject(parent)
+    , m_rustSl(rust_service_locator_new())
 {
 }
 
 ServiceLocator::~ServiceLocator()
 {
     QMutexLocker locker(&m_mutex);
-    // 注意：我們不擁有服務物件的所有權，不進行刪除
-    m_services.clear();
+    if (m_rustSl) {
+        rust_service_locator_free(m_rustSl);
+        m_rustSl = nullptr;
+    }
 }
 
 void ServiceLocator::unregisterService(const QString& id)
 {
-    QMutexLocker locker(&m_mutex);
-    m_services.remove(id);
+    QByteArray idBytes = id.toUtf8();
+    rust_service_locator_unregister(m_rustSl, idBytes.constData());
 }
 
 bool ServiceLocator::hasService(const QString& id) const
 {
-    QMutexLocker locker(&m_mutex);
-    return m_services.contains(id);
+    QByteArray idBytes = id.toUtf8();
+    return rust_service_locator_has(m_rustSl, idBytes.constData());
 }
 
 QStringList ServiceLocator::registeredServices() const
 {
-    QMutexLocker locker(&m_mutex);
-    return m_services.keys();
+    QStringList result;
+    size_t len = 0;
+    char** list = rust_service_locator_list(m_rustSl, &len);
+    if (!list) return result;
+    for (size_t i = 0; i < len; ++i) {
+        result << QString::fromUtf8(list[i]);
+    }
+    rust_service_locator_free_list(list, len);
+    return result;
 }

@@ -2,8 +2,6 @@
 #define UPDATER_H
 
 #include <QObject>
-#include <QNetworkAccessManager>
-#include <QNetworkReply>
 #include <QTimer>
 #include <QString>
 
@@ -12,6 +10,8 @@
  *
  * 負責檢查 Scriptura 的 GitHub Releases 並提供更新功能。
  * 支援檢查穩定版 (Latest Release) 和預覽版 (Latest Pre-release)。
+ * Backend logic (HTTP fetch, JSON parsing, semver comparison) delegated
+ * to Rust FFI (rust_backend.h) via QtConcurrent background thread.
  */
 class Updater : public QObject
 {
@@ -51,11 +51,7 @@ signals:
     void updateCheckFailed(const QString &error);
     void noUpdateAvailable();
 
-private slots:
-    void onNetworkReply(QNetworkReply *reply);
-
 private:
-    QNetworkAccessManager *m_networkManager;
     QTimer *m_timer;
     bool m_updateCheckEnabled;
     int m_updateCheckInterval; // Days

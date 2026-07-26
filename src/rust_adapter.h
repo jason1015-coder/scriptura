@@ -279,6 +279,77 @@ private:
 };
 
 // ─────────────────────────────────────────────────────────────────────
+//  RustUpdaterAdapter — bridges Rust Updater to Qt signals
+// ─────────────────────────────────────────────────────────────────────
+class RustUpdaterAdapter : public QObject
+{
+    Q_OBJECT
+public:
+    explicit RustUpdaterAdapter(QObject *parent = nullptr);
+    ~RustUpdaterAdapter() override;
+
+    void checkForUpdates(const QString &currentVersion, const QString &updateUrl);
+    bool isUpdateAvailable() const;
+    QString latestVersion() const;
+
+signals:
+    void updateAvailable(const QString &version, const QString &downloadUrl);
+
+private:
+    static void onUpdateAvailableCb(const char *data, void *userData);
+
+    RustUpdater *m_updater = nullptr;
+    QString m_latestVersion;
+};
+
+// ─────────────────────────────────────────────────────────────────────
+//  RustConfigValidatorAdapter — bridges Rust ConfigValidator to Qt
+// ─────────────────────────────────────────────────────────────────────
+class RustConfigValidatorAdapter : public QObject
+{
+    Q_OBJECT
+public:
+    explicit RustConfigValidatorAdapter(QObject *parent = nullptr);
+    ~RustConfigValidatorAdapter() override;
+
+    QString validate(const QString &jsonConfig, const QString &schemaJson);
+
+signals:
+    void validationError(const QString &error);
+
+private:
+    static void onValidationErrorCb(const char *data, void *userData);
+
+    RustConfigValidator *m_validator = nullptr;
+};
+
+// ─────────────────────────────────────────────────────────────────────
+//  RustPluginRegistryAdapter — bridges Rust PluginRegistry to Qt signals
+// ─────────────────────────────────────────────────────────────────────
+class RustPluginRegistryAdapter : public QObject
+{
+    Q_OBJECT
+public:
+    explicit RustPluginRegistryAdapter(QObject *parent = nullptr);
+    ~RustPluginRegistryAdapter() override;
+
+    void setRegistryUrl(const QString &url);
+    QString registryUrl() const;
+    void checkForUpdates();
+    bool upgradeAvailable(const QString &pluginId, const QString &currentVersion) const;
+
+signals:
+    void registryUpdated(const QString &manifestJson);
+    void installFailed(const QString &pluginId, const QString &error);
+
+private:
+    static void onRegistryUpdatedCb(const char *data, void *userData);
+    static void onInstallFailedCb(const char *id, const char *error, void *userData);
+
+    RustPluginRegistry *m_registry = nullptr;
+};
+
+// ─────────────────────────────────────────────────────────────────────
 //  RustBackend — singleton root that owns all Rust backend instances
 // ─────────────────────────────────────────────────────────────────────
 class RustBackend : public QObject
@@ -288,12 +359,15 @@ public:
     static RustBackend* instance();
     static void destroyInstance();
 
-    RustLspClientAdapter*        lspClient() const { return m_lsp; }
-    RustDapClientAdapter*        dapClient() const { return m_dap; }
-    RustEventBusAdapter*         eventBus() const { return m_eventBus; }
-    RustPluginManagerAdapter*    pluginManager() const { return m_pluginManager; }
-    RustWorkspaceAdapter*        workspace() const { return m_workspace; }
-    RustTaskRunnerAdapter*       taskRunner() const { return m_taskRunner; }
+    RustLspClientAdapter*             lspClient() const { return m_lsp; }
+    RustDapClientAdapter*             dapClient() const { return m_dap; }
+    RustEventBusAdapter*              eventBus() const { return m_eventBus; }
+    RustPluginManagerAdapter*         pluginManager() const { return m_pluginManager; }
+    RustWorkspaceAdapter*             workspace() const { return m_workspace; }
+    RustTaskRunnerAdapter*            taskRunner() const { return m_taskRunner; }
+    RustUpdaterAdapter*               updater() const { return m_updater; }
+    RustConfigValidatorAdapter*       configValidator() const { return m_configValidator; }
+    RustPluginRegistryAdapter*        pluginRegistry() const { return m_pluginRegistry; }
 
 private:
     RustBackend(QObject *parent = nullptr);
@@ -301,12 +375,15 @@ private:
     RustBackend(const RustBackend&) = delete;
     RustBackend& operator=(const RustBackend&) = delete;
 
-    RustLspClientAdapter*        m_lsp = nullptr;
-    RustDapClientAdapter*        m_dap = nullptr;
-    RustEventBusAdapter*         m_eventBus = nullptr;
-    RustPluginManagerAdapter*    m_pluginManager = nullptr;
-    RustWorkspaceAdapter*        m_workspace = nullptr;
-    RustTaskRunnerAdapter*       m_taskRunner = nullptr;
+    RustLspClientAdapter*             m_lsp = nullptr;
+    RustDapClientAdapter*             m_dap = nullptr;
+    RustEventBusAdapter*              m_eventBus = nullptr;
+    RustPluginManagerAdapter*         m_pluginManager = nullptr;
+    RustWorkspaceAdapter*             m_workspace = nullptr;
+    RustTaskRunnerAdapter*            m_taskRunner = nullptr;
+    RustUpdaterAdapter*               m_updater = nullptr;
+    RustConfigValidatorAdapter*       m_configValidator = nullptr;
+    RustPluginRegistryAdapter*        m_pluginRegistry = nullptr;
 
     static RustBackend* s_instance;
 };

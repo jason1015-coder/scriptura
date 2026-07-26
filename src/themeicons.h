@@ -9,6 +9,7 @@
 #include <QFileIconProvider>
 
 class QLabel;
+class ThemeManager;
 class QAbstractButton;
 class QAction;
 
@@ -31,7 +32,8 @@ public:
         Normal,    ///< 一般狀態：QPalette::WindowText
         Selected,  ///< 選取/高亮背景上的文字：QPalette::HighlightedText
         Disabled,  ///< 停用狀態：QPalette::Disabled | QPalette::WindowText
-        Accent     ///< 強調色：QPalette::Highlight
+        Accent,    ///< 強調色：QPalette::Highlight
+        Svg        ///< 主題專用的 SVG 圖標色 (從 ThemeManager::svgColor 取得)
     };
     Q_ENUM(Role)
 
@@ -68,6 +70,11 @@ public:
     void setIcon(QLabel* label, const QString& path, Role role = Role::Normal,
                  const QSize& size = QSize());
 
+    /**
+     * @brief 設定 ThemeManager 實例以取得主題專用 SVG 色
+     */
+    void setThemeManager(const ThemeManager *mgr);
+
 public slots:
     /**
      * @brief 用目前主題顏色重新著色所有已追蹤的目標
@@ -79,6 +86,8 @@ private:
 
     QColor colorForRole(Role role) const;
     QIcon makeIcon(const QString& path, const QColor& color) const;
+
+    const ThemeManager *m_themeManager = nullptr;
 
     struct Entry {
         QPointer<QObject> target;  ///< 弱引用，目標銷毀後自動失效

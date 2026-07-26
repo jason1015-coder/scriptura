@@ -59,7 +59,7 @@
 #include "windowanimator.h"
 #include "thememanager.h"
 #include "themeicons.h"
-#include "permission.h"
+#include "rust_adapter.h"
 
 class DapClient;
 class DebugPanel;
@@ -207,7 +207,6 @@ private slots:
     void toggleSidebar();
     void onBottomTabChanged(int index);
     void onTopTabChanged(int index);
-    void onSettingsTabCloseRequested(int tabIndex);
 
 private:
     enum class TabType {
@@ -239,8 +238,8 @@ private:
     FindReplaceBar *findReplaceBar;
     ProjectSearchPanel *projectSearchPanel;
     CommandPalette *commandPalette;
-    QWidget     *welcomeWidget;
-    QVBoxLayout *recentProjectsLayout;
+    // Welcome menu screen is now a standalone window (WelcomeMenuScreen)
+    // shown before the main window, so the in-editor welcome widget is removed.
     QStackedWidget *editorStack;
     ProblemPanel *problemPanel;
     TodoPanel    *todoPanel;
@@ -315,7 +314,7 @@ private:
     QPushButton* createSettingsTabCloseButton(int tabIndex);
     QString findTerminal();
     QPlainTextEdit* getCurrentEditor();
-    QWidget* createWelcomeWidget();
+    // createWelcomeWidget() removed — welcome menu is now a standalone pre-launch screen
     QWidget* createKeyboardShortcutsWidget();
     QWidget* createThemeSettingsWidget();
     QWidget* createEditorSettingsWidget();
@@ -334,7 +333,7 @@ private:
     void showBottomPanel(QWidget *panel);
     void onUpdateAvailable(const QString &version, const QString &downloadUrl);
     void onUpdateCheckFailed(const QString &error);
-    void showWelcomeScreen();
+    // showWelcomeScreen() removed — see WelcomeMenuScreen instead
     void showEditorInterface();
     void loadProjectDirectory(const QString &dirName);
     void openFileInTab(const QString &fileName);
@@ -343,7 +342,6 @@ private:
     void toggleInspector();
     void loadRecentProjects();
     void saveRecentProjects();
-    void updateRecentProjectsOnWelcome();
     void autoSave();
     bool checkUnsavedChanges();
     
@@ -364,16 +362,16 @@ private:
     void onDapLogMessage(const QString &msg);
 
     QPalette buildBasePalette(ThemeColorFamily family, ThemeMode mode);
-    QColor highContrastAccentColor(ThemeColorFamily family, ThemeMode mode);
-    void applyHighContrastPalette(QPalette &p, ThemeColorFamily family, ThemeMode mode);
-    struct SyntaxColors { QColor keyword, string, comment, number, preprocessor, tag, attribute, cssProperty, variable, function, escape; };
-    SyntaxColors baseSyntaxColors(ThemeMode mode);
-    SyntaxColors highContrastSyntaxColor(ThemeColorFamily family, ThemeMode mode, const SyntaxColors &base);
-    void applyHighContrastSyntax(SyntaxColors &c, ThemeColorFamily family, ThemeMode mode);
     void updateFamilyButtonPreview(QPushButton *btn, ThemeColorFamily family, ThemeMode mode, ThemeFeatures features);
 
     Theme themeFromLegacyInt(int legacy) const;
     int themeToLegacyInt(const Theme &theme) const;
+
+    // Frameless window resize state
+    int m_resizeEdge = 0;
+    bool m_resizing = false;
+    QPoint m_resizeStartPos;
+    QRect m_resizeStartGeometry;
 
 };
 
