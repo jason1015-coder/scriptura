@@ -153,9 +153,11 @@ QPlainTextEdit, QTextEdit {
     font-size: 13px;
 }
 
-/* ---- Group boxes — neumorphic ---- */
+/* ---- Group boxes — neumorphic raised ---- */
 QGroupBox {
     border: 1px solid palette(mid);
+    border-top-color: palette(light);
+    border-left-color: palette(light);
     border-radius: 12px;
     margin-top: 14px;
     padding-top: 14px;
@@ -178,7 +180,7 @@ QListView,
 QTableView,
 QAbstractItemView {
     border: none;
-    border-radius: 6px;
+    border-radius: 8px;
     background-color: transparent;
     outline: none;
     padding: 2px;
@@ -218,18 +220,20 @@ QStatusBar::item {
     padding: 0 6px;
 }
 
-/* ---- Menus — glassmorphism ---- */
+/* ---- Menus — neumorphic raised ---- */
 QMenu {
     background-color: palette(base);
     border: 1px solid palette(mid);
-    border-radius: 10px;
+    border-top-color: palette(light);
+    border-left-color: palette(light);
+    border-radius: 12px;
     padding: 6px;
 }
 
 QMenuBar::item {
     background: transparent;
     padding: 5px 10px;
-    border-radius: 6px;
+    border-radius: 8px;
     color: palette(text);
 }
 
@@ -245,7 +249,7 @@ QMenuBar::item:pressed {
 QMenu::item {
     background-color: transparent;
     padding: 6px 28px 6px 12px;
-    border-radius: 6px;
+    border-radius: 8px;
     color: palette(text);
     margin: 1px 2px;
 }
@@ -285,6 +289,8 @@ QTabBar::tab {
     color: palette(mid);
     min-width: 70px;
     font-size: 12px;
+    border-top-left-radius: 10px;
+    border-top-right-radius: 10px;
 }
 
 QTabBar::tab:selected {
@@ -308,11 +314,13 @@ QTabWidget::pane {
     background-color: palette(base);
 }
 
-/* ---- Buttons — neumorphic ---- */
+/* ---- Buttons — neumorphic raised ---- */
 QPushButton,
 QDialogButtonBox > QPushButton {
     border: 1px solid palette(mid);
-    border-radius: 8px;
+    border-top-color: palette(light);
+    border-left-color: palette(light);
+    border-radius: 10px;
     padding: 7px 16px;
     background-color: palette(button);
     color: palette(text);
@@ -323,18 +331,23 @@ QDialogButtonBox > QPushButton {
 QPushButton:hover,
 QDialogButtonBox > QPushButton:hover {
     background-color: palette(light);
-    border-color: palette(highlight);
+    border-top-color: palette(highlight);
+    border-left-color: palette(highlight);
 }
 
 QPushButton:pressed,
 QDialogButtonBox > QPushButton:pressed {
     background-color: palette(mid);
+    border-top-color: palette(mid);
+    border-left-color: palette(mid);
+    border-bottom-color: palette(light);
+    border-right-color: palette(light);
 }
 
 QPushButton:default {
-    background-color: palette(highlight);
+    background: palette(highlight);
     color: palette(highlighted-text);
-    border-color: palette(highlight);
+    border: 1px solid palette(highlight);
 }
 
 QPushButton:disabled,
@@ -344,25 +357,25 @@ QDialogButtonBox > QPushButton:disabled {
     color: palette(mid);
 }
 
-/* Accent primary button (welcome screen, dialogs) — neumorphic */
+/* Accent primary button — neumorphic raised */
 QPushButton#primaryButton {
-    background-color: palette(highlight);
     color: palette(highlighted-text);
-    border: none;
-    border-radius: 10px;
+    border: 1px solid palette(highlight);
+    border-radius: 12px;
     padding: 9px 18px;
     font-weight: 600;
+    background: palette(highlight);
 }
 
 QPushButton#primaryButton:hover {
-    background-color: palette(highlight);
-    border: none;
+    background: palette(highlight);
+    border: 1px solid palette(highlight);
 }
 
-/* ---- Tool buttons (icon buttons) — neumorphic ---- */
+/* ---- Tool buttons — neumorphic raised ---- */
 QToolButton {
     border: none;
-    border-radius: 6px;
+    border-radius: 8px;
     padding: 5px;
     background-color: transparent;
     color: palette(text);
@@ -377,8 +390,10 @@ QToolButton:pressed {
 }
 
 QToolButton:checked {
-    background-color: palette(highlight);
+    background: palette(highlight);
+    border: 1px solid palette(highlight);
     color: palette(highlighted-text);
+    border-radius: 8px;
 }
 
 QToolButton:disabled {
@@ -391,7 +406,11 @@ QComboBox,
 QSpinBox,
 QDoubleSpinBox {
     border: 1px solid palette(mid);
-    border-radius: 6px;
+    border-top-color: palette(dark);
+    border-left-color: palette(dark);
+    border-bottom-color: palette(light);
+    border-right-color: palette(light);
+    border-radius: 8px;
     padding: 6px 10px;
     background-color: palette(base);
     color: palette(text);
@@ -422,7 +441,7 @@ QComboBox::drop-down {
 
 QComboBox QAbstractItemView {
     border: 1px solid palette(mid);
-    border-radius: 6px;
+    border-radius: 8px;
     background-color: palette(base);
     selection-background-color: palette(highlight);
     selection-color: palette(highlighted-text);
@@ -433,7 +452,7 @@ QComboBox QAbstractItemView {
 QPlainTextEdit,
 QTextEdit {
     border: 1px solid palette(mid);
-    border-radius: 6px;
+    border-radius: 8px;
     padding: 6px;
     background-color: palette(base);
     color: palette(text);
@@ -450,7 +469,7 @@ QTextEdit:focus {
 QTreeView::item,
 QListView::item {
     padding: 5px 6px;
-    border-radius: 6px;
+    border-radius: 8px;
     color: palette(text);
     border: none;
 }
@@ -500,16 +519,22 @@ QScrollBar:horizontal {
 
 QScrollBar::handle:vertical {
     background-color: palette(mid);
-    border-radius: 5px;
+    border-radius: 6px;
     min-height: 30px;
     margin: 2px;
+    border: 1px solid palette(mid);
+    border-top-color: palette(light);
+    border-left-color: palette(light);
 }
 
 QScrollBar::handle:horizontal {
     background-color: palette(mid);
-    border-radius: 5px;
+    border-radius: 6px;
     min-width: 30px;
     margin: 2px;
+    border: 1px solid palette(mid);
+    border-top-color: palette(light);
+    border-left-color: palette(light);
 }
 
 QScrollBar::handle:hover {
@@ -540,8 +565,12 @@ QCheckBox::indicator,
 QRadioButton::indicator {
     width: 16px;
     height: 16px;
-    border-radius: 4px;
+    border-radius: 6px;
     border: 1px solid palette(mid);
+    border-top-color: palette(dark);
+    border-left-color: palette(dark);
+    border-bottom-color: palette(light);
+    border-right-color: palette(light);
     background-color: palette(base);
 }
 
@@ -551,19 +580,21 @@ QRadioButton::indicator {
 
 QCheckBox::indicator:hover,
 QRadioButton::indicator:hover {
-    border-color: palette(highlight);
+    border-top-color: palette(highlight);
+    border-left-color: palette(highlight);
+    border-bottom-color: palette(highlight);
+    border-right-color: palette(highlight);
 }
 
 QCheckBox::indicator:checked {
-    background-color: palette(highlight);
-    border-color: palette(highlight);
+    background: palette(highlight);
+    border: 1px solid palette(highlight);
     image: url(:/icons/check.svg);
 }
 
 QRadioButton::indicator:checked {
-    background-color: palette(highlight);
-    border-color: palette(highlight);
-    background-color: qradialgradient(cx:0.5, cy:0.5, radius:0.5, fx:0.5, fy:0.5, stop:0.35 palette(highlighted-text), stop:0.4 palette(highlight));
+    background: palette(highlight);
+    border: 1px solid palette(highlight);
 }
 
 QCheckBox:disabled,
@@ -582,7 +613,7 @@ QToolTip {
     background-color: palette(base);
     color: palette(text);
     border: 1px solid palette(mid);
-    border-radius: 6px;
+    border-radius: 10px;
     padding: 5px 9px;
     font-size: 12px;
 }
@@ -607,7 +638,7 @@ QDoubleSpinBox::down-button:hover {
 /* ---- Progress bars ---- */
 QProgressBar {
     border: none;
-    border-radius: 4px;
+    border-radius: 6px;
     background-color: palette(mid);
     height: 6px;
     text-align: center;
@@ -615,7 +646,7 @@ QProgressBar {
 
 QProgressBar::chunk {
     background-color: palette(highlight);
-    border-radius: 4px;
+    border-radius: 6px;
 }
 
 /* ---- Splitter handles ---- */

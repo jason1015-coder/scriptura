@@ -36,7 +36,7 @@ ProblemPanel::ProblemPanel(QWidget *parent)
     m_closeButton->setToolTip(tr("Close"));
     m_closeButton->setStyleSheet(
         "QPushButton { border: none; background: transparent; font-size: 16px; }"
-        "QPushButton:hover { background: palette(highlight); color: white; border-radius: 4px; }"
+        "QPushButton:hover { background: palette(highlight); color: white; border-radius: 8px; }"
     );
 
     headerLayout->addWidget(m_filterTabs);

@@ -26,6 +26,14 @@ CustomTitleBar::CustomTitleBar(QWidget *parent)
     setFixedHeight(52);
     setAttribute(Qt::WA_TranslucentBackground, false);
     setObjectName("unifiedTitleBar");
+    setStyleSheet(R"(
+        CustomTitleBar#unifiedTitleBar {
+            background-color: palette(window);
+            border-radius: 14px;
+            border-bottom-left-radius: 0;
+            border-bottom-right-radius: 0;
+        }
+    )");
     setupLayout();
     styleButtons();
 }
@@ -142,7 +150,7 @@ void CustomTitleBar::styleButtons()
             border: none;
             background-color: transparent;
             color: palette(text);
-            border-radius: 6px;
+            border-radius: 8px;
             padding: 0px;
         }
         QPushButton:hover {
@@ -168,7 +176,7 @@ void CustomTitleBar::styleButtons()
         QLineEdit#unifiedSearchField {
             background-color: rgba(128, 128, 128, 0.08);
             border: 1px solid rgba(128, 128, 128, 0.12);
-            border-radius: 6px;
+            border-radius: 8px;
             padding: 4px 10px;
             color: palette(text);
             font-size: 12px;

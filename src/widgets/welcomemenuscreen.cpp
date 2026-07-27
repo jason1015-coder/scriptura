@@ -182,7 +182,7 @@ void WelcomeMenuScreen::setupUI()
         btn->setStyleSheet(
             "QPushButton#windowControlButton {"
             "  border: none;"
-            "  border-radius: 6px;"
+            "  border-radius: 8px;"
             "  background: transparent;"
             "  font-size: 14px;"
             "  font-weight: bold;"
@@ -202,7 +202,7 @@ void WelcomeMenuScreen::setupUI()
     m_closeBtn->setStyleSheet(
         "QPushButton#windowControlButton {"
         "  border: none;"
-        "  border-radius: 6px;"
+        "  border-radius: 8px;"
         "  background: transparent;"
         "  font-size: 14px;"
         "  font-weight: bold;"
@@ -328,7 +328,7 @@ void WelcomeMenuScreen::setupUI()
         "}"
         "QListWidget#recentProjectsList::item {"
         "  padding: 8px 10px;"
-        "  border-radius: 6px;"
+        "  border-radius: 8px;"
         "  margin: 2px 0px;"
         "}"
         "QListWidget#recentProjectsList::item:hover {"
@@ -396,7 +396,7 @@ void WelcomeMenuScreen::setThemeBackground(const QColor &color)
         WelcomeMenuScreen {
             background-color: %1;
             border: none;
-            border-radius: 18px;
+            border-radius: 14px;
         }
         QLabel {
             color: %2;

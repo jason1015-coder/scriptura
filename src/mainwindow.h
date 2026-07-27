@@ -26,6 +26,7 @@
 #include <QGroupBox>
 #include <QGridLayout>
 #include <QTabBar>
+#include <QScrollArea>
 #include <memory>
 #include "codeeditor.h"
 #include "lspclient.h"
@@ -211,10 +212,7 @@ private slots:
 private:
     enum class TabType {
         File = 0,
-        ThemeSettings = 1,
-        EditorSettings = 2,
-        KeyboardShortcuts = 3,
-        UpdaterSettings = 4
+        Settings = 1
     };
 
     Ui::MainWindow *ui;
@@ -247,11 +245,8 @@ private:
     TerminalPanel *terminalPanel;
     Theme selectedTheme;
 
-    // Settings page widgets
-    QWidget *themeSettingsWidget;
-    QWidget *editorSettingsWidget;
-    QWidget *keyboardShortcutsPageWidget;
-    QWidget *updaterSettingsWidget;
+    // Unified scrollable settings page
+    QWidget *unifiedSettingsWidget;
 
     QTimer *autoSaveTimer;
     QTimer *lspDebounceTimer;
@@ -315,11 +310,7 @@ private:
     QString findTerminal();
     QPlainTextEdit* getCurrentEditor();
     // createWelcomeWidget() removed — welcome menu is now a standalone pre-launch screen
-    QWidget* createKeyboardShortcutsWidget();
-    QWidget* createThemeSettingsWidget();
-    QWidget* createEditorSettingsWidget();
-    QWidget* createKeyboardShortcutsPageWidget();
-    QWidget* createUpdaterSettingsWidget();
+    QWidget* createUnifiedSettingsWidget();
     void startLanguageServer(const QString &filePath);
     void startLanguageServerForProject(const QString &projectPath);
     void stopLanguageServer();

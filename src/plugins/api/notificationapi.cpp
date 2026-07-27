@@ -56,7 +56,7 @@ void PluginNotificationApi::showToast(const QString &title, const QString &messa
 
     toast->setStyleSheet(
         QString("QFrame#pluginToast_%1 { background: %2; color: white; "
-                "border-radius: 6px; padding: 4px; }")
+                "border-radius: 8px; padding: 4px; }")
             .arg(styleClass, bg)
     );
     toast->adjustSize();

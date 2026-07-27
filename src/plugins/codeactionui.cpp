@@ -52,9 +52,9 @@ void CodeActionBar::setActions(const QList<CodeActionItem> &actions)
     for (int i = 0; i < actions.size(); ++i) {
         QPushButton *btn = new QPushButton(actions[i].title, this);
         if (actions[i].isPreferred) {
-            btn->setStyleSheet("QPushButton { background-color: palette(highlight); color: palette(highlightedText); border: none; padding: 4px 10px; border-radius: 4px; }");
+            btn->setStyleSheet("QPushButton { background-color: palette(highlight); color: palette(highlightedText); border: none; padding: 4px 10px; border-radius: 8px; }");
         } else {
-            btn->setStyleSheet("QPushButton { border: 1px solid palette(mid); padding: 4px 10px; border-radius: 4px; background: palette(base); }");
+            btn->setStyleSheet("QPushButton { border: 1px solid palette(mid); padding: 4px 10px; border-radius: 8px; background: palette(base); }");
             btn->setFlat(true);
         }
         connect(btn, &QPushButton::clicked, this, [this, i]() { onActionClicked(i); });

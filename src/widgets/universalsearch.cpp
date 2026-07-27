@@ -115,7 +115,7 @@ UniversalSearchPopup::UniversalSearchPopup(QLineEdit *searchField, QWidget *pare
             padding: 4px;
             outline: none;
         }
-        QListWidget::item { border-radius: 6px; padding: 2px 4px; }
+        QListWidget::item { border-radius: 8px; padding: 2px 4px; }
         QListWidget::item:selected {
             background-color: palette(highlight);
             color: palette(highlighted-text);

@@ -54,7 +54,7 @@ public:
             SplashScreen {
                 background-color: white;
                 border: none;
-                border-radius: 16px;
+                border-radius: 14px;
             }
         )");
     }
@@ -65,7 +65,7 @@ public:
             SplashScreen {
                 background-color: %1;
                 border: none;
-                border-radius: 16px;
+                border-radius: 14px;
             }
             QLabel {
                 color: palette(text);

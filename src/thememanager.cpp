@@ -83,19 +83,19 @@ ThemeDefinition ThemeManager::buildDefinition(ColorFamily family, Mode mode)
         return d ? QColor(100, 150, 255) : QColor(0, 122, 255);
     };
 
-    // ── Core UI colours ───────────────────────────────────────────
+    // ── Core UI colours (extra-soft — normal themes) ─────────────
     def.bgColor        = bgOf(family, dark);
-    def.textColor      = dark ? QColor(220, 220, 220) : QColor(30, 30, 32);
-    def.svgColor       = dark ? QColor(180, 180, 190) : QColor(80, 80, 90);
-    def.buttonColor    = dark ? QColor(60, 60, 65)    : QColor(240, 240, 242);
+    def.textColor      = dark ? QColor(175, 175, 182) : QColor(105, 105, 112);
+    def.svgColor       = dark ? QColor(140, 140, 148) : QColor(125, 125, 135);
+    def.buttonColor    = dark ? QColor(68, 68, 73)    : QColor(234, 234, 239);
     def.highlightColor = accentOf(family, dark);
 
-    // ── Fine-grained UI colours ───────────────────────────────────
-    def.baseColor         = dark ? QColor(30, 30, 32)     : QColor(255, 255, 255);
-    def.borderColor       = dark ? QColor(60, 60, 65)     : QColor(200, 200, 204);
-    def.lightColor        = dark ? QColor(75, 75, 80)     : QColor(230, 230, 233);
-    def.midColor          = dark ? QColor(55, 55, 60)     : QColor(195, 195, 199);
-    def.darkColor         = dark ? QColor(35, 35, 38)     : QColor(175, 175, 179);
+    // ── Fine-grained UI colours (extra-soft — normal themes) ─────
+    def.baseColor         = dark ? QColor(42, 42, 46)     : QColor(250, 250, 252);
+    def.borderColor       = dark ? QColor(76, 76, 81)     : QColor(220, 220, 224);
+    def.lightColor        = dark ? QColor(82, 82, 87)     : QColor(232, 232, 236);
+    def.midColor          = dark ? QColor(66, 66, 71)     : QColor(206, 206, 210);
+    def.darkColor         = dark ? QColor(52, 52, 57)     : QColor(190, 190, 194);
     def.buttonTextColor   = def.textColor;
     def.highlightedText   = dark ? Qt::white : Qt::white;
 
@@ -184,11 +184,19 @@ void ThemeManager::applyTheme(const Theme &theme)
 
     // Apply high-contrast adjustments if needed
     if (theme.features.testFlag(Feature::HighContrast)) {
-        // Boost contrast: make colours more extreme
+        // High contrast: family-tinted extremes — max readability while preserving colour identity
         bool dark = theme.isDark();
-        m_currentDefinition.bgColor   = dark ? QColor(0, 0, 0)     : QColor(255, 255, 255);
-        m_currentDefinition.textColor = dark ? QColor(255, 255, 255) : QColor(0, 0, 0);
-        m_currentDefinition.svgColor  = m_currentDefinition.textColor;
+        QColor fam = m_currentDefinition.bgColor;
+        m_currentDefinition.bgColor       = dark ? fam.darker(180)     : fam.lighter(102);
+        m_currentDefinition.textColor     = dark ? QColor(255, 255, 255) : QColor(0, 0, 0);
+        m_currentDefinition.baseColor     = dark ? fam.darker(150)     : fam.lighter(100);
+        m_currentDefinition.buttonColor   = dark ? QColor(55, 55, 58)    : QColor(225, 225, 229);
+        m_currentDefinition.borderColor   = dark ? QColor(130, 130, 132) : QColor(150, 150, 155);
+        m_currentDefinition.lightColor    = dark ? QColor(70, 70, 73)    : QColor(215, 215, 219);
+        m_currentDefinition.midColor      = dark ? QColor(75, 75, 78)    : QColor(185, 185, 190);
+        m_currentDefinition.darkColor     = dark ? QColor(90, 90, 93)    : QColor(160, 160, 165);
+        m_currentDefinition.svgColor      = dark ? QColor(255, 255, 255) : QColor(0, 0, 0);
+        m_currentDefinition.highlightColor = m_currentDefinition.highlightColor.lighter(108);
     }
 
     QApplication::setStyle("Fusion");
@@ -261,9 +269,9 @@ QString ThemeManager::generateDesignTokens() const
     tokens << QString("--text: %1;").arg(d.textColor.name());
     tokens << QString("--border: %1;").arg(d.borderColor.name());
     tokens << QString("--svg-color: %1;").arg(d.svgColor.name());
-    tokens << QString("--radius-sm: 4px;");
-    tokens << QString("--radius-md: 6px;");
-    tokens << QString("--radius-lg: 8px;");
+    tokens << QString("--radius-sm: 6px;");
+    tokens << QString("--radius-md: 8px;");
+    tokens << QString("--radius-lg: 12px;");
     tokens << QString("--spacing-xs: 4px;");
     tokens << QString("--spacing-sm: 8px;");
     tokens << QString("--spacing-md: 12px;");
@@ -293,23 +301,27 @@ QString ThemeManager::generateGlobalStylesheet() const
     lines << QString("    font-size: 13px;");
     lines << QString("}");
     lines << QString("");
-    lines << QString("/* Group Boxes */");
+    lines << QString("/* Group Boxes — neumorphic raised */");
     lines << QString("QGroupBox {");
-    lines << QString("    border: 1px solid palette(mid);");
+    lines << QString("    border: 1px solid %1;").arg(d.darkColor.name());
+    lines << QString("    border-top-color: %1;").arg(d.lightColor.name());
+    lines << QString("    border-left-color: %1;").arg(d.lightColor.name());
     lines << QString("    border-radius: 12px;");
     lines << QString("    margin-top: 14px;");
     lines << QString("    padding-top: 14px;");
-    lines << QString("    background-color: palette(base);");
+    lines << QString("    background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 %1, stop:1 %2);")
+        .arg(d.baseColor.lighter(102).name(), d.baseColor.darker(101).name());
     lines << QString("}");
     lines << QString("");
     lines << QString("QGroupBox::title {");
     lines << QString("    subcontrol-origin: margin;");
     lines << QString("    subcontrol-position: top left;");
     lines << QString("    left: 10px;");
-    lines << QString("    padding: 0 6px;");
+    lines << QString("    padding: 0 14px 0 6px;");
     lines << QString("    color: palette(text);");
     lines << QString("    font-weight: 600;");
     lines << QString("    font-size: 12px;");
+    lines << QString("    background: transparent;");
     lines << QString("}");
     lines << QString("");
     lines << QString("/* Menu Bar & Toolbar */");
@@ -342,18 +354,21 @@ QString ThemeManager::generateGlobalStylesheet() const
     lines << QString("    font-size: 12px;");
     lines << QString("}");
     lines << QString("");
-    lines << QString("/* Menus */");
+    lines << QString("/* Menus — neumorphic raised */");
     lines << QString("QMenu {");
-    lines << QString("    background-color: palette(base);");
-    lines << QString("    border: 1px solid palette(mid);");
-    lines << QString("    border-radius: 10px;");
+    lines << QString("    border: 1px solid %1;").arg(d.darkColor.name());
+    lines << QString("    border-top-color: %1;").arg(d.lightColor.name());
+    lines << QString("    border-left-color: %1;").arg(d.lightColor.name());
+    lines << QString("    border-radius: 12px;");
     lines << QString("    padding: 6px;");
+    lines << QString("    background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 %1, stop:1 %2);")
+        .arg(d.baseColor.name(), d.buttonColor.name());
     lines << QString("}");
     lines << QString("");
     lines << QString("QMenuBar::item {");
     lines << QString("    background: transparent;");
     lines << QString("    padding: 5px 10px;");
-    lines << QString("    border-radius: 6px;");
+    lines << QString("    border-radius: 8px;");
     lines << QString("    color: palette(text);");
     lines << QString("}");
     lines << QString("");
@@ -364,13 +379,14 @@ QString ThemeManager::generateGlobalStylesheet() const
     lines << QString("QMenu::item {");
     lines << QString("    background-color: transparent;");
     lines << QString("    padding: 6px 28px 6px 12px;");
-    lines << QString("    border-radius: 6px;");
+    lines << QString("    border-radius: 8px;");
     lines << QString("    color: palette(text);");
     lines << QString("    margin: 1px 2px;");
     lines << QString("}");
     lines << QString("");
     lines << QString("QMenu::item:selected {");
-    lines << QString("    background-color: palette(highlight);");
+    lines << QString("    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 %1, stop:1 %2);")
+        .arg(d.highlightColor.lighter(105).name(), d.highlightColor.name());
     lines << QString("    color: palette(highlighted-text);");
     lines << QString("}");
     lines << QString("");
@@ -390,22 +406,24 @@ QString ThemeManager::generateGlobalStylesheet() const
     lines << QString("QTabBar::tab {");
     lines << QString("    border: none;");
     lines << QString("    border-bottom: 2px solid transparent;");
-    lines << QString("    background-color: transparent;");
+    lines << QString("    background: transparent;");
     lines << QString("    padding: 8px 16px;");
     lines << QString("    margin: 0;");
     lines << QString("    color: palette(mid);");
     lines << QString("    min-width: 70px;");
     lines << QString("    font-size: 12px;");
+    lines << QString("    border-top-left-radius: 10px;");
+    lines << QString("    border-top-right-radius: 10px;");
     lines << QString("}");
     lines << QString("");
     lines << QString("QTabBar::tab:selected {");
-    lines << QString("    background-color: palette(base);");
+    lines << QString("    background: palette(base);");
     lines << QString("    border-bottom: 2px solid palette(highlight);");
     lines << QString("    color: palette(text);");
     lines << QString("}");
     lines << QString("");
     lines << QString("QTabBar::tab:hover:!selected {");
-    lines << QString("    background-color: palette(light);");
+    lines << QString("    background: palette(light);");
     lines << QString("    color: palette(text);");
     lines << QString("}");
     lines << QString("");
@@ -415,13 +433,16 @@ QString ThemeManager::generateGlobalStylesheet() const
     lines << QString("    background-color: palette(base);");
     lines << QString("}");
     lines << QString("");
-    lines << QString("/* Buttons — neumorphic */");
+    lines << QString("/* Buttons — neumorphic raised */");
     lines << QString("QPushButton,");
     lines << QString("QDialogButtonBox > QPushButton {");
-    lines << QString("    border: 1px solid palette(mid);");
-    lines << QString("    border-radius: 8px;");
+    lines << QString("    border: 1px solid %1;").arg(d.darkColor.name());
+    lines << QString("    border-top-color: %1;").arg(d.lightColor.name());
+    lines << QString("    border-left-color: %1;").arg(d.lightColor.name());
+    lines << QString("    border-radius: 10px;");
     lines << QString("    padding: 7px 16px;");
-    lines << QString("    background-color: palette(button);");
+    lines << QString("    background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 %1, stop:1 %2);")
+        .arg(d.buttonColor.lighter(105).name(), d.buttonColor.darker(103).name());
     lines << QString("    color: palette(text);");
     lines << QString("    min-height: 20px;");
     lines << QString("    min-width: 72px;");
@@ -429,57 +450,82 @@ QString ThemeManager::generateGlobalStylesheet() const
     lines << QString("");
     lines << QString("QPushButton:hover,");
     lines << QString("QDialogButtonBox > QPushButton:hover {");
-    lines << QString("    background-color: palette(light);");
-    lines << QString("    border-color: palette(highlight);");
+    lines << QString("    background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 %1, stop:1 %2);")
+        .arg(d.lightColor.name(), d.buttonColor.name());
+    lines << QString("    border-top-color: %1;").arg(d.highlightColor.lighter(120).name());
+    lines << QString("    border-left-color: %1;").arg(d.highlightColor.lighter(120).name());
+    lines << QString("    border-bottom-color: %1;").arg(d.highlightColor.darker(105).name());
+    lines << QString("    border-right-color: %1;").arg(d.highlightColor.darker(105).name());
     lines << QString("}");
     lines << QString("");
     lines << QString("QPushButton:pressed,");
     lines << QString("QDialogButtonBox > QPushButton:pressed {");
-    lines << QString("    background-color: palette(mid);");
+    lines << QString("    background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 %1, stop:1 %2);")
+        .arg(d.buttonColor.darker(103).name(), d.buttonColor.name());
+    lines << QString("    border-top-color: %1;").arg(d.darkColor.name());
+    lines << QString("    border-left-color: %1;").arg(d.darkColor.name());
+    lines << QString("    border-bottom-color: %1;").arg(d.lightColor.name());
+    lines << QString("    border-right-color: %1;").arg(d.lightColor.name());
     lines << QString("}");
     lines << QString("");
     lines << QString("QPushButton:default {");
-    lines << QString("    background-color: palette(highlight);");
+    lines << QString("    border: 1px solid %1;").arg(d.highlightColor.darker(110).name());
+    lines << QString("    border-top-color: %1;").arg(d.highlightColor.lighter(110).name());
+    lines << QString("    border-left-color: %1;").arg(d.highlightColor.lighter(110).name());
+    lines << QString("    border-radius: 10px;");
+    lines << QString("    background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 %1, stop:1 %2);")
+        .arg(d.highlightColor.lighter(105).name(), d.highlightColor.darker(103).name());
     lines << QString("    color: palette(highlighted-text);");
-    lines << QString("    border-color: palette(highlight);");
     lines << QString("}");
     lines << QString("");
     lines << QString("QPushButton:disabled,");
     lines << QString("QDialogButtonBox > QPushButton:disabled {");
-    lines << QString("    background-color: palette(button);");
-    lines << QString("    border-color: palette(mid);");
-    lines << QString("    color: palette(mid);");
+    lines << QString("    background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 %1, stop:1 %2);")
+        .arg(d.buttonColor.name(), d.midColor.name());
+    lines << QString("    border-color: %1;").arg(d.midColor.name());
+    lines << QString("    color: %1;").arg(d.midColor.darker(120).name());
     lines << QString("}");
     lines << QString("");
-    lines << QString("/* Tool Buttons */");
+    lines << QString("/* Tool Buttons — neumorphic raised */");
     lines << QString("QToolButton {");
     lines << QString("    border: none;");
-    lines << QString("    border-radius: 6px;");
+    lines << QString("    border-radius: 8px;");
     lines << QString("    padding: 5px;");
-    lines << QString("    background-color: transparent;");
+    lines << QString("    background: transparent;");
     lines << QString("}");
     lines << QString("");
     lines << QString("QToolButton:hover {");
-    lines << QString("    background-color: palette(light);");
+    lines << QString("    background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 %1, stop:1 %2);")
+        .arg(d.lightColor.lighter(105).name(), d.lightColor.name());
     lines << QString("}");
     lines << QString("");
     lines << QString("QToolButton:pressed {");
-    lines << QString("    background-color: palette(mid);");
+    lines << QString("    background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 %1, stop:1 %2);")
+        .arg(d.midColor.name(), d.darkColor.name());
     lines << QString("}");
     lines << QString("");
     lines << QString("QToolButton:checked {");
-    lines << QString("    background-color: palette(highlight);");
+    lines << QString("    background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 %1, stop:1 %2);")
+        .arg(d.highlightColor.lighter(110).name(), d.highlightColor.darker(103).name());
+    lines << QString("    border: 1px solid %1;").arg(d.highlightColor.darker(110).name());
+    lines << QString("    border-top-color: %1;").arg(d.highlightColor.lighter(115).name());
+    lines << QString("    border-left-color: %1;").arg(d.highlightColor.lighter(115).name());
     lines << QString("}");
     lines << QString("");
-    lines << QString("/* Inputs */");
+    lines << QString("/* Inputs — neumorphic inset */");
     lines << QString("QLineEdit,");
     lines << QString("QComboBox,");
     lines << QString("QSpinBox,");
     lines << QString("QDoubleSpinBox {");
-    lines << QString("    border: 1px solid palette(mid);");
-    lines << QString("    border-radius: 6px;");
+    lines << QString("    border: 1px solid %1;").arg(d.midColor.darker(105).name());
+    lines << QString("    border-top-color: %1;").arg(d.darkColor.name());
+    lines << QString("    border-left-color: %1;").arg(d.darkColor.name());
+    lines << QString("    border-bottom-color: %1;").arg(d.lightColor.name());
+    lines << QString("    border-right-color: %1;").arg(d.lightColor.name());
+    lines << QString("    border-radius: 8px;");
     lines << QString("    padding: 6px 10px;");
-    lines << QString("    background-color: palette(base);");
+    lines << QString("    background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 %1, stop:1 %2);")
+        .arg(d.baseColor.darker(102).name(), d.baseColor.lighter(102).name());
     lines << QString("    color: palette(text);");
     lines << QString("    selection-background-color: palette(highlight);");
     lines << QString("    selection-color: palette(highlighted-text);");
@@ -490,14 +536,16 @@ QString ThemeManager::generateGlobalStylesheet() const
     lines << QString("QComboBox:focus,");
     lines << QString("QSpinBox:focus,");
     lines << QString("QDoubleSpinBox:focus {");
-    lines << QString("    border: 1px solid palette(highlight);");
+    lines << QString("    border: 1px solid %1;").arg(d.highlightColor.name());
+    lines << QString("    background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 %1, stop:1 %2);")
+        .arg(d.baseColor.lighter(103).name(), d.baseColor.name());
     lines << QString("}");
     lines << QString("");
     lines << QString("/* Tree View */");
     lines << QString("QTreeView,");
     lines << QString("QListView {");
     lines << QString("    border: none;");
-    lines << QString("    border-radius: 6px;");
+    lines << QString("    border-radius: 8px;");
     lines << QString("    background-color: transparent;");
     lines << QString("    outline: none;");
     lines << QString("    padding: 2px;");
@@ -506,7 +554,7 @@ QString ThemeManager::generateGlobalStylesheet() const
     lines << QString("QTreeView::item,");
     lines << QString("QListView::item {");
     lines << QString("    padding: 5px 6px;");
-    lines << QString("    border-radius: 6px;");
+    lines << QString("    border-radius: 8px;");
     lines << QString("    color: palette(text);");
     lines << QString("    border: none;");
     lines << QString("}");
@@ -549,21 +597,30 @@ QString ThemeManager::generateGlobalStylesheet() const
     lines << QString("}");
     lines << QString("");
     lines << QString("QScrollBar::handle:vertical {");
-    lines << QString("    background-color: palette(mid);");
-    lines << QString("    border-radius: 5px;");
+    lines << QString("    border-radius: 6px;");
     lines << QString("    min-height: 30px;");
     lines << QString("    margin: 2px;");
+    lines << QString("    border: 1px solid %1;").arg(d.darkColor.name());
+    lines << QString("    border-top-color: %1;").arg(d.lightColor.name());
+    lines << QString("    border-left-color: %1;").arg(d.lightColor.name());
+    lines << QString("    background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 %1, stop:1 %2);")
+        .arg(d.lightColor.name(), d.midColor.name());
     lines << QString("}");
     lines << QString("");
     lines << QString("QScrollBar::handle:horizontal {");
-    lines << QString("    background-color: palette(mid);");
-    lines << QString("    border-radius: 5px;");
+    lines << QString("    border-radius: 6px;");
     lines << QString("    min-width: 30px;");
     lines << QString("    margin: 2px;");
+    lines << QString("    border: 1px solid %1;").arg(d.darkColor.name());
+    lines << QString("    border-top-color: %1;").arg(d.lightColor.name());
+    lines << QString("    border-left-color: %1;").arg(d.lightColor.name());
+    lines << QString("    background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 %1, stop:1 %2);")
+        .arg(d.lightColor.name(), d.midColor.name());
     lines << QString("}");
     lines << QString("");
     lines << QString("QScrollBar::handle:hover {");
-    lines << QString("    background-color: palette(dark);");
+    lines << QString("    background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 %1, stop:1 %2);")
+        .arg(d.midColor.lighter(110).name(), d.darkColor.name());
     lines << QString("}");
     lines << QString("");
     lines << QString("QScrollBar::add-line,");
@@ -590,9 +647,14 @@ QString ThemeManager::generateGlobalStylesheet() const
     lines << QString("QRadioButton::indicator {");
     lines << QString("    width: 16px;");
     lines << QString("    height: 16px;");
-    lines << QString("    border-radius: 4px;");
-    lines << QString("    border: 1px solid palette(mid);");
-    lines << QString("    background-color: palette(base);");
+    lines << QString("    border-radius: 6px;");
+    lines << QString("    border: 1px solid %1;").arg(d.midColor.darker(105).name());
+    lines << QString("    border-top-color: %1;").arg(d.darkColor.name());
+    lines << QString("    border-left-color: %1;").arg(d.darkColor.name());
+    lines << QString("    border-bottom-color: %1;").arg(d.lightColor.name());
+    lines << QString("    border-right-color: %1;").arg(d.lightColor.name());
+    lines << QString("    background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 %1, stop:1 %2);")
+        .arg(d.baseColor.darker(103).name(), d.baseColor.name());
     lines << QString("}");
     lines << QString("");
     lines << QString("QRadioButton::indicator {");
@@ -601,19 +663,23 @@ QString ThemeManager::generateGlobalStylesheet() const
     lines << QString("");
     lines << QString("QCheckBox::indicator:hover,");
     lines << QString("QRadioButton::indicator:hover {");
-    lines << QString("    border-color: palette(highlight);");
+    lines << QString("    border-top-color: %1;").arg(d.highlightColor.lighter(120).name());
+    lines << QString("    border-left-color: %1;").arg(d.highlightColor.lighter(120).name());
+    lines << QString("    border-bottom-color: %1;").arg(d.highlightColor.darker(105).name());
+    lines << QString("    border-right-color: %1;").arg(d.highlightColor.darker(105).name());
     lines << QString("}");
     lines << QString("");
     lines << QString("QCheckBox::indicator:checked {");
-    lines << QString("    background-color: palette(highlight);");
-    lines << QString("    border-color: palette(highlight);");
+    lines << QString("    border: 1px solid %1;").arg(d.highlightColor.name());
+    lines << QString("    background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 %1, stop:1 %2);")
+        .arg(d.highlightColor.lighter(110).name(), d.highlightColor.darker(103).name());
     lines << QString("    image: url(:/icons/check.svg);");
     lines << QString("}");
     lines << QString("");
     lines << QString("QRadioButton::indicator:checked {");
-    lines << QString("    background-color: palette(highlight);");
-    lines << QString("    border-color: palette(highlight);");
-    lines << QString("    background-color: qradialgradient(cx:0.5, cy:0.5, radius:0.5, fx:0.5, fy:0.5, stop:0.35 palette(highlighted-text), stop:0.4 palette(highlight));");
+    lines << QString("    border: 1px solid %1;").arg(d.highlightColor.name());
+    lines << QString("    background: qradialgradient(cx:0.5, cy:0.5, radius:0.5, fx:0.5, fy:0.5, stop:0.35 palette(highlighted-text), stop:0.4 %1);")
+        .arg(d.highlightColor.name());
     lines << QString("}");
     lines << QString("");
     lines << QString("/* Tooltips */");
@@ -621,7 +687,7 @@ QString ThemeManager::generateGlobalStylesheet() const
     lines << QString("    background-color: palette(base);");
     lines << QString("    color: palette(text);");
     lines << QString("    border: 1px solid palette(mid);");
-    lines << QString("    border-radius: 8px;");
+    lines << QString("    border-radius: 10px;");
     lines << QString("    padding: 5px 9px;");
     lines << QString("    font-size: 12px;");
     lines << QString("}");
@@ -631,19 +697,24 @@ QString ThemeManager::generateGlobalStylesheet() const
     lines << QString("    outline: none;");
     lines << QString("}");
     lines << QString("");
-    lines << QString("/* Primary Button */");
+    lines << QString("/* Primary Button — neumorphic raised */");
     lines << QString("QPushButton#primaryButton {");
-    lines << QString("    background-color: palette(highlight);");
     lines << QString("    color: palette(highlighted-text);");
-    lines << QString("    border: none;");
-    lines << QString("    border-radius: 10px;");
+    lines << QString("    border: 1px solid %1;").arg(d.highlightColor.darker(110).name());
+    lines << QString("    border-top-color: %1;").arg(d.highlightColor.lighter(115).name());
+    lines << QString("    border-left-color: %1;").arg(d.highlightColor.lighter(115).name());
+    lines << QString("    border-radius: 12px;");
     lines << QString("    padding: 9px 18px;");
     lines << QString("    font-weight: 600;");
+    lines << QString("    background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 %1, stop:1 %2);")
+        .arg(d.highlightColor.lighter(108).name(), d.highlightColor.darker(103).name());
     lines << QString("}");
     lines << QString("");
     lines << QString("QPushButton#primaryButton:hover {");
-    lines << QString("    background-color: palette(highlight);");
-    lines << QString("    border: none;");
+    lines << QString("    background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 %1, stop:1 %2);")
+        .arg(d.highlightColor.lighter(115).name(), d.highlightColor.name());
+    lines << QString("    border-top-color: %1;").arg(d.highlightColor.lighter(125).name());
+    lines << QString("    border-left-color: %1;").arg(d.highlightColor.lighter(125).name());
     lines << QString("}");
     lines << QString("");
     lines << QString("/* Animations / Transitions */");

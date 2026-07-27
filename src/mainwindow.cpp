@@ -159,6 +159,33 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
     m_windowAnimator = new WindowAnimator(this);
     m_titleBar = new CustomTitleBar(this);
     
+    // Give editor container rounded corners
+    ui->editorContainer->setStyleSheet("QWidget#editorContainer { background-color: palette(window); border-radius: 14px; }");
+    
+    // Add margins to main layout so container rounded corners are visible
+    if (QHBoxLayout *hLayout = qobject_cast<QHBoxLayout*>(ui->centralwidget->layout())) {
+        hLayout->setContentsMargins(6, 6, 6, 6);
+        hLayout->setSpacing(6);
+    }
+    ui->centralwidget->setStyleSheet("QWidget#centralwidget { background-color: palette(mid); }");
+
+    ui->sidebarDrawer->setStyleSheet(R"(
+        QWidget#sidebarDrawer {
+            background-color: palette(window);
+            border-radius: 14px;
+        }
+    )");
+
+    // Round bottom panel container corners so they don't appear sharp
+    ui->bottomPanelContainer->setStyleSheet(R"(
+        QWidget#bottomPanelContainer {
+            background-color: palette(window);
+            border-top: 1px solid palette(mid);
+            border-bottom-left-radius: 14px;
+            border-bottom-right-radius: 14px;
+        }
+    )");
+    
     // Connect title bar signals
     connect(m_titleBar, &CustomTitleBar::minimizeRequest, this, &MainWindow::showMinimized);
     connect(m_titleBar, &CustomTitleBar::maximizeRequest, this, [this]() {
@@ -234,15 +261,10 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
         regCmd(tr("Keyboard Shortcuts"),      tr("Ctrl+K"),      [this]() { showKeyboardShortcuts(); });
         regCmd(tr("About Scriptura"),         QString(),          [this]() { on_action_about_triggered(); });
 
-        // Settings pages
-        regCmd(tr("Editor Settings"),          QString(), [this]() { on_action_editor_settings_triggered(); }, Cat::Setting);
+        // Settings pages — all unified into one scrollable page
+        regCmd(tr("Settings"),                 QString(), [this]() { on_action_editor_settings_triggered(); }, Cat::Setting);
         regCmd(tr("Theme Settings"),           QString(), [this]() { on_action_theme_triggered(); }, Cat::Setting);
-        regCmd(tr("Update Settings"),          QString(), [this]() {
-            for (int i = 0; i < tabBar->count(); ++i)
-                if (static_cast<TabType>(tabBar->tabData(i).toInt()) == TabType::UpdaterSettings) {
-                    tabBar->setCurrentIndex(i); return;
-                }
-        }, Cat::Setting);
+        regCmd(tr("Update Settings"),          QString(), [this]() { on_action_editor_settings_triggered(); }, Cat::Setting);
 
         // Theme quick-switches
         struct ThemeEntry { QString name; ThemeColorFamily family; ThemeMode mode; };
@@ -344,33 +366,9 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
     // Plugin registry - load user-configured URL
     registryUrl = QSettings().value("plugin/registryUrl", "https://raw.githubusercontent.com/jason1015-coder/scriptura/main/plugin-registry.json").toString();
 
-    // Create settings page widgets
-    themeSettingsWidget = createThemeSettingsWidget();
-    editorSettingsWidget = createEditorSettingsWidget();
-    keyboardShortcutsPageWidget = createKeyboardShortcutsPageWidget();
-    updaterSettingsWidget = createUpdaterSettingsWidget();
-
-    editorStack->addWidget(themeSettingsWidget);
-    editorStack->addWidget(editorSettingsWidget);
-    editorStack->addWidget(keyboardShortcutsPageWidget);
-    editorStack->addWidget(updaterSettingsWidget);
-
-    // Add settings tabs to tabBar
-    int themeSettingsTabIndex = tabBar->addTab(tr("Theme"));
-    tabBar->setTabData(themeSettingsTabIndex, static_cast<int>(TabType::ThemeSettings));
-    tabBar->setTabButton(themeSettingsTabIndex, QTabBar::RightSide, createSettingsTabCloseButton(themeSettingsTabIndex));
-
-    int editorSettingsTabIndex = tabBar->addTab(tr("Settings"));
-    tabBar->setTabData(editorSettingsTabIndex, static_cast<int>(TabType::EditorSettings));
-    tabBar->setTabButton(editorSettingsTabIndex, QTabBar::RightSide, createSettingsTabCloseButton(editorSettingsTabIndex));
-
-    int keyboardShortcutsTabIndex = tabBar->addTab(tr("Keys"));
-    tabBar->setTabData(keyboardShortcutsTabIndex, static_cast<int>(TabType::KeyboardShortcuts));
-    tabBar->setTabButton(keyboardShortcutsTabIndex, QTabBar::RightSide, createSettingsTabCloseButton(keyboardShortcutsTabIndex));
-
-    int updaterSettingsTabIndex = tabBar->addTab(tr("Updates"));
-    tabBar->setTabData(updaterSettingsTabIndex, static_cast<int>(TabType::UpdaterSettings));
-    tabBar->setTabButton(updaterSettingsTabIndex, QTabBar::RightSide, createSettingsTabCloseButton(updaterSettingsTabIndex));
+    // Create unified scrollable settings page (tab added when user opens settings)
+    unifiedSettingsWidget = createUnifiedSettingsWidget();
+    editorStack->addWidget(unifiedSettingsWidget);
 
     bottomPanelStack->addWidget(problemPanel);
     bottomPanelStack->addWidget(gitPanel);
@@ -566,8 +564,9 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
     // Apply styles for the inspector drawer
     m_inspectorDrawer->setStyleSheet(R"(
         QWidget#inspectorDrawer {
-            border-left: 1px solid palette(mid);
             background-color: palette(window);
+            border-radius: 14px;
+            border-left: 1px solid palette(mid);
         }
         QWidget#inspectorHeader {
             background-color: transparent;
@@ -578,7 +577,7 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
         }
         QPushButton#inspectorCloseBtn {
             border: none;
-            border-radius: 4px;
+            border-radius: 8px;
             padding: 2px;
             background-color: transparent;
         }
@@ -1140,39 +1139,21 @@ QPushButton* MainWindow::createTabCloseButton(const QString &filePath)
 // createWelcomeWidget() removed — replaced by standalone WelcomeMenuScreen
 // shown between splash and main window startup.
 
-QWidget* MainWindow::createKeyboardShortcutsWidget()
+QWidget* MainWindow::createUnifiedSettingsWidget()
 {
-    QWidget *widget = new QWidget(this);
-    QVBoxLayout *layout = new QVBoxLayout(widget);
-    layout->setAlignment(Qt::AlignCenter);
+    // Unified scrollable settings page combining Theme, Editor, Keyboard Shortcuts, and Updates
+    QScrollArea *scrollArea = new QScrollArea(this);
+    scrollArea->setWidgetResizable(true);
+    scrollArea->setFrameShape(QFrame::NoFrame);
 
-    QLabel *shortcutsLabel = new QLabel(tr(
-        "<b>Keyboard Shortcuts:</b><br>"
-        "Ctrl+S: Save<br>"
-        "Ctrl+Shift+S: Save As<br>"
-        "Ctrl+Z: Undo<br>"
-        "Ctrl+Y: Redo<br>"
-        "Ctrl+F: Find<br>"
-        "Ctrl+H: Replace<br>"
-        "Ctrl+G: Find Next<br>"
-        "Ctrl+Shift+P: Command Palette<br>"
-        "Ctrl+K: Keyboard Shortcuts"
-    ), widget);
-    shortcutsLabel->setAlignment(Qt::AlignCenter);
-    shortcutsLabel->setOpenExternalLinks(false);
-    layout->addWidget(shortcutsLabel);
+    QWidget *content = new QWidget();
+    content->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+    QVBoxLayout *mainLayout = new QVBoxLayout(content);
+    mainLayout->setSpacing(16);
+    mainLayout->setContentsMargins(20, 20, 20, 20);
 
-    return widget;
-}
-
-QWidget* MainWindow::createThemeSettingsWidget()
-{
-    QWidget *widget = new QWidget(this);
-    QVBoxLayout *mainLayout = new QVBoxLayout(widget);
-    mainLayout->setSpacing(12);
-    mainLayout->setContentsMargins(16, 16, 16, 16);
-
-    QGroupBox *themeGroup = new QGroupBox(tr("Theme"), widget);
+    // ── Theme Section ────────────────────────────────────────────────────
+    QGroupBox *themeGroup = new QGroupBox(tr("Theme"), content);
     QGridLayout *themeGrid = new QGridLayout(themeGroup);
     themeGrid->setSpacing(6);
     QButtonGroup *themeBtnGroup = new QButtonGroup(themeGroup);
@@ -1181,31 +1162,27 @@ QWidget* MainWindow::createThemeSettingsWidget()
         ThemeColorFamily family;
         QString name;
     };
-
     FamilyEntry families[] = {
-        {ThemeColorFamily::Default, "Default"},
-        {ThemeColorFamily::Blue,    "Blue"},
-        {ThemeColorFamily::Green,   "Green"},
-        {ThemeColorFamily::Red,     "Red"},
-        {ThemeColorFamily::Yellow,  "Yellow"},
-        {ThemeColorFamily::Brown,   "Brown"},
-        {ThemeColorFamily::Cyan,    "Cyan"},
-        {ThemeColorFamily::Violet,  "Violet"}
+        {ThemeColorFamily::Default, "Default"}, {ThemeColorFamily::Blue, "Blue"},
+        {ThemeColorFamily::Green, "Green"},     {ThemeColorFamily::Red, "Red"},
+        {ThemeColorFamily::Yellow, "Yellow"},   {ThemeColorFamily::Brown, "Brown"},
+        {ThemeColorFamily::Cyan, "Cyan"},       {ThemeColorFamily::Violet, "Violet"}
     };
 
-    // Store theme button data so we can refresh stylesheets on theme change
-    struct ThemeButtonEntry { QPushButton *btn; Theme theme; QString label; };
+    struct ThemeButtonEntry { QPushButton *btn; Theme theme; };
     QList<ThemeButtonEntry> themeButtons;
 
     auto refreshButtonStyle = [](QPushButton *btn, const Theme &t) {
-        ThemeManager::ColorFamily tmFamily = static_cast<ThemeManager::ColorFamily>(static_cast<int>(t.family));
-        ThemeManager::Mode tmMode = static_cast<ThemeManager::Mode>(static_cast<int>(t.mode));
-        ThemeDefinition td = ThemeManager::buildDefinition(tmFamily, tmMode);
+        ThemeManager::ColorFamily tmF = static_cast<ThemeManager::ColorFamily>(static_cast<int>(t.family));
+        ThemeManager::Mode tmM = static_cast<ThemeManager::Mode>(static_cast<int>(t.mode));
+        ThemeDefinition td = ThemeManager::buildDefinition(tmF, tmM);
         QPalette p = ThemeManager::buildPalette(td);
         QColor bg = p.color(QPalette::Window);
-        QColor textColor = p.color(QPalette::WindowText);
-        btn->setStyleSheet(QString("background-color: %1; color: %2; padding: 8px; border: 1px solid %3; border-radius: 4px; text-align: left;")
-                           .arg(bg.name()).arg(textColor.name()).arg(textColor.name()));
+        QColor tc = p.color(QPalette::WindowText);
+        btn->setStyleSheet(QStringLiteral(
+            "background-color: %1; color: %2; padding: 8px;"
+            " border: 1px solid %3; border-radius: 8px; text-align: left;")
+            .arg(bg.name(), tc.name(), tc.name()));
     };
 
     int btnIdx = 0;
@@ -1215,136 +1192,107 @@ QWidget* MainWindow::createThemeSettingsWidget()
                 ThemeMode mode = static_cast<ThemeMode>(mi);
                 ThemeFeatures features = hci ? ThemeFeatures(ThemeFeature::HighContrast) : ThemeFeatures();
                 Theme t(static_cast<ThemeColorFamily>(fi), mode, features);
-
-                QString label = families[fi].name + " – " + (mode == ThemeMode::Light ? tr("Light") : tr("Dark"));
-                if (hci)
-                    label += " (" + tr("High Contrast") + ")";
+                QString label = families[fi].name + QStringLiteral(" \u2013 ")
+                    + (mode == ThemeMode::Light ? tr("Light") : tr("Dark"));
+                if (hci) label += QStringLiteral(" (") + tr("High Contrast") + QStringLiteral(")");
 
                 QPushButton *btn = new QPushButton(label, themeGroup);
                 btn->setCheckable(true);
                 btn->setCursor(Qt::PointingHandCursor);
-
                 refreshButtonStyle(btn, t);
-
                 themeGrid->addWidget(btn, btnIdx / 4, btnIdx % 4);
                 themeBtnGroup->addButton(btn, btnIdx);
-                themeButtons.append({btn, t, label});
-
-                if (t == selectedTheme)
-                    btn->setChecked(true);
-
+                themeButtons.append({btn, t});
+                if (t == selectedTheme) btn->setChecked(true);
                 ++btnIdx;
             }
         }
     }
 
-    // Re-style buttons whenever the global theme changes (handles inconsistent appearance)
-    connect(m_themeManager, &ThemeManager::themeChanged, widget, [themeButtons, refreshButtonStyle]() {
-        for (const auto &entry : themeButtons) {
-            refreshButtonStyle(entry.btn, entry.theme);
-        }
+    connect(m_themeManager, &ThemeManager::themeChanged, content, [themeButtons, refreshButtonStyle]() {
+        for (const auto &e : themeButtons) refreshButtonStyle(e.btn, e.theme);
     });
 
     mainLayout->addWidget(themeGroup);
-    mainLayout->addStretch();
 
     connect(themeBtnGroup, static_cast<void (QButtonGroup::*)(QAbstractButton*)>(&QButtonGroup::buttonClicked),
             this, [this, themeButtons](QAbstractButton *button) {
         QPushButton *btn = qobject_cast<QPushButton*>(button);
-        if (!btn)
-            return;
-        // Find the matching theme from the button list
-        Theme t;
-        bool found = false;
-        for (const auto &entry : themeButtons) {
-            if (entry.btn == btn) {
-                t = entry.theme;
-                found = true;
+        if (!btn) return;
+        for (const auto &e : themeButtons) {
+            if (e.btn == btn) {
+                if (e.theme != selectedTheme) {
+                    selectedTheme = e.theme;
+                    applyTheme(selectedTheme);
+                    QSettings s;
+                    s.setValue("theme/selected", themeToLegacyInt(selectedTheme));
+                }
                 break;
             }
         }
-        if (!found)
-            return;
-        if (t != selectedTheme) {
-            selectedTheme = t;
-            applyTheme(selectedTheme);
-            QSettings settings;
-            settings.setValue("theme/selected", themeToLegacyInt(selectedTheme));
-        }
     });
 
-    return widget;
-}
-
-QWidget* MainWindow::createEditorSettingsWidget()
-{
-    QWidget *widget = new QWidget(this);
-    QVBoxLayout *mainLayout = new QVBoxLayout(widget);
-    mainLayout->setSpacing(12);
-    mainLayout->setContentsMargins(16, 16, 16, 16);
-
+    // ── Editor Section ───────────────────────────────────────────────────
     CodeEditor *editor = qobject_cast<CodeEditor*>(ui->tabWidget->currentWidget());
 
-    // Font settings
-    QGroupBox *fontGroup = new QGroupBox(tr("Font"), widget);
+    // Font
+    QGroupBox *fontGroup = new QGroupBox(tr("Font"), content);
     QVBoxLayout *fontLayout = new QVBoxLayout(fontGroup);
-    
+
     QHBoxLayout *fontNameLayout = new QHBoxLayout();
-    QLabel *fontLabel = new QLabel(tr("Font Family:"), widget);
-    QFontComboBox *fontCombo = new QFontComboBox(widget);
+    QLabel *fontLabel = new QLabel(tr("Font Family:"), content);
+    QFontComboBox *fontCombo = new QFontComboBox(content);
     fontCombo->setFontFilters(QFontComboBox::ScalableFonts);
     if (editor) fontCombo->setCurrentFont(editor->font());
     fontNameLayout->addWidget(fontLabel);
     fontNameLayout->addWidget(fontCombo, 1);
     fontLayout->addLayout(fontNameLayout);
-    
+
     QHBoxLayout *sizeLayout = new QHBoxLayout();
-    QLabel *sizeLabel = new QLabel(tr("Size:"), widget);
-    QSpinBox *sizeSpin = new QSpinBox(widget);
+    QLabel *sizeLabel = new QLabel(tr("Size:"), content);
+    QSpinBox *sizeSpin = new QSpinBox(content);
     sizeSpin->setRange(8, 72);
     if (editor) sizeSpin->setValue(editor->font().pointSize());
     sizeLayout->addWidget(sizeLabel);
     sizeLayout->addWidget(sizeSpin);
     sizeLayout->addStretch();
     fontLayout->addLayout(sizeLayout);
-    
     mainLayout->addWidget(fontGroup);
 
-    // Editor behavior
-    QGroupBox *behaviorGroup = new QGroupBox(tr("Behavior"), widget);
+    // Behavior
+    QGroupBox *behaviorGroup = new QGroupBox(tr("Behavior"), content);
     QVBoxLayout *behaviorLayout = new QVBoxLayout(behaviorGroup);
-    
+
     QHBoxLayout *tabLayout = new QHBoxLayout();
-    QLabel *tabLabel = new QLabel(tr("Tab Width:"), widget);
-    QSpinBox *tabSpin = new QSpinBox(widget);
+    QLabel *tabLabel = new QLabel(tr("Tab Width:"), content);
+    QSpinBox *tabSpin = new QSpinBox(content);
     tabSpin->setRange(1, 16);
     if (editor) tabSpin->setValue(editor->tabWidth());
     tabLayout->addWidget(tabLabel);
     tabLayout->addWidget(tabSpin);
     tabLayout->addStretch();
     behaviorLayout->addLayout(tabLayout);
-    
-    QCheckBox *wordWrapCheckbox = new QCheckBox(tr("Word Wrap"), widget);
+
+    QCheckBox *wordWrapCheckbox = new QCheckBox(tr("Word Wrap"), content);
     if (editor) wordWrapCheckbox->setChecked(editor->lineWrapMode() != QPlainTextEdit::NoWrap);
     behaviorLayout->addWidget(wordWrapCheckbox);
-    
-    QCheckBox *indentGuidesCheckbox = new QCheckBox(tr("Show Indent Guides"), widget);
+
+    QCheckBox *indentGuidesCheckbox = new QCheckBox(tr("Show Indent Guides"), content);
     if (editor) indentGuidesCheckbox->setChecked(editor->property("showIndentGuides").toBool());
     behaviorLayout->addWidget(indentGuidesCheckbox);
-    
     mainLayout->addWidget(behaviorGroup);
 
     // Display
-    QGroupBox *displayGroup = new QGroupBox(tr("Display"), widget);
+    QGroupBox *displayGroup = new QGroupBox(tr("Display"), content);
     QVBoxLayout *displayLayout = new QVBoxLayout(displayGroup);
-    
-    QCheckBox *lineNumbersCheckbox = new QCheckBox(tr("Show Line Numbers"), widget);
+
+    QCheckBox *lineNumbersCheckbox = new QCheckBox(tr("Show Line Numbers"), content);
     if (editor) lineNumbersCheckbox->setChecked(editor->property("showLineNumbers").toBool());
     displayLayout->addWidget(lineNumbersCheckbox);
-    
+
     QHBoxLayout *widthLayout = new QHBoxLayout();
-    QLabel *widthLabel = new QLabel(tr("Editor Width:"), widget);
-    QSpinBox *widthSpin = new QSpinBox(widget);
+    QLabel *widthLabel = new QLabel(tr("Editor Width:"), content);
+    QSpinBox *widthSpin = new QSpinBox(content);
     widthSpin->setRange(200, 2000);
     widthSpin->setSuffix(" px");
     if (editor) widthSpin->setValue(editor->minimumWidth());
@@ -1352,203 +1300,121 @@ QWidget* MainWindow::createEditorSettingsWidget()
     widthLayout->addWidget(widthSpin);
     widthLayout->addStretch();
     displayLayout->addLayout(widthLayout);
-    
     mainLayout->addWidget(displayGroup);
-    mainLayout->addStretch();
 
-    // Apply settings immediately when changed
-    auto applySettings = [&]() {
-        QSettings settings;
-
-        QFont font = fontCombo->currentFont();
-        font.setPointSize(sizeSpin->value());
-        settings.setValue("editor/font", font);
-
-        int tabWidth = tabSpin->value();
-        settings.setValue("editor/tabWidth", tabWidth);
-
-        int editorWidth = widthSpin->value();
-        settings.setValue("editor/width", editorWidth);
-        
-        bool wordWrap = wordWrapCheckbox->isChecked();
-        settings.setValue("editor/wordWrap", wordWrap);
-        
-        bool showIndentGuides = indentGuidesCheckbox->isChecked();
-        settings.setValue("editor/showIndentGuides", showIndentGuides);
-        
-        bool showLineNumbers = lineNumbersCheckbox->isChecked();
-        settings.setValue("editor/showLineNumbers", showLineNumbers);
-
+    // Apply editor settings
+    auto applySettings = [=]() {
+        QSettings s;
+        QFont f = fontCombo->currentFont();
+        f.setPointSize(sizeSpin->value());
+        s.setValue("editor/font", f);
+        s.setValue("editor/tabWidth", tabSpin->value());
+        s.setValue("editor/width", widthSpin->value());
+        s.setValue("editor/wordWrap", wordWrapCheckbox->isChecked());
+        s.setValue("editor/showIndentGuides", indentGuidesCheckbox->isChecked());
+        s.setValue("editor/showLineNumbers", lineNumbersCheckbox->isChecked());
         for (int i = 0; i < ui->tabWidget->count(); i++) {
             if (CodeEditor *ed = qobject_cast<CodeEditor*>(ui->tabWidget->widget(i))) {
-                ed->setFont(font);
-                ed->setTabWidth(tabWidth);
-                if (editorWidth > 0)
-                    ed->setMinimumWidth(editorWidth);
-                ed->setLineWrapMode(wordWrap ? QPlainTextEdit::WidgetWidth : QPlainTextEdit::NoWrap);
-                ed->setProperty("showIndentGuides", showIndentGuides);
-                ed->setProperty("showLineNumbers", showLineNumbers);
+                QFont ef = fontCombo->currentFont();
+                ef.setPointSize(sizeSpin->value());
+                ed->setFont(ef);
+                ed->setTabWidth(tabSpin->value());
+                ed->setLineWrapMode(wordWrapCheckbox->isChecked() ? QPlainTextEdit::WidgetWidth : QPlainTextEdit::NoWrap);
+                ed->setProperty("showIndentGuides", indentGuidesCheckbox->isChecked());
+                ed->setProperty("showLineNumbers", lineNumbersCheckbox->isChecked());
+                ed->setMinimumWidth(widthSpin->value());
             }
         }
     };
+    connect(fontCombo, &QFontComboBox::currentFontChanged, content, applySettings);
+    connect(sizeSpin, &QSpinBox::valueChanged, content, applySettings);
+    connect(tabSpin, &QSpinBox::valueChanged, content, applySettings);
+    connect(wordWrapCheckbox, &QCheckBox::toggled, content, applySettings);
+    connect(indentGuidesCheckbox, &QCheckBox::toggled, content, applySettings);
+    connect(lineNumbersCheckbox, &QCheckBox::toggled, content, applySettings);
+    connect(widthSpin, &QSpinBox::valueChanged, content, applySettings);
 
-    connect(fontCombo, &QFontComboBox::currentFontChanged, widget, [applySettings](const QFont &) { applySettings(); });
-    connect(sizeSpin, &QSpinBox::valueChanged, widget, [applySettings](int) { applySettings(); });
-    connect(tabSpin, &QSpinBox::valueChanged, widget, [applySettings](int) { applySettings(); });
-    connect(wordWrapCheckbox, &QCheckBox::toggled, widget, [applySettings](bool) { applySettings(); });
-    connect(indentGuidesCheckbox, &QCheckBox::toggled, widget, [applySettings](bool) { applySettings(); });
-    connect(lineNumbersCheckbox, &QCheckBox::toggled, widget, [applySettings](bool) { applySettings(); });
-    connect(widthSpin, &QSpinBox::valueChanged, widget, [applySettings](int) { applySettings(); });
-
-    return widget;
-}
-
-QWidget* MainWindow::createKeyboardShortcutsPageWidget()
-{
-    QWidget *widget = new QWidget(this);
-    QVBoxLayout *layout = new QVBoxLayout(widget);
-    layout->setSpacing(16);
-    layout->setContentsMargins(16, 16, 16, 16);
-
-    QLabel *titleLabel = new QLabel(tr("<b>Keyboard Shortcuts</b>"), widget);
-    titleLabel->setAlignment(Qt::AlignCenter);
-    QFont titleFont = titleLabel->font();
-    titleFont.setPointSize(16);
-    titleFont.setBold(true);
-    titleLabel->setFont(titleFont);
-    layout->addWidget(titleLabel);
-
+    // ── Keyboard Shortcuts Section ───────────────────────────────────────
+    QGroupBox *shortcutsGroup = new QGroupBox(tr("Keyboard Shortcuts"), content);
+    QVBoxLayout *shortcutsLayout = new QVBoxLayout(shortcutsGroup);
     QLabel *shortcutsLabel = new QLabel(tr(
         "<b>File Operations:</b><br>"
-        "Ctrl+N: New File &nbsp;&nbsp; "
-        "Ctrl+S: Save &nbsp;&nbsp; "
-        "Ctrl+Shift+S: Save As &nbsp;&nbsp; "
-        "Ctrl+O: Open File<br><br>"
+        "Ctrl+N: New File &nbsp;&nbsp; Ctrl+S: Save &nbsp;&nbsp; "
+        "Ctrl+Shift+S: Save As &nbsp;&nbsp; Ctrl+O: Open File<br><br>"
         "<b>Edit Operations:</b><br>"
-        "Ctrl+Z: Undo &nbsp;&nbsp; "
-        "Ctrl+Y: Redo &nbsp;&nbsp; "
-        "Ctrl+X: Cut &nbsp;&nbsp; "
-        "Ctrl+C: Copy &nbsp;&nbsp; "
-        "Ctrl+V: Paste<br><br>"
+        "Ctrl+Z: Undo &nbsp;&nbsp; Ctrl+Y: Redo &nbsp;&nbsp; "
+        "Ctrl+X: Cut &nbsp;&nbsp; Ctrl+C: Copy &nbsp;&nbsp; Ctrl+V: Paste<br><br>"
         "<b>View/Navigation:</b><br>"
-        "Ctrl+F: Find &nbsp;&nbsp; "
-        "Ctrl+H: Replace &nbsp;&nbsp; "
-        "Ctrl+G: Find Next &nbsp;&nbsp; "
-        "Ctrl+Shift+G: Find Previous &nbsp;&nbsp; "
+        "Ctrl+F: Find &nbsp;&nbsp; Ctrl+H: Replace &nbsp;&nbsp; "
+        "Ctrl+G: Find Next &nbsp;&nbsp; Ctrl+Shift+G: Find Previous<br>"
         "Ctrl+Shift+F: Project Search &nbsp;&nbsp; "
-        "Ctrl+Shift+P: Command Palette &nbsp;&nbsp; "
-        "Ctrl+K: Keyboard Shortcuts<br><br>"
-        "<b>Project:</b><br>"
-        "Ctrl+E: Project Settings &nbsp;&nbsp; "
-        "Ctrl+T: Theme Selection"
-    ), widget);
+        "Ctrl+Shift+P: Command Palette &nbsp;&nbsp; Ctrl+K: Shortcuts<br><br>"
+        "<b>Debug:</b><br>"
+        "F5: Run/Debug &nbsp;&nbsp; Shift+F5: Stop &nbsp;&nbsp; "
+        "F9: Toggle Breakpoint &nbsp;&nbsp; F10: Step Over &nbsp;&nbsp; "
+        "F11: Step Into &nbsp;&nbsp; Shift+F11: Step Out &nbsp;&nbsp; Ctrl+F5: Continue"
+    ), content);
     shortcutsLabel->setTextFormat(Qt::RichText);
-    shortcutsLabel->setAlignment(Qt::AlignLeft);
     shortcutsLabel->setWordWrap(true);
-    layout->addWidget(shortcutsLabel);
+    shortcutsLayout->addWidget(shortcutsLabel);
+    mainLayout->addWidget(shortcutsGroup);
 
-    layout->addStretch();
+    // ── Updates Section ───────────────────────────────────────────────────
+    QGroupBox *updateGroup = new QGroupBox(tr("Updates"), content);
+    QVBoxLayout *updateLayout = new QVBoxLayout(updateGroup);
 
-    return widget;
-}
+    QPushButton *checkStableButton = new QPushButton(tr("Check for Latest Release (Recommended)"), updateGroup);
+    QPushButton *checkPreReleaseButton = new QPushButton(tr("Check for Latest Pre-release"), updateGroup);
+    checkPreReleaseButton->setToolTip(tr("Pre-releases may be unstable. Update at your own risk."));
+    updateLayout->addWidget(checkStableButton);
+    updateLayout->addWidget(checkPreReleaseButton);
 
-QWidget* MainWindow::createUpdaterSettingsWidget()
-{
-    QWidget *widget = new QWidget(this);
-    QVBoxLayout *layout = new QVBoxLayout(widget);
-    layout->setSpacing(16);
-    layout->setContentsMargins(16, 16, 16, 16);
+    QLabel *versionLabel = new QLabel(tr("Current Version: %1").arg(SCRIPTURA_VERSION), updateGroup);
+    updateLayout->addWidget(versionLabel);
 
-    QLabel *titleLabel = new QLabel(tr("<b>Application Updates</b>"), widget);
-    titleLabel->setAlignment(Qt::AlignCenter);
-    QFont titleFont = titleLabel->font();
-    titleFont.setPointSize(16);
-    titleFont.setBold(true);
-    titleLabel->setFont(titleFont);
-    layout->addWidget(titleLabel);
+    mainLayout->addWidget(updateGroup);
 
-    QLabel *descriptionLabel = new QLabel(tr(
-        "Check for Scriptura updates from GitHub Releases.<br>"
-        "You can check for the latest stable release or the latest pre-release."
-    ), widget);
-    descriptionLabel->setWordWrap(true);
-    layout->addWidget(descriptionLabel);
+    // Plugin Registry
+    QGroupBox *registryGroup = new QGroupBox(tr("Plugin Registry"), content);
+    QVBoxLayout *registryLayout = new QVBoxLayout(registryGroup);
+    QLabel *registryUrlLabel = new QLabel(tr("Registry URL:"), registryGroup);
+    QLineEdit *registryUrlEdit = new QLineEdit(registryGroup);
+    registryUrlEdit->setPlaceholderText(tr("https://example.com/plugin-registry.json"));
+    registryUrlEdit->setText(registryUrl);
+    connect(registryUrlEdit, &QLineEdit::textChanged, this, [this](const QString &url) {
+        m_pluginRegistry->setRegistryUrl(QUrl(url));
+        QSettings().setValue("plugin/registryUrl", url);
+    });
+    registryLayout->addWidget(registryUrlLabel);
+    registryLayout->addWidget(registryUrlEdit);
+    mainLayout->addWidget(registryGroup);
 
-     QGroupBox *checkGroup = new QGroupBox(tr("Check for Updates"), widget);
-     QVBoxLayout *checkLayout = new QVBoxLayout(checkGroup);
-
-     QPushButton *checkStableButton = new QPushButton(tr("Check for Latest Release (Recommended)"), checkGroup);
-     QPushButton *checkPreReleaseButton = new QPushButton(tr("Check for Latest Pre-release"), checkGroup);
-     checkPreReleaseButton->setToolTip(tr("Pre-releases may be unstable. Update at your own risk."));
-
-     checkLayout->addWidget(checkStableButton);
-     checkLayout->addWidget(checkPreReleaseButton);
-
-     layout->addWidget(checkGroup);
-
-     QGroupBox *registryGroup = new QGroupBox(tr("Plugin Registry"), widget);
-     QVBoxLayout *registryLayout = new QVBoxLayout(registryGroup);
-
-     QLabel *registryUrlLabel = new QLabel(tr("Registry URL:"), registryGroup);
-     QLineEdit *registryUrlEdit = new QLineEdit(registryGroup);
-     registryUrlEdit->setPlaceholderText(tr("https://example.com/plugin-registry.json"));
-     registryUrlEdit->setText(registryUrl);
-     connect(registryUrlEdit, &QLineEdit::textChanged, this, [this](const QString &url) {
-         m_pluginRegistry->setRegistryUrl(QUrl(url));
-         QSettings().setValue("plugin/registryUrl", url);
-     });
-     registryLayout->addWidget(registryUrlLabel);
-     registryLayout->addWidget(registryUrlEdit);
-
-     layout->addWidget(registryGroup);
-
-     QGroupBox *infoGroup = new QGroupBox(tr("Current Version"), widget);
-    QVBoxLayout *infoLayout = new QVBoxLayout(infoGroup);
-
-    QLabel *versionLabel = new QLabel(tr("Version: %1").arg(SCRIPTURA_VERSION), infoGroup);
-    infoLayout->addWidget(versionLabel);
-
-    layout->addWidget(infoGroup);
-    layout->addStretch();
-
-    // Connect buttons
+    // Connect update buttons
     connect(checkStableButton, &QPushButton::clicked, this, [this]() {
         updater->checkForUpdates(Updater::Stable);
     });
     connect(checkPreReleaseButton, &QPushButton::clicked, this, [this]() {
-        // Show warning for pre-release
         QMessageBox::StandardButton reply = QMessageBox::warning(
-            this,
-            tr("Pre-release Warning"),
+            this, tr("Pre-release Warning"),
             tr("Pre-releases may be unstable and contain bugs.\n"
                "They are intended for testing new features before the stable release.\n\n"
                "Do you want to continue?"),
-            QMessageBox::Yes | QMessageBox::No
-        );
-        if (reply == QMessageBox::Yes) {
+            QMessageBox::Yes | QMessageBox::No);
+        if (reply == QMessageBox::Yes)
             updater->checkForUpdates(Updater::PreRelease);
-        }
     });
 
-    return widget;
+    mainLayout->addStretch();
+
+    scrollArea->setWidget(content);
+    return scrollArea;
 }
 
 void MainWindow::on_action_check_updates_triggered()
 {
-    // Show updater settings tab
-    for (int i = 0; i < tabBar->count(); ++i) {
-        if (static_cast<TabType>(tabBar->tabData(i).toInt()) == TabType::UpdaterSettings) {
-            tabBar->setCurrentIndex(i);
-            return;
-        }
-    }
-    // If updater tab doesn't exist yet, add it
-    int updaterSettingsTabIndex = tabBar->addTab(tr("Updates"));
-    tabBar->setTabData(updaterSettingsTabIndex, static_cast<int>(TabType::UpdaterSettings));
-    tabBar->setTabButton(updaterSettingsTabIndex, QTabBar::RightSide, createSettingsTabCloseButton(updaterSettingsTabIndex));
-    tabBar->setCurrentIndex(updaterSettingsTabIndex);
+    // Update settings are now part of the unified settings page
+    on_action_editor_settings_triggered();
 }
-
 
 void MainWindow::showEditorInterface()
 {
@@ -2068,13 +1934,23 @@ void MainWindow::on_tabWidget_tabCloseRequested(int index)
     delete widget;
 
     if (ui->tabWidget->count() > 0) {
-        showEditorInterface();
+        // Do NOT call showEditorInterface() here — onTopTabChanged() was already
+        // triggered by tabBar->removeTab() above and correctly switched the
+        // editorStack to match the new current tab in the tabBar (which may be a
+        // settings tab). Calling showEditorInterface() here would unconditionally
+        // switch back to ui->tabWidget, causing the settings page to appear
+        // blank when a file is closed while viewing settings.
         updateStatusBar();
         // Update problem panel to show current file's problems
         QString newCurrent = QUrl::fromLocalFile(currentFile).toString();
         problemPanel->setCurrentFile(newCurrent);
     } else {
-        showEditorInterface();
+        // No file tabs remain — only show editor interface if tabBar is also
+        // empty (onTopTabChanged(-1) returned early without switching).
+        // If settings tabs remain, onTopTabChanged already handled the switch.
+        if (tabBar->count() == 0) {
+            showEditorInterface();
+        }
         setWindowTitle(projectDir.isEmpty() ? "Scriptura" : QFileInfo(projectDir).fileName() + " - Scriptura");
         showSearchBar(false);
         problemPanel->hide();
@@ -2256,21 +2132,12 @@ void MainWindow::onTopTabChanged(int index)
 
     QVariant data = tabBar->tabData(index);
     if (data.typeId() == QMetaType::Int) {
-        // Settings tab
+        // Settings tab (unified)
         TabType type = static_cast<TabType>(data.toInt());
-        switch (type) {
-            case TabType::ThemeSettings:
-                editorStack->setCurrentWidget(themeSettingsWidget);
-                break;
-            case TabType::EditorSettings:
-                editorStack->setCurrentWidget(editorSettingsWidget);
-                break;
-            case TabType::KeyboardShortcuts:
-                editorStack->setCurrentWidget(keyboardShortcutsPageWidget);
-                break;
-            case TabType::UpdaterSettings:
-                editorStack->setCurrentWidget(updaterSettingsWidget);
-                break;
+        if (type == TabType::Settings) {
+            qDebug() << "onTopTabChanged: switching to unifiedSettingsWidget";
+            editorStack->setCurrentWidget(unifiedSettingsWidget);
+            unifiedSettingsWidget->show();
         }
     } else if (data.typeId() == QMetaType::QString) {
         // File tab - find by file path
@@ -2476,18 +2343,23 @@ void MainWindow::on_action_about_triggered()
 
 void MainWindow::on_action_editor_settings_triggered()
 {
-    // Show editor settings as a page in the editor area
+    qDebug() << "on_action_editor_settings_triggered: switching to unifiedSettingsWidget";
+    // Find existing settings tab or add a new one
+    int settingsTabIndex = -1;
     for (int i = 0; i < tabBar->count(); ++i) {
-        if (static_cast<TabType>(tabBar->tabData(i).toInt()) == TabType::EditorSettings) {
-            tabBar->setCurrentIndex(i);
-            return;
+        if (tabBar->tabData(i).typeId() == QMetaType::Int &&
+            static_cast<TabType>(tabBar->tabData(i).toInt()) == TabType::Settings) {
+            settingsTabIndex = i;
+            break;
         }
     }
-    // If settings tab doesn't exist yet, add it
-    int editorSettingsTabIndex = tabBar->addTab(tr("Settings"));
-    tabBar->setTabData(editorSettingsTabIndex, static_cast<int>(TabType::EditorSettings));
-    tabBar->setTabButton(editorSettingsTabIndex, QTabBar::RightSide, createSettingsTabCloseButton(editorSettingsTabIndex));
-    tabBar->setCurrentIndex(editorSettingsTabIndex);
+    if (settingsTabIndex == -1) {
+        settingsTabIndex = tabBar->addTab(tr("Settings"));
+        tabBar->setTabData(settingsTabIndex, static_cast<int>(TabType::Settings));
+        tabBar->setTabButton(settingsTabIndex, QTabBar::RightSide, createSettingsTabCloseButton(settingsTabIndex));
+    }
+    tabBar->setCurrentIndex(settingsTabIndex);
+    editorStack->setCurrentWidget(unifiedSettingsWidget);
 }
 
 void MainWindow::applyTheme(const Theme &theme)
@@ -2766,13 +2638,13 @@ void MainWindow::applyTheme(const Theme &theme)
         }
         QScrollBar::handle:vertical {
             background-color: rgba(%11, %12, %13, 0.25);
-            border-radius: 5px;
+            border-radius: 6px;
             min-height: 30px;
             margin: 2px;
         }
         QScrollBar::handle:horizontal {
             background-color: rgba(%11, %12, %13, 0.25);
-            border-radius: 5px;
+            border-radius: 6px;
             min-width: 30px;
             margin: 2px;
         }
@@ -2795,7 +2667,7 @@ void MainWindow::applyTheme(const Theme &theme)
         QCheckBox::indicator, QRadioButton::indicator {
             width: 16px;
             height: 16px;
-            border-radius: 4px;
+            border-radius: 6px;
             border: 1px solid rgba(%17, %18, %19, 0.15);
             background-color: rgba(%20, %21, %22, 0.3);
         }
@@ -2970,18 +2842,8 @@ void MainWindow::applyTheme(const Theme &theme)
 
 void MainWindow::on_action_theme_triggered()
 {
-    // Show theme settings as a page in the editor area
-    for (int i = 0; i < tabBar->count(); ++i) {
-        if (static_cast<TabType>(tabBar->tabData(i).toInt()) == TabType::ThemeSettings) {
-            tabBar->setCurrentIndex(i);
-            return;
-        }
-    }
-    // If theme tab doesn't exist yet, add it
-    int themeSettingsTabIndex = tabBar->addTab(tr("Theme"));
-    tabBar->setTabData(themeSettingsTabIndex, static_cast<int>(TabType::ThemeSettings));
-    tabBar->setTabButton(themeSettingsTabIndex, QTabBar::RightSide, createSettingsTabCloseButton(themeSettingsTabIndex));
-    tabBar->setCurrentIndex(themeSettingsTabIndex);
+    // Theme settings are now part of the unified settings page
+    on_action_editor_settings_triggered();
 }
 
 void MainWindow::on_action_license_triggered()
@@ -3729,18 +3591,8 @@ bool MainWindow::nativeEvent(const QByteArray &eventType, void *message, qintptr
 
 void MainWindow::showKeyboardShortcuts()
 {
-    // Show keyboard shortcuts as a page in the editor area
-    for (int i = 0; i < tabBar->count(); ++i) {
-        if (static_cast<TabType>(tabBar->tabData(i).toInt()) == TabType::KeyboardShortcuts) {
-            tabBar->setCurrentIndex(i);
-            return;
-        }
-    }
-    // If keyboard shortcuts tab doesn't exist yet, add it
-    int keyboardShortcutsTabIndex = tabBar->addTab(tr("Keys"));
-    tabBar->setTabData(keyboardShortcutsTabIndex, static_cast<int>(TabType::KeyboardShortcuts));
-    tabBar->setTabButton(keyboardShortcutsTabIndex, QTabBar::RightSide, createSettingsTabCloseButton(keyboardShortcutsTabIndex));
-    tabBar->setCurrentIndex(keyboardShortcutsTabIndex);
+    // Keyboard shortcuts are now part of the unified settings page
+    on_action_editor_settings_triggered();
 }
 
 Theme MainWindow::themeFromLegacyInt(int legacy) const
