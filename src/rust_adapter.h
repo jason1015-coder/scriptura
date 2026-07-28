@@ -17,7 +17,6 @@
 #include "rust_backend.h"
 #include "permission.h"
 #include "plugincrashhandler.h"
-#include "dependencyresolver.h"
 
 // ─────────────────────────────────────────────────────────────────────
 //  RustLspClientAdapter — bridges LSP protocol to Qt signals
@@ -462,22 +461,28 @@ private:
 };
 
 // ─────────────────────────────────────────────────────────────────────
-//  RustDependencyResolverAdapter — wraps C++ DependencyResolver
+//  RustDependencyResolverAdapter — wraps Rust FFI DependencyResolver
 // ─────────────────────────────────────────────────────────────────────
 class RustDependencyResolverAdapter : public QObject
 {
     Q_OBJECT
 public:
+    struct DependencyError {
+        QString pluginId;
+        QString missingDependency;
+        bool isOptional = false;
+    };
+
     explicit RustDependencyResolverAdapter(QObject *parent = nullptr);
     ~RustDependencyResolverAdapter() override;
 
-    QList<DependencyResolver::DependencyError> validate(
+    QList<DependencyError> validate(
         const QList<QJsonObject> &plugins, const QSet<QString> &actuallyLoaded);
     QStringList topologicalSort(const QList<QJsonObject> &plugins);
     bool hasCircularDependency(const QList<QJsonObject> &plugins);
 
 private:
-    DependencyResolver m_resolver;
+    RustDependencyResolver *m_resolver = nullptr;
 };
 
 // ─────────────────────────────────────────────────────────────────────

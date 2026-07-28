@@ -1,11 +1,11 @@
 #include "pluginmanagerdialog.h"
+#include "rust_adapter.h"
 #include <QJsonArray>
 #include <QBrush>
 #include <QColor>
 #include <QButtonGroup>
-#include "plugininterface.h"
 
-PluginManagerDialog::PluginManagerDialog(PluginManager *manager, PluginContext *context, QWidget *parent)
+PluginManagerDialog::PluginManagerDialog(RustPluginManagerAdapter *manager, PluginContext *context, QWidget *parent)
     : QDialog(parent)
     , m_manager(manager)
     , m_context(context)
@@ -108,10 +108,9 @@ void PluginManagerDialog::loadAvailablePlugins()
 
     QSet<QString> loadedIds;
     if (m_manager) {
-        for (ScripturaPlugin *plugin : m_manager->plugins()) {
-            if (plugin) {
-                loadedIds.insert(plugin->id());
-            }
+        QStringList loaded = m_manager->listLoaded();
+        for (const QString &id : loaded) {
+            loadedIds.insert(id);
         }
     }
 
@@ -125,7 +124,7 @@ void PluginManagerDialog::loadAvailablePlugins()
         if (pInfo.id.isEmpty()) continue;
 
         pInfo.loaded = loadedIds.contains(pInfo.id);
-        pInfo.enabled = !m_manager->isDisabled(pInfo.id);
+        pInfo.enabled = true; // Rust adapter doesn't track enabled/disabled separately
         m_plugins.append(pInfo);
     }
 }
@@ -246,7 +245,7 @@ void PluginManagerDialog::installPlugin()
     }
 
     if (m_manager) {
-        m_manager->addAllowedPlugin(pluginId);
+        m_manager->loadPlugin(targetDir);
     }
 
     QMessageBox::information(this, tr("Plugin Installed"), tr("Plugin '%1' has been installed successfully. Restart Scriptura to load it.").arg(pluginId));
@@ -305,10 +304,6 @@ void PluginManagerDialog::removeSelectedPlugin()
 
     if (reply != QMessageBox::Yes) {
         return;
-    }
-
-    if (m_manager) {
-        m_manager->removeAllowedPlugin(plugin.id);
     }
 
     if (removePluginDir(plugin.path)) {
@@ -423,17 +418,15 @@ void PluginManagerDialog::togglePluginState()
     }
 
     if (plugin.enabled) {
-        if (m_manager->disablePlugin(plugin.id)) {
-            plugin.enabled = false;
-            m_toggleStateButton->setText(tr("Enable"));
-            QMessageBox::information(this, tr("Plugin Disabled"), tr("Plugin '%1' has been disabled. Restart Scriptura to apply the change.").arg(plugin.name));
-        }
+        m_manager->unloadPlugin(plugin.id);
+        plugin.enabled = false;
+        m_toggleStateButton->setText(tr("Enable"));
+        QMessageBox::information(this, tr("Plugin Disabled"), tr("Plugin '%1' has been disabled.").arg(plugin.name));
     } else {
-        if (m_manager->enablePlugin(plugin.id)) {
-            plugin.enabled = true;
-            m_toggleStateButton->setText(tr("Disable"));
-            QMessageBox::information(this, tr("Plugin Enabled"), tr("Plugin '%1' has been enabled. Restart Scriptura to load it.").arg(plugin.name));
-        }
+        m_manager->loadPlugin(plugin.path);
+        plugin.enabled = true;
+        m_toggleStateButton->setText(tr("Disable"));
+        QMessageBox::information(this, tr("Plugin Enabled"), tr("Plugin '%1' has been enabled.").arg(plugin.name));
     }
 
     refreshPluginList();

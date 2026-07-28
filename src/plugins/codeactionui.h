@@ -8,8 +8,10 @@
 #include <QList>
 #include <QString>
 #include <QLabel>
+#include <QJsonArray>
 #include "codeeditor.h"
-#include "lspclient.h"
+
+class RustLspClientAdapter;
 
 struct CodeActionItem {
     QString title;
@@ -48,13 +50,13 @@ public:
     explicit CodeActionController(QObject *parent = nullptr);
     ~CodeActionController() override;
 
-    void attach(CodeEditor *editor, LspClient *client);
-    void attach(CodeEditor *editor, LspClient *client, const QString &fileUri);
+    void attach(CodeEditor *editor, RustLspClientAdapter *client);
+    void attach(CodeEditor *editor, RustLspClientAdapter *client, const QString &fileUri);
     void showCurrent();
     void hide();
     bool isVisible() const { return m_bar && m_bar->isVisible(); }
 
-    void onDiagnosticsReceived(const QString &uri, const QList<struct LspClient::Diagnostic> &diagnostics);
+    void onDiagnosticsReceived(const QString &uri, const QJsonArray &diagnostics);
     void onCodeActionReceived(const QJsonArray &items, int requestId);
     void onActionSelected(const QString &actionTitle, const QString &kind, int index);
     void onEditorCursorChanged();
@@ -66,10 +68,10 @@ signals:
 private:
     void requestCodeActions(const QString &uri);
     QString currentFileUri() const;
-    QList<struct LspClient::Diagnostic> m_currentDiagnostics;
+    QJsonArray m_currentDiagnostics;
 
     CodeEditor *m_editor;
-    LspClient *m_client;
+    RustLspClientAdapter *m_client;
     CodeActionBar *m_bar;
     QWidget *m_parent;
     QString m_currentUri;

@@ -1,4 +1,10 @@
 #include "codeeditor.h"
+#include "foldmanager.h"
+#include "bracketcolorizer.h"
+#include "bookmarkmanager.h"
+#include "snippetmanager.h"
+#include "codelensmanager.h"
+#include "rust_backend.h"
 
 #include <cmath>
 #include <QColor>
@@ -625,6 +631,10 @@ CodeEditor::CodeEditor(QWidget *parent)
     , syntaxHighlighter(new CodeHighlighter(document()))
     , m_multiCursor(new MultiCursorManager(this))
     , m_tabWidth(4)
+    , m_foldManager(new FoldManager(this, this))
+    , m_bracketColorizer(new BracketColorizer(this, this))
+    , m_bookmarkManager(new BookmarkManager(this))
+    , m_snippetManager(new SnippetManager(this))
 {
     connect(this, &CodeEditor::blockCountChanged, this, &CodeEditor::updateLineNumberAreaWidth);
     connect(this, &CodeEditor::updateRequest, this, &CodeEditor::updateLineNumberArea);
@@ -652,6 +662,7 @@ CodeEditor::CodeEditor(QWidget *parent)
 
 void CodeEditor::setLanguageForFile(const QString &filePath)
 {
+    m_filePath = filePath;
     syntaxHighlighter->setLanguage(
         LanguageRegistry::instance().languageForFile(filePath));
 }
@@ -815,7 +826,7 @@ void CodeEditor::drawInlayHints(QPaintEvent *event)
     const QColor hintColor(128, 128, 128, 180);
     painter.setPen(QPen(hintColor, 1));
 
-    for (const LspClient::InlayHint &hint : m_inlayHints) {
+    for (const LspInlayHint &hint : m_inlayHints) {
         // Skip hints outside visible range
         if (hint.position.line < firstVisibleLine || hint.position.line > lastVisibleLine)
             continue;
@@ -911,10 +922,15 @@ void CodeEditor::updateLineNumberArea(const QRect &rect, int dy)
 
 void CodeEditor::highlightCurrentLine()
 {
-    // Preserve existing selections (diagnostics + plugin decorations) and add/update current line highlight
+    // Preserve existing selections (diagnostics + plugin decorations + bracket colors) and add/update current line highlight
     QList<QTextEdit::ExtraSelection> extraSelections;
     extraSelections.append(m_diagnosticSelections);
     extraSelections.append(m_pluginExtraSelections);
+
+    // Add bracket colorization selections
+    if (m_bracketColorizer && m_bracketColorEnabled) {
+        extraSelections.append(m_bracketColorizer->extraSelections());
+    }
 
     if (!isReadOnly()) {
         QTextEdit::ExtraSelection selection;
@@ -963,8 +979,192 @@ void CodeEditor::mousePressEvent(QMouseEvent *event)
     }
 }
 
+void CodeEditor::selectNextOccurrence()
+{
+    QTextCursor cursor = textCursor();
+    if (cursor.hasSelection()) {
+        QString selectedText = cursor.selectedText();
+        // Find next occurrence after current selection
+        QTextCursor next = document()->find(selectedText, cursor.selectionEnd());
+        if (!next.isNull()) {
+            m_multiCursor->addCursor(next);
+            setTextCursor(next);
+        }
+    }
+}
+
+void CodeEditor::selectAllOccurrences()
+{
+    QTextCursor cursor = textCursor();
+    if (!cursor.hasSelection()) return;
+    QString selectedText = cursor.selectedText();
+    QTextCursor searchCursor(document());
+    searchCursor.movePosition(QTextCursor::Start);
+    while (true) {
+        QTextCursor found = document()->find(selectedText, searchCursor);
+        if (found.isNull()) break;
+        m_multiCursor->addCursor(found);
+        searchCursor = found;
+        searchCursor.movePosition(QTextCursor::Right);
+    }
+}
+
+void CodeEditor::addCursorAbove()
+{
+    QTextCursor cursor = textCursor();
+    int blockNum = cursor.blockNumber();
+    if (blockNum == 0) return;
+    QTextBlock block = document()->findBlockByNumber(blockNum - 1);
+    QTextCursor newCursor(block);
+    newCursor.setPosition(block.position() + qMin(cursor.positionInBlock(), block.length() - 1));
+    m_multiCursor->addCursor(newCursor);
+}
+
+void CodeEditor::addCursorBelow()
+{
+    QTextCursor cursor = textCursor();
+    int blockNum = cursor.blockNumber();
+    if (blockNum >= document()->blockCount() - 1) return;
+    QTextBlock block = document()->findBlockByNumber(blockNum + 1);
+    QTextCursor newCursor(block);
+    newCursor.setPosition(block.position() + qMin(cursor.positionInBlock(), block.length() - 1));
+    m_multiCursor->addCursor(newCursor);
+}
+
+void CodeEditor::setBracketColorization(bool enabled)
+{
+    m_bracketColorEnabled = enabled;
+    if (m_bracketColorizer) {
+        m_bracketColorizer->setEnabled(enabled);
+    }
+}
+
+void CodeEditor::handleSmartIndent(QKeyEvent *event)
+{
+    if (!m_smartIndent) return;
+    QTextCursor cursor = textCursor();
+    QTextBlock block = cursor.block();
+    QString lineText = block.text();
+    int indent = 0;
+    for (const QChar &c : lineText) {
+        if (c == ' ') indent++;
+        else if (c == '\t') indent += m_tabWidth;
+        else break;
+    }
+    if (event->key() == Qt::Key_Return || event->key() == Qt::Key_Enter) {
+        // Check if line ends with { or (
+        QString trimmed = lineText.trimmed();
+        if (trimmed.endsWith('{') || trimmed.endsWith('(') || trimmed.endsWith('[')) {
+            indent += m_tabWidth;
+        }
+        cursor.insertText("\n" + QString(indent, ' '));
+        setTextCursor(cursor);
+        event->accept();
+    }
+}
+
+void CodeEditor::handleBracketAutoClose(QKeyEvent *event)
+{
+    QMap<QChar, QChar> pairs = {{'(', ')'}, {'[', ']'}, {'{', '}'}, {'"', '"'}, {'\'', '\''}};
+    if (event->text().isEmpty() || !pairs.contains(event->text().at(0)))
+        return;
+    
+    QTextCursor cursor = textCursor();
+    QChar open = event->text().at(0);
+    QChar close = pairs[open];
+    
+    // For quotes, check if next char is the same quote — skip over it
+    if (open == close) {
+        QChar nextChar = document()->characterAt(cursor.position());
+        if (nextChar == open) {
+            cursor.movePosition(QTextCursor::Right);
+            setTextCursor(cursor);
+            event->accept();
+            return;
+        }
+    }
+    
+    // Skip if next character is alphanumeric (don't auto-close before word chars)
+    QChar nextChar = document()->characterAt(cursor.position());
+    if (nextChar.isLetterOrNumber())
+        return;
+    
+    cursor.insertText(QString(open) + close);
+    cursor.movePosition(QTextCursor::Left);
+    setTextCursor(cursor);
+    event->accept();
+}
+
 void CodeEditor::keyPressEvent(QKeyEvent *event)
 {
+    // Ctrl+D: Select next occurrence
+    if (event->key() == Qt::Key_D && event->modifiers() == Qt::ControlModifier) {
+        selectNextOccurrence();
+        event->accept();
+        return;
+    }
+    // Ctrl+Shift+L: Select all occurrences
+    if (event->key() == Qt::Key_L && (event->modifiers() & Qt::ControlModifier) && (event->modifiers() & Qt::ShiftModifier)) {
+        selectAllOccurrences();
+        event->accept();
+        return;
+    }
+    // Alt+Shift+Up/Down: Add cursor above/below
+    if (event->key() == Qt::Key_Up && (event->modifiers() & Qt::AltModifier) && (event->modifiers() & Qt::ShiftModifier)) {
+        addCursorAbove();
+        event->accept();
+        return;
+    }
+    if (event->key() == Qt::Key_Down && (event->modifiers() & Qt::AltModifier) && (event->modifiers() & Qt::ShiftModifier)) {
+        addCursorBelow();
+        event->accept();
+        return;
+    }
+    // Smart indentation on Enter
+    if ((event->key() == Qt::Key_Return || event->key() == Qt::Key_Enter) && m_smartIndent && !m_multiCursor->hasCursors()) {
+        handleSmartIndent(event);
+        return;
+    }
+    // Bracket auto-close
+    if (!event->text().isEmpty() && !m_multiCursor->hasCursors() && m_bracketColorEnabled) {
+        handleBracketAutoClose(event);
+        if (event->isAccepted()) return;
+    }
+    // Emmet expansion on Tab when cursor follows an abbreviation
+    if (event->key() == Qt::Key_Tab && !event->modifiers().testFlag(Qt::ControlModifier)) {
+        QTextCursor cursor = textCursor();
+        // Select text from start of line to cursor to find abbreviation
+        QTextCursor lineStart(cursor);
+        lineStart.movePosition(QTextCursor::StartOfBlock);
+        QString lineText = lineStart.selectedText() + cursor.block().text().left(cursor.positionInBlock());
+        // Look for Emmet-like pattern at end of line (word chars, >, +, *, ^, #, .)
+        QRegularExpression emmetRe("([a-zA-Z0-9\[\]()>+*^#._@\-]+)$");
+        QRegularExpressionMatch match = emmetRe.match(lineText);
+        if (match.hasMatch() && !m_bracketColorEnabled) {
+            QString abbreviation = match.captured(1);
+            // Simple check: abbreviation should look like Emmet (contain special chars)
+            if (abbreviation.contains(QRegularExpression("[>+*^#\[\]()]")) && abbreviation.length() >= 2) {
+                // Expand via Rust FFI
+                QByteArray abbrBytes = abbreviation.toUtf8();
+                char *expanded = rust_emmet_expand(abbrBytes.constData());
+                if (expanded) {
+                    QString expansion = QString::fromUtf8(expanded);
+                    rust_free_string(expanded);
+                    if (!expansion.isEmpty()) {
+                        // Remove the abbreviation from the line
+                        cursor.movePosition(QTextCursor::StartOfBlock, QTextCursor::MoveAnchor);
+                        cursor.movePosition(QTextCursor::Right, QTextCursor::MoveAnchor, lineText.length() - abbreviation.length());
+                        cursor.movePosition(QTextCursor::Right, QTextCursor::KeepAnchor, abbreviation.length());
+                        cursor.removeSelectedText();
+                        cursor.insertText(expansion);
+                        setTextCursor(cursor);
+                        event->accept();
+                        return;
+                    }
+                }
+            }
+        }
+    }
     if (!m_ghostText.isEmpty()) {
         if (event->key() == Qt::Key_Tab || event->key() == Qt::Key_Return || event->key() == Qt::Key_Enter) {
             QString accepted = m_ghostText;
@@ -1069,6 +1269,56 @@ void CodeEditor::lineNumberAreaPaintEvent(QPaintEvent *event)
                 painter.setPen(numberPen);
             }
 
+            // Draw fold indicator if this line is a fold start
+            if (m_foldManager && m_foldManager->isFoldStart(line - 1)) {
+                m_foldManager->paintFoldIndicator(painter, 0, top, line - 1, bottom - top);
+            }
+
+            // Draw bookmark indicator
+            if (m_bookmarkManager && !m_filePath.isEmpty() && m_bookmarkManager->isBookmarked(m_filePath, line - 1)) {
+                painter.setPen(Qt::NoPen);
+                painter.setBrush(QColor(255, 215, 0));  // Gold bookmark dot
+                painter.drawEllipse(4, top + 3, 8, 8);
+                painter.setPen(numberPen);
+            }
+
+            // Draw blame annotation if enabled
+            if (m_blameEnabled && m_blameData.contains(blockNumber)) {
+                const BlameLineInfo &info = m_blameData[blockNumber];
+                QFont blameFont = font();
+                blameFont.setPointSize(blameFont.pointSize() - 2);
+                painter.setFont(blameFont);
+                QColor blameColor = palette().color(QPalette::Midlight);
+                blameColor.setAlpha(160);
+                painter.setPen(blameColor);
+                QString blameText = info.author + " " + info.date;
+                int blameX = 20 + fontMetrics().horizontalAdvance(QString::number(blockCount() + 1)) + 12;
+                painter.drawText(blameX, top, areaWidth - blameX, fontHeight,
+                               Qt::AlignLeft | Qt::AlignVCenter, blameText);
+                painter.setFont(font());
+                painter.setPen(numberPen);
+            }
+
+            // Draw Code Lens annotations above the line
+            if (!m_codeLensItems.isEmpty()) {
+                for (const CodeLensItem &lens : m_codeLensItems) {
+                    if (lens.line == blockNumber) {
+                        QFont lensFont = font();
+                        lensFont.setPointSize(lensFont.pointSize() - 1);
+                        painter.setFont(lensFont);
+                        QColor lensColor = palette().color(QPalette::Midlight);
+                        lensColor.setAlpha(200);
+                        painter.setPen(lensColor);
+                        int lensX = 20 + fontMetrics().horizontalAdvance(QString::number(blockCount() + 1)) + 12;
+                        // Draw above the line number
+                        painter.drawText(lensX, top - 2, areaWidth - lensX, fontHeight,
+                                       Qt::AlignLeft | Qt::AlignBottom, lens.title);
+                        painter.setFont(font());
+                        painter.setPen(numberPen);
+                    }
+                }
+            }
+
             // Draw line number
             QString number = QString::number(line);
             painter.drawText(20, top, areaWidth - 20, fontHeight,
@@ -1105,7 +1355,7 @@ void CodeEditor::setDiagnosticTooltips(const QList<QPair<QTextCursor, QString>> 
     m_diagnosticTooltips = tips;
 }
 
-void CodeEditor::setInlayHints(const QList<LspClient::InlayHint> &hints)
+void CodeEditor::setInlayHints(const QList<LspInlayHint> &hints)
 {
     m_inlayHints = hints;
     update();
@@ -1221,6 +1471,9 @@ void CodeEditor::highlightCurrentLine(int line)
     extraSelections.append(selection);
     extraSelections.append(m_diagnosticSelections);
     extraSelections.append(m_pluginExtraSelections);
+    if (m_bracketColorizer && m_bracketColorEnabled) {
+        extraSelections.append(m_bracketColorizer->extraSelections());
+    }
     extraSelections.append(m_extraCursors);
     setExtraSelections(extraSelections);
 }

@@ -12,7 +12,7 @@ class RustEventBusAdapter;
 
 class MainWindow;
 class CodeEditor;
-class LspClient;
+class RustLspClientAdapter;
 class ProblemPanel;
 class TerminalPanel;
 class GitPanel;
@@ -55,7 +55,7 @@ public:
     QString currentPluginId() const;
     void setCurrentPluginId(const QString& pluginId);
     CodeEditor* currentEditor() const;
-    LspClient* lspClient() const;
+    RustLspClientAdapter* lspClient() const;
     ProblemPanel* problemPanel() const;
     TerminalPanel* terminalPanel() const;
     GitPanel* gitPanel() const;

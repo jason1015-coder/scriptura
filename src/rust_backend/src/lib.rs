@@ -32,6 +32,12 @@ mod updater;
 mod utils;
 mod version_fetcher;
 mod workspace;
+mod diff_engine;
+mod encoding_engine;
+mod blame_engine;
+mod emmet_engine;
+mod session_engine;
+mod test_engine;
 
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;

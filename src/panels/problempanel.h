@@ -9,7 +9,7 @@
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QTextEdit>
-#include "lspclient.h"
+#include <QJsonArray>
 
 class ProblemPanel : public QWidget
 {
@@ -20,7 +20,7 @@ public:
     explicit ProblemPanel(QWidget *parent = nullptr);
     ~ProblemPanel();
 
-    void setProblems(const QString &fileUri, const QList<LspClient::Diagnostic> &diagnostics);
+    void setProblems(const QString &fileUri, const QJsonArray &diagnostics);
     void clearProblems(const QString &fileUri);
     void clearAll();
     int problemCount(Filter filter = All) const;
@@ -39,14 +39,14 @@ public slots:
 private slots:
     void onFilterTabChanged(int index);
     void onCloseClicked();
-    void onProblemsChanged(const QString &uri, const QList<LspClient::Diagnostic> &diags);
+    void onProblemsChanged(const QString &uri, const QJsonArray &diags);
 
 private:
     struct ProblemItem {
         QString fileUri;
         int line;
         int column;
-        LspClient::Diagnostic::Severity severity;
+        int severity; // 1=Error, 2=Warning, 3=Info, 4=Hint
         QString message;
         QString source;
     };
@@ -54,9 +54,9 @@ private:
     void rebuildTree();
     void addProblemItem(const ProblemItem &item);
     QTreeWidgetItem *createTreeItem(const ProblemItem &item) const;
-    QString severityIcon(LspClient::Diagnostic::Severity severity) const;
-    QString severityText(LspClient::Diagnostic::Severity severity) const;
-    QColor severityColor(LspClient::Diagnostic::Severity severity) const;
+    QString severityIcon(int severity) const;
+    QString severityText(int severity) const;
+    QColor severityColor(int severity) const;
 
     QTreeWidget *m_treeWidget;
     QTabBar *m_filterTabs;
@@ -64,7 +64,7 @@ private:
     QLabel *m_countLabel;
     QVBoxLayout *m_mainLayout;
 
-    QMap<QString, QList<LspClient::Diagnostic>> m_allProblems;
+    QMap<QString, QJsonArray> m_allProblems;
     QList<ProblemItem> m_filteredProblems;
     Filter m_currentFilter;
     QString m_currentFile;

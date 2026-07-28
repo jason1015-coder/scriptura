@@ -840,16 +840,22 @@ pub extern "C" fn rust_service_locator_free_list(strs: *mut *mut c_char, len: us
 make_new!(rust_dep_resolver_new, DependencyResolver, RustDependencyResolver);
 make_free!(rust_dep_resolver_free, DependencyResolver, RustDependencyResolver);
 
+/// Add a plugin with its metadata JSON to the resolver.
+/// Returns true on success, false on parse failure (check rust_last_error()).
 #[no_mangle]
-pub extern "C" fn rust_dep_resolver_resolve(
-    r: *mut RustDependencyResolver, json_metadata: *const c_char
+pub extern "C" fn rust_dep_resolver_add_plugin(
+    r: *mut RustDependencyResolver,
+    id: *const c_char,
+    metadata_json: *const c_char,
 ) -> bool {
     let r = unsafe { &mut *(r as *mut DependencyResolver) };
-    // For the FFI, we accept one plugin at a time
-    let fake_id = "plugin";
-    r.add_plugin(fake_id, unsafe { ptr_to_str(json_metadata) }).is_ok()
+    r.add_plugin(unsafe { ptr_to_str(id) }, unsafe { ptr_to_str(metadata_json) }).is_ok()
 }
 
+/// Resolve all added plugins and return the topological sort order.
+/// Returns an allocated array of C strings (caller must free via
+/// rust_dep_resolver_free_order). Sets out_len to the number of items.
+/// Returns null on error (e.g. circular dependency).
 #[no_mangle]
 pub extern "C" fn rust_dep_resolver_order(
     r: *mut RustDependencyResolver, out_len: *mut usize
@@ -870,6 +876,15 @@ pub extern "C" fn rust_dep_resolver_order(
 #[no_mangle]
 pub extern "C" fn rust_dep_resolver_free_order(strs: *mut *mut c_char, len: usize) {
     rust_pm_free_strings(strs, len);
+}
+
+/// Clear all registered plugins from the resolver.
+#[no_mangle]
+pub extern "C" fn rust_dep_resolver_clear(r: *mut RustDependencyResolver) {
+    unsafe {
+        let r = &mut *(r as *mut DependencyResolver);
+        *r = DependencyResolver::new();
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -1312,4 +1327,217 @@ pub extern "C" fn rust_ls_manager_stop(m: *mut RustLanguageServerManager, lang_i
 #[no_mangle]
 pub extern "C" fn rust_ls_manager_stop_all(m: *mut RustLanguageServerManager) {
     unsafe { (&*(m as *mut LanguageServerManager)).stop_all(); }
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  Diff Engine
+// ═══════════════════════════════════════════════════════════════════════
+
+/// Compute diff between two texts and return JSON array of hunks
+#[no_mangle]
+pub extern "C" fn rust_diff_compute(left: *const c_char, right: *const c_char) -> *mut c_char {
+    let l = unsafe { ptr_to_str(left) };
+    let r = unsafe { ptr_to_str(right) };
+    crate::str_to_cstring(&crate::diff_engine::compute_diff_json(l, r))
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  Encoding Engine
+// ═══════════════════════════════════════════════════════════════════════
+
+/// Detect encoding of a file
+#[no_mangle]
+pub extern "C" fn rust_encoding_detect(file_path: *const c_char) -> *mut c_char {
+    let path = unsafe { ptr_to_str(file_path) };
+    crate::str_to_cstring(&crate::encoding_engine::detect_encoding(path))
+}
+
+/// Detect line ending style
+#[no_mangle]
+pub extern "C" fn rust_encoding_detect_line_ending(file_path: *const c_char) -> *mut c_char {
+    let path = unsafe { ptr_to_str(file_path) };
+    crate::str_to_cstring(&crate::encoding_engine::detect_line_ending(path))
+}
+
+/// Check if file has BOM
+#[no_mangle]
+pub extern "C" fn rust_encoding_has_bom(file_path: *const c_char) -> bool {
+    let path = unsafe { ptr_to_str(file_path) };
+    crate::encoding_engine::has_bom(path)
+}
+
+/// Convert line endings
+#[no_mangle]
+pub extern "C" fn rust_encoding_convert_line_endings(
+    content: *const c_char, from_style: *const c_char, to_style: *const c_char
+) -> *mut c_char {
+    let c = unsafe { ptr_to_str(content) };
+    let from = unsafe { ptr_to_str(from_style) };
+    let to = unsafe { ptr_to_str(to_style) };
+    crate::str_to_cstring(&crate::encoding_engine::convert_line_endings(c, from, to))
+}
+
+/// Read file with specific encoding
+#[no_mangle]
+pub extern "C" fn rust_encoding_read(file_path: *const c_char, encoding: *const c_char) -> *mut c_char {
+    let path = unsafe { ptr_to_str(file_path) };
+    let enc = unsafe { ptr_to_str(encoding) };
+    match crate::encoding_engine::read_file_with_encoding(path, enc) {
+        Ok(content) => crate::str_to_cstring(&content),
+        Err(e) => crate::str_to_cstring(&e),
+    }
+}
+
+/// Write file with specific encoding
+#[no_mangle]
+pub extern "C" fn rust_encoding_write(
+    file_path: *const c_char, content: *const c_char, encoding: *const c_char
+) -> bool {
+    let path = unsafe { ptr_to_str(file_path) };
+    let c = unsafe { ptr_to_str(content) };
+    let enc = unsafe { ptr_to_str(encoding) };
+    crate::encoding_engine::write_file_with_encoding(path, c, enc).is_ok()
+}
+
+/// Get supported encodings as JSON array
+#[no_mangle]
+pub extern "C" fn rust_encoding_supported() -> *mut c_char {
+    let encodings = crate::encoding_engine::supported_encodings();
+    let mut json = String::from("[");
+    for (i, (name, display)) in encodings.iter().enumerate() {
+        if i > 0 { json.push(','); }
+        json.push_str(&format!(r#"{{"name":"{}","display":"{}"}}"#, name, display));
+    }
+    json.push(']');
+    crate::str_to_cstring(&json)
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  Blame Engine
+// ═══════════════════════════════════════════════════════════════════════
+
+/// Parse git blame porcelain output and return JSON
+#[no_mangle]
+pub extern "C" fn rust_blame_parse(output: *const c_char) -> *mut c_char {
+    let out = unsafe { ptr_to_str(output) };
+    crate::str_to_cstring(&crate::blame_engine::parse_blame_json(out))
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  Emmet Engine
+// ═══════════════════════════════════════════════════════════════════════
+
+/// Expand Emmet abbreviation to HTML/CSS
+#[no_mangle]
+pub extern "C" fn rust_emmet_expand(abbreviation: *const c_char) -> *mut c_char {
+    let abbr = unsafe { ptr_to_str(abbreviation) };
+    crate::str_to_cstring(&crate::emmet_engine::expand_emmet(abbr))
+}
+
+/// Expand Emmet and return JSON with expanded text and CSS flag
+#[no_mangle]
+pub extern "C" fn rust_emmet_expand_json(abbreviation: *const c_char) -> *mut c_char {
+    let abbr = unsafe { ptr_to_str(abbreviation) };
+    crate::str_to_cstring(&crate::emmet_engine::expand_emmet_json(abbr))
+}
+
+/// Check if text is a CSS shorthand
+#[no_mangle]
+pub extern "C" fn rust_emmet_is_css_shorthand(text: *const c_char) -> bool {
+    let t = unsafe { ptr_to_str(text) };
+    crate::emmet_engine::is_css_shorthand(t)
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  Session Engine
+// ═══════════════════════════════════════════════════════════════════════
+
+/// Check if a saved session exists
+#[no_mangle]
+pub extern "C" fn rust_session_has_saved() -> bool {
+    crate::session_engine::has_saved_session()
+}
+
+/// Clear saved session
+#[no_mangle]
+pub extern "C" fn rust_session_clear() -> bool {
+    crate::session_engine::clear_session().is_ok()
+}
+
+/// Load session JSON and return it
+#[no_mangle]
+pub extern "C" fn rust_session_load() -> *mut c_char {
+    match crate::session_engine::load_session() {
+        Ok(session) => {
+            let json = serde_json::to_string(&session).unwrap_or_default();
+            crate::str_to_cstring(&json)
+        }
+        Err(_) => std::ptr::null_mut(),
+    }
+}
+
+/// Save session from JSON string
+#[no_mangle]
+pub extern "C" fn rust_session_save(json: *const c_char) -> bool {
+    let data = unsafe { ptr_to_str(json) };
+    if let Ok(session) = serde_json::from_str::<crate::session_engine::EditorSession>(data) {
+        crate::session_engine::save_session(&session).is_ok()
+    } else {
+        false
+    }
+}
+
+/// Check if hot exit data exists
+#[no_mangle]
+pub extern "C" fn rust_session_has_hot_exit() -> bool {
+    crate::session_engine::hot_exit_dir().join("index.json").exists()
+}
+
+/// Load hot exit tabs JSON
+#[no_mangle]
+pub extern "C" fn rust_session_load_hot_exit() -> *mut c_char {
+    match crate::session_engine::load_hot_exit() {
+        Ok(tabs) => {
+            let json = serde_json::to_string(&tabs).unwrap_or_default();
+            crate::str_to_cstring(&json)
+        }
+        Err(_) => std::ptr::null_mut(),
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  Test Engine
+// ═══════════════════════════════════════════════════════════════════════
+
+/// Detect test framework from project files
+#[no_mangle]
+pub extern "C" fn rust_test_detect_framework(project_path: *const c_char) -> *mut c_char {
+    let path = unsafe { ptr_to_str(project_path) };
+    crate::str_to_cstring(&crate::test_engine::detect_framework(path))
+}
+
+/// Build test command for the given framework
+#[no_mangle]
+pub extern "C" fn rust_test_build_command(
+    framework: *const c_char,
+    project_path: *const c_char,
+    filter: *const c_char,
+) -> *mut c_char {
+    let fw = unsafe { ptr_to_str(framework) };
+    let path = unsafe { ptr_to_str(project_path) };
+    let filt = unsafe { ptr_to_str(filter) };
+    crate::str_to_cstring(&crate::test_engine::build_command(fw, path, filt))
+}
+
+/// Parse test output into JSON TestSuite
+#[no_mangle]
+pub extern "C" fn rust_test_parse_output(
+    framework: *const c_char,
+    output: *const c_char,
+) -> *mut c_char {
+    let fw = unsafe { ptr_to_str(framework) };
+    let out = unsafe { ptr_to_str(output) };
+    let suite = crate::test_engine::parse_output(fw, out);
+    let json = serde_json::to_string(&suite).unwrap_or_default();
+    crate::str_to_cstring(&json)
 }

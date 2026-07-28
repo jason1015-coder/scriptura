@@ -2,12 +2,12 @@
 #include <QJsonObject>
 #include <QJsonArray>
 #include <QSet>
-#include "dependencyresolver.h"
+#include "rust_adapter.h"
 #include "test_dependencyresolver.h"
 
 void TestDependencyResolver::testBuildGraph()
 {
-    DependencyResolver resolver;
+    RustDependencyResolverAdapter resolver;
     QJsonObject p1, p2;
     p1["id"] = "plugin-a";
     p1["dependencies"] = QJsonArray{"plugin-b"};
@@ -23,7 +23,7 @@ void TestDependencyResolver::testBuildGraph()
 
 void TestDependencyResolver::testTopologicalSortSimple()
 {
-    DependencyResolver resolver;
+    RustDependencyResolverAdapter resolver;
     QJsonObject p1, p2, p3;
     p1["id"] = "a";
     p1["dependencies"] = QJsonArray{"b"};
@@ -39,7 +39,7 @@ void TestDependencyResolver::testTopologicalSortSimple()
 
 void TestDependencyResolver::testTopologicalSortMultipleDeps()
 {
-    DependencyResolver resolver;
+    RustDependencyResolverAdapter resolver;
     QJsonObject p1, p2, p3, p4;
     p1["id"] = "app";
     p1["dependencies"] = QJsonArray{"ui", "core"};
@@ -58,7 +58,7 @@ void TestDependencyResolver::testTopologicalSortMultipleDeps()
 
 void TestDependencyResolver::testHasCircularDependency()
 {
-    DependencyResolver resolver;
+    RustDependencyResolverAdapter resolver;
     QJsonObject p1, p2;
     p1["id"] = "a";
     p1["dependencies"] = QJsonArray{"b"};
@@ -70,7 +70,7 @@ void TestDependencyResolver::testHasCircularDependency()
 
 void TestDependencyResolver::testNoCircularDependency()
 {
-    DependencyResolver resolver;
+    RustDependencyResolverAdapter resolver;
     QJsonObject p1, p2, p3;
     p1["id"] = "a";
     p1["dependencies"] = QJsonArray{"b"};
@@ -84,13 +84,13 @@ void TestDependencyResolver::testNoCircularDependency()
 
 void TestDependencyResolver::testValidateMissingRequiredDependency()
 {
-    DependencyResolver resolver;
+    RustDependencyResolverAdapter resolver;
     QJsonObject p1;
     p1["id"] = "plugin-a";
     p1["dependencies"] = QJsonArray{"missing-dep"};
 
     QSet<QString> loaded{"plugin-a"};
-    QList<DependencyResolver::DependencyError> errors = resolver.validate({p1}, loaded);
+    QList<RustDependencyResolverAdapter::DependencyError> errors = resolver.validate({p1}, loaded);
     QCOMPARE(errors.size(), 1);
     QCOMPARE(errors.first().pluginId, QString("plugin-a"));
     QCOMPARE(errors.first().missingDependency, QString("missing-dep"));
@@ -99,20 +99,20 @@ void TestDependencyResolver::testValidateMissingRequiredDependency()
 
 void TestDependencyResolver::testValidateOptionalDependencyMissing()
 {
-    DependencyResolver resolver;
+    RustDependencyResolverAdapter resolver;
     QJsonObject p1;
     p1["id"] = "plugin-a";
     p1["dependencies"] = QJsonArray{};
     p1["optionalDependencies"] = QJsonArray{"missing-opt"};
 
     QSet<QString> loaded{"plugin-a"};
-    QList<DependencyResolver::DependencyError> errors = resolver.validate({p1}, loaded);
+    QList<RustDependencyResolverAdapter::DependencyError> errors = resolver.validate({p1}, loaded);
     QCOMPARE(errors.size(), 0);
 }
 
 void TestDependencyResolver::testValidateAllDependenciesPresent()
 {
-    DependencyResolver resolver;
+    RustDependencyResolverAdapter resolver;
     QJsonObject p1, p2;
     p1["id"] = "plugin-a";
     p1["dependencies"] = QJsonArray{"plugin-b"};
@@ -120,13 +120,13 @@ void TestDependencyResolver::testValidateAllDependenciesPresent()
     p2["dependencies"] = QJsonArray{};
 
     QSet<QString> loaded{"plugin-a", "plugin-b"};
-    QList<DependencyResolver::DependencyError> errors = resolver.validate({p1, p2}, loaded);
+    QList<RustDependencyResolverAdapter::DependencyError> errors = resolver.validate({p1, p2}, loaded);
     QCOMPARE(errors.size(), 0);
 }
 
 void TestDependencyResolver::testTopologicalSortReturnsEmptyOnCircular()
 {
-    DependencyResolver resolver;
+    RustDependencyResolverAdapter resolver;
     QJsonObject p1, p2;
     p1["id"] = "a";
     p1["dependencies"] = QJsonArray{"b"};

@@ -1216,30 +1216,111 @@ void RustPluginCrashHandlerAdapter::onCrashCb(const char *pluginId, const char *
 }
 
 // ═══════════════════════════════════════════════════════════════════════
-//  RustDependencyResolverAdapter
+//  RustDependencyResolverAdapter — uses Rust FFI directly
 // ═══════════════════════════════════════════════════════════════════════
 
 RustDependencyResolverAdapter::RustDependencyResolverAdapter(QObject *parent)
     : QObject(parent)
+    , m_resolver(rust_dep_resolver_new())
 {
 }
 
-RustDependencyResolverAdapter::~RustDependencyResolverAdapter() = default;
+RustDependencyResolverAdapter::~RustDependencyResolverAdapter()
+{
+    if (m_resolver) {
+        rust_dep_resolver_free(m_resolver);
+        m_resolver = nullptr;
+    }
+}
 
-QList<DependencyResolver::DependencyError> RustDependencyResolverAdapter::validate(
+/// Helper: add all plugins to the Rust resolver, clear first.
+/// Returns false if any plugin metadata is invalid.
+static bool addAllPlugins(RustDependencyResolver *resolver, const QList<QJsonObject> &plugins)
+{
+    rust_dep_resolver_clear(resolver);
+    for (const QJsonObject &p : plugins) {
+        QByteArray id = p["id"].toString().toUtf8();
+        QByteArray meta = QJsonDocument(p).toJson(QJsonDocument::Compact);
+        if (!rust_dep_resolver_add_plugin(resolver, id.constData(), meta.constData())) {
+            return false;
+        }
+    }
+    return true;
+}
+
+QList<RustDependencyResolverAdapter::DependencyError> RustDependencyResolverAdapter::validate(
     const QList<QJsonObject> &plugins, const QSet<QString> &actuallyLoaded)
 {
-    return m_resolver.validate(plugins, actuallyLoaded);
+    QList<DependencyError> errors;
+    if (!m_resolver) return errors;
+
+    // Try to resolve all plugins together
+    if (!addAllPlugins(m_resolver, plugins)) {
+        // Metadata parse failure — report all plugins as unparseable
+        for (const QJsonObject &p : plugins) {
+            DependencyError err;
+            err.pluginId = p["id"].toString();
+            err.missingDependency = QString();
+            err.isOptional = false;
+            errors.append(err);
+        }
+        return errors;
+    }
+
+    size_t len = 0;
+    char **result = rust_dep_resolver_order(m_resolver, &len);
+
+    // If order is empty AND we have plugins, resolution failed (missing deps or cycle)
+    if ((!result || len == 0) && !plugins.isEmpty()) {
+        // Check each plugin's dependencies against actuallyLoaded
+        for (const QJsonObject &p : plugins) {
+            QString pluginId = p["id"].toString();
+            QJsonArray depArray = p["dependencies"].toArray();
+            for (const QJsonValue &val : depArray) {
+                QString depId = val.toString();
+                if (!actuallyLoaded.contains(depId)) {
+                    DependencyError err;
+                    err.pluginId = pluginId;
+                    err.missingDependency = depId;
+                    err.isOptional = false;
+                    errors.append(err);
+                }
+            }
+        }
+    }
+
+    if (result) {
+        rust_dep_resolver_free_order(result, len);
+    }
+    return errors;
 }
 
 QStringList RustDependencyResolverAdapter::topologicalSort(const QList<QJsonObject> &plugins)
 {
-    return m_resolver.topologicalSort(plugins);
+    if (!m_resolver) return {};
+
+    // Add all plugins to the resolver first
+    if (!addAllPlugins(m_resolver, plugins)) {
+        return {};
+    }
+
+    // Now resolve the order
+    size_t len = 0;
+    char **result = rust_dep_resolver_order(m_resolver, &len);
+    QStringList sorted;
+    if (result && len > 0) {
+        for (size_t i = 0; i < len; ++i) {
+            sorted.append(QString::fromUtf8(result[i]));
+        }
+        rust_dep_resolver_free_order(result, len);
+    }
+    return sorted;
 }
 
 bool RustDependencyResolverAdapter::hasCircularDependency(const QList<QJsonObject> &plugins)
 {
-    return m_resolver.hasCircularDependency(plugins);
+    // Use topologicalSort — if it returns empty, there's a cycle
+    return topologicalSort(plugins).isEmpty() && !plugins.isEmpty();
 }
 
 // ═══════════════════════════════════════════════════════════════════════

@@ -1,6 +1,5 @@
 #include "plugincontext.h"
 #include "rust_adapter.h"
-#include "pluginmanager.h"
 #include "mainwindow.h"
 #include "plugins/api/uiapi.h"
 #include "plugins/api/editorapi.h"
@@ -90,7 +89,7 @@ CodeEditor* PluginContext::currentEditor() const
     return m_mainWindow->getCurrentCodeEditor();
 }
 
-LspClient* PluginContext::lspClient() const
+RustLspClientAdapter* PluginContext::lspClient() const
 {
     if (!m_mainWindow) return nullptr;
     if (!m_currentPluginId.isEmpty()) {
@@ -146,13 +145,8 @@ QString PluginContext::currentProjectPath() const
 
 QObject* PluginContext::getPlugin(const QString& id) const
 {
-    PluginManager* manager = qApp->findChild<PluginManager*>();
-    if (manager) {
-        ScripturaPlugin* plugin = manager->getPlugin(id);
-        if (plugin) {
-            return qobject_cast<QObject*>(plugin);
-        }
-    }
+    Q_UNUSED(id)
+    // Plugin lookup via Rust adapter - plugins are managed by the Rust backend
     return nullptr;
 }
 

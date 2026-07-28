@@ -1,9 +1,11 @@
 #include "debugpanel.h"
-#include "dapclient.h"
+#include "rust_adapter.h"
 
 #include <QStandardItemModel>
 #include <QVBoxLayout>
 #include <QHBoxLayout>
+#include <QJsonObject>
+#include <QJsonArray>
 
 DebugPanel::DebugPanel(QWidget *parent)
     : QWidget(parent)
@@ -43,23 +45,27 @@ DebugPanel::DebugPanel(QWidget *parent)
     connect(m_evalEdit, &QLineEdit::returnPressed, this, &DebugPanel::onEvalReturnPressed);
 }
 
-void DebugPanel::setClient(DapClient *client)
+void DebugPanel::setClient(RustDapClientAdapter *client)
 {
     m_client = client;
 }
 
-void DebugPanel::setStack(const QList<DapClient::StackFrame> &frames)
+void DebugPanel::setStack(const QJsonArray &frames)
 {
     QStandardItemModel *model = new QStandardItemModel(this);
-    for (const DapClient::StackFrame &frame : frames) {
-        QStandardItem *item = new QStandardItem(QString("%1: %2").arg(frame.source.name).arg(frame.name));
-        item->setData(frame.id, Qt::UserRole);
+    for (const QJsonValue &v : frames) {
+        QJsonObject frame = v.toObject();
+        int id = frame["id"].toInt();
+        QString name = frame["name"].toString();
+        QString sourceName = frame["source"].toObject()["name"].toString();
+        QStandardItem *item = new QStandardItem(QString("%1: %2").arg(sourceName, name));
+        item->setData(id, Qt::UserRole);
         model->appendRow(item);
     }
     m_stackTree->setModel(model);
 }
 
-void DebugPanel::addVariables(const QList<DapClient::Variable> &variables)
+void DebugPanel::addVariables(const QJsonArray &variables)
 {
     if (!m_variablesTree->model()) {
         QStandardItemModel *model = new QStandardItemModel(this);
@@ -67,12 +73,17 @@ void DebugPanel::addVariables(const QList<DapClient::Variable> &variables)
     }
     QStandardItemModel *model = qobject_cast<QStandardItemModel*>(m_variablesTree->model());
     if (!model) return;
-    for (const DapClient::Variable &v : variables) {
-        QString label = QString("%1 = %2").arg(v.name, v.value);
-        if (!v.type.isEmpty())
-            label += QString(" (%1)").arg(v.type);
+    for (const QJsonValue &v : variables) {
+        QJsonObject var = v.toObject();
+        QString name = var["name"].toString();
+        QString value = var["value"].toString();
+        QString type = var["type"].toString();
+        int ref = var["variablesReference"].toInt();
+        QString label = QString("%1 = %2").arg(name, value);
+        if (!type.isEmpty())
+            label += QString(" (%1)").arg(type);
         QStandardItem *item = new QStandardItem(label);
-        item->setData(v.variablesReference, Qt::UserRole);
+        item->setData(ref, Qt::UserRole);
         model->appendRow(item);
     }
 }

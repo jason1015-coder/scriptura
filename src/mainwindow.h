@@ -29,24 +29,41 @@
 #include <QScrollArea>
 #include <memory>
 #include "codeeditor.h"
-#include "lspclient.h"
 #include "problempanel.h"
 #include "todopanel.h"
 #include "gitpanel.h"
 #include "terminalpanel.h"
-#include "updater.h"
-#include "configvalidator.h"
-#include "pluginmanager.h"
-#include "plugincontext.h"
+#include "debugpanel.h"
 #include "findreplace.h"
+#include "zenmode.h"
+#include "filewatcher.h"
+#include "outlinepanel.h"
+#include "snippetmanager.h"
+#include "regextester.h"
+#include "dataformatter.h"
+#include "markdownpreview.h"
+#include "globalreplacepreview.h"
+#include "sessionmanager.h"
+#include "refactoringmanager.h"
+#include "codelensmanager.h"
+#include "gitblame.h"
+#include "statusbarwidget.h"
+#include "encodingmanager.h"
+#include "diffviewer.h"
+#include "notificationcenter.h"
+#include "gitstash.h"
+#include "gitrebase.h"
+#include "shortcuteditor.h"
+#include "taskrunnerui.h"
+#include "bookmarkpanel.h"
+#include "cssbreadcrumb.h"
+#include "testrunner.h"
+#include "testpanel.h"
+#include "pluginmarketplace.h"
+#include "themarketplace.h"
+#include "snippeteditordialog.h"
 #include "projectsearch.h"
 #include "commandpalette.h"
-#include "dapclient.h"
-#include "debugpanel.h"
-#include "debugconfiguration.h"
-#include "rundialog.h"
-#include "workspace.h"
-#include "taskrunner.h"
 #include "minimap.h"
 #include "splitmanager.h"
 #include "breadcrumb.h"
@@ -55,61 +72,20 @@
 #include "httpclientpanel.h"
 #include "codeactionui.h"
 #include "sqliteviewer.h"
-#include "pluginregistry.h"
 #include "customtitlebar.h"
 #include "windowanimator.h"
 #include "thememanager.h"
 #include "themeicons.h"
 #include "rust_adapter.h"
 
-class DapClient;
 class DebugPanel;
-class Workspace;
-class TaskRunner;
-
 class FindReplaceBar;
 class ProjectSearchPanel;
 class CommandPalette;
 
-enum class ThemeColorFamily {
-    Default = 0,
-    Blue = 1,
-    Green = 2,
-    Red = 3,
-    Yellow = 4,
-    Brown = 5,
-    Cyan = 6,
-    Violet = 7
-};
-
-enum class ThemeMode {
-    Light = 0,
-    Dark = 1
-};
-
-enum class ThemeFeature {
-    None = 0x0,
-    HighContrast = 0x1
-};
-
-Q_DECLARE_FLAGS(ThemeFeatures, ThemeFeature)
-
-struct Theme {
-    ThemeColorFamily family;
-    ThemeMode mode;
-    ThemeFeatures features;
-
-    Theme(ThemeColorFamily f = ThemeColorFamily::Default, ThemeMode m = ThemeMode::Light,
-          ThemeFeatures feat = ThemeFeatures())
-        : family(f), mode(m), features(feat) {}
-
-    bool isDark() const { return mode == ThemeMode::Dark; }
-
-    bool operator==(const Theme &other) const {
-        return family == other.family && mode == other.mode && features == other.features;
-    }
-    bool operator!=(const Theme &other) const { return !(*this == other); }
-};
+#include "themedefs.h"
+#include "breadcrumbbar.h"
+#include "debugconfiguration.h"
 
 QT_BEGIN_NAMESPACE
 namespace Ui {
@@ -135,7 +111,7 @@ public:
 
     CodeEditor* getCurrentCodeEditor();
     QString currentProjectPath() const { return projectDir; }
-    LspClient* getLspClient() const { return lspClient; }
+    RustLspClientAdapter* getLspClient() const { return lspClient; }
     ProblemPanel* getProblemPanel() const { return problemPanel; }
     TerminalPanel* getTerminalPanel() const { return terminalPanel; }
     GitPanel* getGitPanel() const { return gitPanel; }
@@ -253,27 +229,28 @@ private:
     QTimer *m_hoverTimer;
     QStringList recentProjects;
     int maxRecentProjects = 10;
-     QStringList m_languageServers;
-     QString registryUrl;
-     Updater *updater;
-    ConfigValidator *configValidator;
-    LspClient *lspClient;
-    PluginManager *pluginManager;
-    PluginContext *pluginContext;
+    QStringList m_languageServers;
+    QString registryUrl;
+    RustUpdaterAdapter *updater;
+    RustConfigValidatorAdapter *configValidator;
+    RustLspClientAdapter *lspClient;
+    RustPluginManagerAdapter *pluginManager;
     PluginManagerDialog *pluginManagerDialog;
     int m_previousEditorStackIndex;
     
     // Debugger
-    DapClient *dapClient;
+    RustDapClientAdapter *dapClient;
     DebugPanel *debugPanel;
     std::unique_ptr<DebugConfigurationManager> debugConfigManager;
     bool m_isDebugging;
     int m_currentFrameId = 0;
     QMap<QString, QString> m_breakpointConditions; // key: "file:line"
     QListWidget *m_completionPopup = nullptr;
+    QMap<QString, QString> m_fileEncodings;  // filePath -> encoding name
+    QMap<QString, QString> m_fileLineEndings; // filePath -> line ending style
 
     // Workspace & Productivity
-    Workspace *m_workspace;
+    RustWorkspaceAdapter *m_workspace;
     QStringList recentFiles;
     void openRecentFile(const QString &path);
     void addRecentFile(const QString &path);
@@ -296,7 +273,35 @@ private:
     HttpClientPanel *m_httpClient;
     CodeActionController *m_codeActionCtrl;
     SqliteViewerPanel *m_sqliteViewer;
-    PluginRegistry *m_pluginRegistry;
+    RustPluginRegistryAdapter *m_pluginRegistry;
+    BreadcrumbBarWidget *m_breadcrumbBar;
+    QMetaObject::Connection m_cssBreadcrumbConnection;
+
+    // P0/P1/P2/P3 Feature Modules
+    ZenMode *m_zenMode;
+    FileWatcher *m_fileWatcher;
+    OutlinePanel *m_outlinePanel;
+    RegexTester *m_regexTester;
+    DataFormatter *m_dataFormatter;
+    MarkdownPreview *m_markdownPreview;
+    GlobalReplacePreview *m_globalReplacePreview;
+    SessionManager *m_sessionManager;
+    RefactoringManager *m_refactoringManager;
+    CodeLensManager *m_codeLensManager;
+    GitBlame *m_gitBlame;
+    StatusBarWidget *m_statusBarWidget;
+    EncodingManager *m_encodingManager;
+    DiffViewerWidget *m_diffViewer;
+    NotificationCenter *m_notificationCenter;
+    GitStashWidget *m_gitStash;
+    GitRebaseWidget *m_gitRebase;
+    TaskRunnerUI *m_taskRunnerUI;
+    BookmarkPanelWidget *m_bookmarkPanel;
+    TestPanel *m_testPanel;
+    CssBreadcrumbParser *m_cssBreadcrumbParser;
+    SnippetEditorDialog *m_snippetEditorDialog;
+    PluginMarketplaceWidget *m_pluginMarketplace;
+    ThemeMarketplaceWidget *m_themeMarketplace;
 
     void updateCursorPosition();
     void updateStatusBar();
@@ -314,7 +319,7 @@ private:
     void startLanguageServer(const QString &filePath);
     void startLanguageServerForProject(const QString &projectPath);
     void stopLanguageServer();
-    void onDiagnosticsReceived(const QString &uri, const QList<LspClient::Diagnostic> &diagnostics);
+    void onDiagnosticsReceived(const QString &uri, const QJsonArray &diagnostics);
     void onProblemActivated(const QString &fileUri, int line, int column);
     void onProblemsFilterChanged(ProblemPanel::Filter filter);
     void toggleProblemPanel();
@@ -324,6 +329,7 @@ private:
     void showBottomPanel(QWidget *panel);
     void onUpdateAvailable(const QString &version, const QString &downloadUrl);
     void onUpdateCheckFailed(const QString &error);
+    void onTestResultsReceived(const QString &output);
     // showWelcomeScreen() removed — see WelcomeMenuScreen instead
     void showEditorInterface();
     void loadProjectDirectory(const QString &dirName);
@@ -347,9 +353,9 @@ private:
     void onDapInitialized();
     void onDapStopped(const QString &reason);
     void onDapContinued();
-    void onStackTraceReceived(int threadId, const QList<DapClient::StackFrame> &frames);
-    void onScopesReceived(int frameId, const QList<DapClient::Scope> &scopes);
-    void onVariablesReceived(int variablesReference, const QList<DapClient::Variable> &variables);
+    void onStackTraceReceived(int threadId, const QJsonArray &frames);
+    void onScopesReceived(int frameId, const QJsonArray &scopes);
+    void onVariablesReceived(int varRef, const QJsonArray &variables);
     void onDapLogMessage(const QString &msg);
 
     QPalette buildBasePalette(ThemeColorFamily family, ThemeMode mode);

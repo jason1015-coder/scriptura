@@ -270,10 +270,12 @@ void   rust_service_locator_free_list(char** strs, size_t len);
 RustDependencyResolver* rust_dep_resolver_new(void);
 void                    rust_dep_resolver_free(RustDependencyResolver* r);
 
-bool   rust_dep_resolver_resolve(RustDependencyResolver* r,
-                                 const char* json_metadata);
+bool   rust_dep_resolver_add_plugin(RustDependencyResolver* r,
+                                     const char* id,
+                                     const char* metadata_json);
 char** rust_dep_resolver_order(RustDependencyResolver* r, size_t* out_len);
 void   rust_dep_resolver_free_order(char** strs, size_t len);
+void   rust_dep_resolver_clear(RustDependencyResolver* r);
 
 /* ══════════════════════════════════════════════════════════════════
  *  Task Runner
@@ -442,6 +444,51 @@ void rust_ls_manager_start(RustLanguageServerManager* m,
                            const char* root_uri);
 void rust_ls_manager_stop(RustLanguageServerManager* m, const char* lang_id);
 void rust_ls_manager_stop_all(RustLanguageServerManager* m);
+
+/* ══════════════════════════════════════════════════════════════════
+ *  Diff Engine
+ * ══════════════════════════════════════════════════════════════════ */
+char* rust_diff_compute(const char* left, const char* right);
+
+/* ══════════════════════════════════════════════════════════════════
+ *  Encoding Engine
+ * ══════════════════════════════════════════════════════════════════ */
+char* rust_encoding_detect(const char* file_path);
+char* rust_encoding_detect_line_ending(const char* file_path);
+bool  rust_encoding_has_bom(const char* file_path);
+char* rust_encoding_convert_line_endings(const char* content, const char* from_style, const char* to_style);
+char* rust_encoding_read(const char* file_path, const char* encoding);
+bool  rust_encoding_write(const char* file_path, const char* content, const char* encoding);
+char* rust_encoding_supported(void);
+
+/* ══════════════════════════════════════════════════════════════════
+ *  Blame Engine
+ * ══════════════════════════════════════════════════════════════════ */
+char* rust_blame_parse(const char* output);
+
+/* ══════════════════════════════════════════════════════════════════
+ *  Emmet Engine
+ * ══════════════════════════════════════════════════════════════════ */
+char* rust_emmet_expand(const char* abbreviation);
+char* rust_emmet_expand_json(const char* abbreviation);
+bool  rust_emmet_is_css_shorthand(const char* text);
+
+/* ══════════════════════════════════════════════════════════════════
+ *  Session Engine
+ * ══════════════════════════════════════════════════════════════════ */
+bool  rust_session_has_saved(void);
+bool  rust_session_clear(void);
+char* rust_session_load(void);
+bool  rust_session_save(const char* json);
+bool  rust_session_has_hot_exit(void);
+char* rust_session_load_hot_exit(void);
+
+/* ══════════════════════════════════════════════════════════════════
+ *  Test Engine
+ * ══════════════════════════════════════════════════════════════════ */
+char* rust_test_detect_framework(const char* project_path);
+char* rust_test_build_command(const char* framework, const char* project_path, const char* filter);
+char* rust_test_parse_output(const char* framework, const char* output);
 
 #ifdef __cplusplus
 } /* extern "C" */

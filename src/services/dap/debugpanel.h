@@ -7,17 +7,19 @@
 #include <QVBoxLayout>
 #include <QLineEdit>
 #include <QSplitter>
-#include "dapclient.h"
+#include <QJsonArray>
+
+class RustDapClientAdapter;
 
 class DebugPanel : public QWidget
 {
     Q_OBJECT
 public:
     explicit DebugPanel(QWidget *parent = nullptr);
-    void setClient(DapClient *client);
+    void setClient(RustDapClientAdapter *client);
 
-    void setStack(const QList<DapClient::StackFrame> &frames);
-    void addVariables(const QList<DapClient::Variable> &variables);
+    void setStack(const QJsonArray &frames);
+    void addVariables(const QJsonArray &variables);
     void clearVariables();
     void showEvaluation(const QString &expression, const QString &result);
     void showWatchEvaluation(const QString &expression, const QString &result);
@@ -43,7 +45,7 @@ private:
     QTabWidget *m_tabs;
     QLineEdit *m_watchEdit;
     QLineEdit *m_evalEdit;
-    DapClient *m_client;
+    RustDapClientAdapter *m_client;
 };
 
 #endif // DEBUGPANEL_H

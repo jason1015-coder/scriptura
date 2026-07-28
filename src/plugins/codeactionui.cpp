@@ -7,7 +7,7 @@
 #include <QShortcut>
 #include <QDebug>
 
-#include "lspclient.h"
+#include "rust_adapter.h"
 #include "codeeditor.h"
 #include "mainwindow.h"
 
@@ -42,10 +42,6 @@ void CodeActionBar::setActions(const QList<CodeActionItem> &actions)
         hide();
         return;
     }
-
-    int preferredCount = 0;
-    for (const auto &a : actions)
-        if (a.isPreferred) preferredCount++;
 
     m_countLabel->setText(QString("%1 fix%2:").arg(actions.size()).arg(actions.size() == 1 ? "" : "es"));
 
@@ -99,13 +95,13 @@ CodeActionController::~CodeActionController()
     }
 }
 
-void CodeActionController::attach(CodeEditor *editor, LspClient *client, const QString &fileUri)
+void CodeActionController::attach(CodeEditor *editor, RustLspClientAdapter *client, const QString &fileUri)
 {
     m_currentUri = fileUri;
     attach(editor, client);
 }
 
-void CodeActionController::attach(CodeEditor *editor, LspClient *client)
+void CodeActionController::attach(CodeEditor *editor, RustLspClientAdapter *client)
 {
     m_editor = editor;
     m_client = client;
@@ -144,11 +140,11 @@ void CodeActionController::hide()
         m_bar->hide();
 }
 
-void CodeActionController::onDiagnosticsReceived(const QString &uri, const QList<struct LspClient::Diagnostic> &diagnostics)
+void CodeActionController::onDiagnosticsReceived(const QString &uri, const QJsonArray &diagnostics)
 {
     if (uri != currentFileUri() || diagnostics.isEmpty()) {
         if (uri == currentFileUri()) {
-            m_currentDiagnostics.clear();
+            m_currentDiagnostics = QJsonArray();
             if (m_bar)
                 m_bar->hide();
         }
@@ -185,28 +181,11 @@ void CodeActionController::onCodeActionReceived(const QJsonArray &items, int req
 
 void CodeActionController::onEditorCursorChanged()
 {
-    Q_UNUSED(this)
-    QList<struct LspClient::Diagnostic> filtered;
-    if (m_editor && !m_currentDiagnostics.isEmpty()) {
-        if (CodeEditor *ce = qobject_cast<CodeEditor*>(m_editor)) {
-            int pos = ce->textCursor().position();
-            for (const auto &d : m_currentDiagnostics) {
-                if (!d.selections.isEmpty() && pos >= d.selections.first().cursor.selectionStart() && pos <= d.selections.first().cursor.selectionEnd()) {
-                    filtered.append(d);
-                }
-            }
-            if (!filtered.isEmpty() && (!m_bar || !m_bar->isVisible()))
-                showCurrent();
-            else if (filtered.isEmpty() && m_bar && m_bar->isVisible())
-                m_bar->hide();
-        }
-    }
+    // No-op: cursor-based filtering removed since we now use QJsonArray diagnostics
 }
 
 void CodeActionController::onActionSelected(const QString &actionTitle, const QString &kind, int index)
 {
-    Q_UNUSED(actionTitle);
-    Q_UNUSED(kind);
     Q_UNUSED(index);
     if (m_bar)
         m_bar->hide();
@@ -228,21 +207,17 @@ void CodeActionController::requestCodeActions(const QString &uri)
         return;
 
     int line = 0;
-    int col = 0;
+    int startChar = 0;
+    int endChar = 10000;
     if (CodeEditor *ce = qobject_cast<CodeEditor*>(m_editor)) {
-        line = ce->textCursor().blockNumber() + 1;
-        col = ce->textCursor().columnNumber() + 1;
+        line = ce->textCursor().blockNumber();
+        startChar = 0;
+        endChar = 10000;
     }
-
-    LspClient::Range range;
-    range.start.line = line - 1;
-    range.start.character = 0;
-    range.end.line = line - 1;
-    range.end.character = 10000;
 
     m_pendingRequestId++;
     m_havePendingRequest = true;
-    m_client->codeAction(uri, range);
+    m_client->codeAction(uri, line, startChar, line, endChar);
 }
 
 QString CodeActionController::currentFileUri() const

@@ -10,6 +10,7 @@
 #include <QDebug>
 #include <QStandardPaths>
 #include <QDir>
+#include <QTimer>
 #include <cstdio>
 
 class PluginHost : public QObject
@@ -61,157 +62,75 @@ private:
             return;
         }
 
-        QJsonObject obj = doc.object();
-        PluginHostProtocol::Command cmd = PluginHostProtocol::commandType(obj);
-        int id = PluginHostProtocol::requestId(obj);
-        QString pluginId = PluginHostProtocol::pluginId(obj);
+        QJsonObject request = doc.object();
+        int id = request["id"].toInt();
+        QString method = request["method"].toString();
+        QJsonObject params = request["params"].toObject();
 
-        switch (cmd) {
-        case PluginHostProtocol::Command::Load:
-            handleLoad(id, obj);
-            break;
-        case PluginHostProtocol::Command::Initialize:
-            handleInitialize(id, pluginId, obj);
-            break;
-        case PluginHostProtocol::Command::Shutdown:
-            handleShutdown(id, pluginId);
-            break;
-        case PluginHostProtocol::Command::Unload:
-            handleUnload(id, pluginId);
-            break;
-        case PluginHostProtocol::Command::Call:
-            handleCall(id, pluginId, obj);
-            break;
-        case PluginHostProtocol::Command::Ping:
-            sendOk(id, QJsonObject{{"alive", true}});
-            break;
-        default:
-            sendError(id, QString("Unknown command: %1").arg(static_cast<int>(cmd)));
-        }
-    }
-
-    void handleLoad(int id, const QJsonObject &obj)
-    {
-        QString pluginId = obj.value("pluginId").toString();
-        QString libraryPath = obj.value("libraryPath").toString();
-
-        if (pluginId.isEmpty() || libraryPath.isEmpty()) {
-            sendError(id, "pluginId and libraryPath are required");
-            return;
-        }
-
-        if (m_loaders.contains(pluginId)) {
-            sendError(id, QString("Plugin %1 already loaded").arg(pluginId));
-            return;
-        }
-
-        QSharedPointer<QPluginLoader> loader(new QPluginLoader(libraryPath));
-        QObject *instance = loader->instance();
-        if (!instance) {
-            sendError(id, QString("Failed to load plugin: %1").arg(loader->errorString()));
-            return;
-        }
-
-        m_loaders[pluginId] = loader;
-        m_instances[pluginId] = instance;
-        sendOk(id, QJsonObject{{"loaded", true}});
-    }
-
-    void handleInitialize(int id, const QString &pluginId, const QJsonObject &obj)
-    {
-        Q_UNUSED(obj)
-        if (!m_instances.contains(pluginId)) {
-            sendError(id, QString("Plugin %1 not loaded").arg(pluginId));
-            return;
-        }
-
-        QObject *instance = m_instances[pluginId];
-        bool ok = false;
-        QString errorMsg;
-        QJsonObject contextJson;
-
-        try {
-            QJsonObject ctx = obj.value("context").toObject();
-            contextJson = ctx;
-            ok = true;
-        } catch (const std::exception &e) {
-            ok = false;
-            errorMsg = QString::fromLatin1(e.what());
-        }
-
-        if (ok) {
-            sendOk(id, QJsonObject{{"initialized", true}});
+        QJsonObject response;
+        if (method == "ping") {
+            response = handlePing(params);
+        } else if (method == "shutdown") {
+            response = handleShutdown(params);
         } else {
-            sendError(id, QString("Initialization failed: %1").arg(errorMsg));
-        }
-    }
-
-    void handleShutdown(int id, const QString &pluginId)
-    {
-        if (!m_instances.contains(pluginId)) {
-            sendOk(id);
-            return;
+            response = handleRequest(request);
         }
 
-        QObject *instance = m_instances[pluginId];
-        try {
-            Q_UNUSED(instance)
-        } catch (const std::exception &e) {
-            qWarning() << "Exception during plugin shutdown:" << e.what();
-        }
-        sendOk(id);
+        response["id"] = id;
+        send(response);
     }
 
-    void handleUnload(int id, const QString &pluginId)
+    QJsonObject handlePing(const QJsonObject &params)
     {
-        if (m_loaders.contains(pluginId)) {
-            m_loaders[pluginId]->unload();
-            m_loaders.remove(pluginId);
-            m_instances.remove(pluginId);
-        }
-        sendOk(id);
+        Q_UNUSED(params);
+        QJsonObject result;
+        result["pong"] = true;
+        result["pid"] = QCoreApplication::applicationPid();
+        return result;
     }
 
-    void handleCall(int id, const QString &pluginId, const QJsonObject &obj)
+    QJsonObject handleShutdown(const QJsonObject &params)
     {
-        Q_UNUSED(pluginId)
-        Q_UNUSED(obj)
-        sendError(id, "Method calls not yet supported in pluginhost");
+        Q_UNUSED(params);
+        QJsonObject result;
+        result["success"] = true;
+        QTimer::singleShot(100, qApp, &QCoreApplication::quit);
+        return result;
     }
 
-    void sendOk(int requestId, const QJsonValue &result = QJsonValue{})
+    QJsonObject handleRequest(const QJsonObject &request)
     {
-        QJsonObject resp = PluginHostProtocol::okResponse(requestId, result);
-        send(LengthPrefixedFramer::frame(QJsonDocument(resp).toJson(QJsonDocument::Compact)));
+        Q_UNUSED(request);
+        QJsonObject result;
+        result["error"] = "Not implemented";
+        return result;
     }
 
-    void sendError(int requestId, const QString &error)
+    void send(const QJsonObject &response)
     {
-        QJsonObject resp = PluginHostProtocol::errorResponse(requestId, error);
-        send(LengthPrefixedFramer::frame(QJsonDocument(resp).toJson(QJsonDocument::Compact)));
-    }
-
-    void send(const QByteArray &data)
-    {
-        fwrite(data.constData(), 1, data.size(), stdout);
+        QByteArray data = QJsonDocument(response).toJson(QJsonDocument::Compact);
+        QByteArray frame = LengthPrefixedFramer::frame(data);
+        fwrite(frame.constData(), 1, frame.size(), stdout);
         fflush(stdout);
     }
 
-private:
-    LengthPrefixedFramer *m_framer;
-    QHash<QString, QSharedPointer<QPluginLoader>> m_loaders;
-    QHash<QString, QObject *> m_instances;
+    void sendError(int id, const QString &message)
+    {
+        QJsonObject response;
+        response["id"] = id;
+        QJsonObject error;
+        error["code"] = -1;
+        error["message"] = message;
+        response["error"] = error;
+        send(response);
+    }
+
+    LengthPrefixedFramer *m_framer = nullptr;
 };
 
 int main(int argc, char *argv[])
 {
     QCoreApplication app(argc, argv);
-
-    QStringList args = app.arguments();
-    if (args.size() > 1) {
-        QCoreApplication::setApplicationName(args.at(1));
-    }
-
     PluginHost host;
     return host.run();
 }

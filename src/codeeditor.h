@@ -16,8 +16,28 @@
 #include <QSet>
 #include <QCache>
 #include "multi-cursor.h"
-#include "lspclient.h"
 #include "languageregistry.h"
+#include "gitblame.h"
+#include "codelensmanager.h"
+
+// Standalone LSP types (formerly in LspClient)
+struct LspPosition {
+    int line = 0;
+    int character = 0;
+};
+
+struct LspInlayHint {
+    LspPosition position;
+    QString label;
+    bool paddingLeft = false;
+    bool paddingRight = false;
+};
+
+class FoldManager;
+class BracketColorizer;
+class BookmarkManager;
+class SnippetManager;
+struct CodeLensItem;
 
 class CodeHighlighter : public QSyntaxHighlighter
 {
@@ -104,7 +124,7 @@ public:
     void setPluginExtraSelections(const QList<QTextEdit::ExtraSelection> &selections);
     QList<QTextEdit::ExtraSelection> pluginExtraSelections() const { return m_pluginExtraSelections; }
     void clearPluginExtraSelections();
-    void setInlayHints(const QList<LspClient::InlayHint> &hints);
+    void setInlayHints(const QList<LspInlayHint> &hints);
     void setGhostText(const QString &text);
     void clearGhostText();
     QString ghostText() const { return m_ghostText; }
@@ -113,6 +133,43 @@ public:
     QSet<int> breakpointLines() const { return m_breakpointLines; }
     void clearBreakpoints();
     void highlightCurrentLine(int line);
+
+    // Code folding
+    FoldManager* foldManager() const { return m_foldManager; }
+
+    // Bracket colorization
+    BracketColorizer* bracketColorizer() const { return m_bracketColorizer; }
+    void setBracketColorization(bool enabled);
+    bool bracketColorizationEnabled() const { return m_bracketColorEnabled; }
+
+    // Bookmarks
+    BookmarkManager* bookmarkManager() const { return m_bookmarkManager; }
+
+    // Snippets
+    SnippetManager* snippetManager() const { return m_snippetManager; }
+
+    // Code Lens
+    void setCodeLensItems(const QList<CodeLensItem> &items) { m_codeLensItems = items; update(); }
+    QList<CodeLensItem> codeLensItems() const { return m_codeLensItems; }
+
+    // File path tracking (for bookmarks, file watcher, etc.)
+    void setFilePath(const QString &path) { m_filePath = path; }
+    QString filePath() const { return m_filePath; }
+
+    // Git blame display
+    void setBlameData(const QMap<int, BlameLineInfo> &data) { m_blameData = data; lineNumberArea->update(); }
+    bool blameEnabled() const { return m_blameEnabled; }
+    void setBlameEnabled(bool enabled) { m_blameEnabled = enabled; lineNumberArea->update(); }
+
+    // Smart indentation
+    void setSmartIndent(bool enabled) { m_smartIndent = enabled; }
+    bool smartIndent() const { return m_smartIndent; }
+
+    // Ctrl+D select next occurrence
+    void selectNextOccurrence();
+    void selectAllOccurrences();
+    void addCursorAbove();
+    void addCursorBelow();
 
 protected:
     void resizeEvent(QResizeEvent *event) override;
@@ -141,6 +198,8 @@ private:
     void drawGhostText(QPaintEvent *event);
     void updateHoverTooltip(const QPoint &pos);
     void updateAllSelections();
+    void handleSmartIndent(QKeyEvent *event);
+    void handleBracketAutoClose(QKeyEvent *event);
 
     QWidget *lineNumberArea;
     CodeHighlighter *syntaxHighlighter;
@@ -151,7 +210,7 @@ private:
     QList<QTextEdit::ExtraSelection> m_pluginExtraSelections;
     QList<QPair<QTextCursor, QString>> m_diagnosticTooltips;
     QList<QTextEdit::ExtraSelection> m_extraCursors;
-    QList<LspClient::InlayHint> m_inlayHints;
+    QList<LspInlayHint> m_inlayHints;
     QPoint m_lastMousePos;
     bool m_hoveringDiagnostic = false;
     bool m_columnSelectionMode = false;
@@ -159,6 +218,18 @@ private:
     int m_currentDebugLine = -1;
     QString m_ghostText;
     bool m_acceptGhostText = false;
+
+    // New features
+    FoldManager *m_foldManager;
+    BracketColorizer *m_bracketColorizer;
+    BookmarkManager *m_bookmarkManager;
+    SnippetManager *m_snippetManager;
+    bool m_bracketColorEnabled = true;
+    bool m_smartIndent = true;
+    bool m_blameEnabled = false;
+    QMap<int, BlameLineInfo> m_blameData;
+    QString m_filePath;
+    QList<CodeLensItem> m_codeLensItems;
 };
 
 class LineNumberArea : public QWidget

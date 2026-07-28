@@ -19,15 +19,16 @@
 #include <QProcess>
 #include <QTemporaryDir>
 #include <QStandardPaths>
-#include "pluginmanager.h"
 #include "plugincontext.h"
+
+class RustPluginManagerAdapter;
 
 class PluginManagerDialog : public QDialog
 {
     Q_OBJECT
 
 public:
-    explicit PluginManagerDialog(PluginManager *manager, PluginContext *context, QWidget *parent = nullptr);
+    explicit PluginManagerDialog(RustPluginManagerAdapter *manager, PluginContext *context, QWidget *parent = nullptr);
     ~PluginManagerDialog() override;
 
     void refresh();
@@ -66,7 +67,7 @@ private:
 public:
     QString getPluginInstallDir() const;
 
-    PluginManager *m_manager;
+    RustPluginManagerAdapter *m_manager;
     PluginContext *m_context;
     QListWidget *m_pluginList;
     QTextEdit *m_detailsText;

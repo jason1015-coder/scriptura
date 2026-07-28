@@ -90,43 +90,18 @@ list(FILTER SCRIPTURA_CORE_SOURCES EXCLUDE REGEX "src/plugins/git/")
 list(FILTER SCRIPTURA_CORE_SOURCES EXCLUDE REGEX "src/pluginhost/")
 list(FILTER SCRIPTURA_CORE_SOURCES EXCLUDE REGEX "src/rust_backend/")
 
-# ── Migration to Rust Backend ──────────────────────────────────────
+# ── Rust Backend (old C++ backend files deleted) ──────────────────
 #
-# All backend services have been implemented in Rust (src/rust_backend/)
+# All backend services have been reimplemented in Rust (src/rust_backend/)
 # with complete C FFI exports (133 functions across 21+ modules).
 # Qt adapter classes are in src/rust_adapter.h/.cpp (RustBackend singleton).
 #
-# Adapters now exist for: LSP, DAP, EventBus, PluginManager, Workspace,
-# TaskRunner, Updater, ConfigValidator, PluginRegistry.
+# Adapters exist for: LSP, DAP, EventBus, PluginManager, Workspace,
+# TaskRunner, Updater, ConfigValidator, PluginRegistry, Permission,
+# ServiceLocator, CrashHandler, DependencyResolver.
 #
-# OLD C++ backend files remain compiled below because the UI layer
-# (mainwindow.cpp) still directly #includes and uses them. Once the UI
-# is fully ported to use RustBackend::instance() adapters, uncomment
-# the exclusion patterns below and remove the old .h/.cpp files.
-#
-# Exclusion patterns for when migration is complete:
-# list(FILTER SCRIPTURA_CORE_SOURCES EXCLUDE REGEX "src/internals/eventbus")
-# list(FILTER SCRIPTURA_CORE_SOURCES EXCLUDE REGEX "src/internals/dependencyresolver")
-# list(FILTER SCRIPTURA_CORE_SOURCES EXCLUDE REGEX "src/internals/permission")
-# list(FILTER SCRIPTURA_CORE_SOURCES EXCLUDE REGEX "src/internals/versionfetcher")
-# list(FILTER SCRIPTURA_CORE_SOURCES EXCLUDE REGEX "src/internals/configvalidator")
-# list(FILTER SCRIPTURA_CORE_SOURCES EXCLUDE REGEX "src/internals/lengthprefixedframer")
-# list(FILTER SCRIPTURA_CORE_SOURCES EXCLUDE REGEX "src/internals/plugincrashhandler")
-# list(FILTER SCRIPTURA_CORE_SOURCES EXCLUDE REGEX "src/internals/servicelocator")
-# list(FILTER SCRIPTURA_CORE_SOURCES EXCLUDE REGEX "src/internals/updater")
-# list(FILTER SCRIPTURA_CORE_SOURCES EXCLUDE REGEX "src/services/")
-# list(FILTER SCRIPTURA_CORE_SOURCES EXCLUDE REGEX "src/plugins/pluginregistry")
-# list(FILTER SCRIPTURA_CORE_SOURCES EXCLUDE REGEX "src/internals/workspace")
-# list(FILTER SCRIPTURA_CORE_SOURCES EXCLUDE REGEX "src/internals/taskrunner")
-#
-# KEEP in C++ (UI/framework code, not backend):
-#   src/internals/crashhandler.cpp  (OS signal handling)
-#   src/internals/pluginsettings.cpp (QSettings wrapper)
-#   src/internals/plugincontext.cpp  (MainWindow bridge)
-#   src/internals/pluginmanagerdialog.cpp (UI dialog)
-#   src/internals/rundialog.cpp      (UI dialog)
-#   src/services/dap/debugpanel.cpp  (UI panel)
-#   src/services/dap/debuggergutter.cpp  (UI drawing
+# Old C++ backend files have been deleted. Remaining exclusions are for
+# files that were never migrated or belong to the plugin host.
 
 # The plugin SDK interface headers live outside src/ (in include/ and sdk/include/)
 # and contain Q_OBJECT classes (ScripturaPlugin, PluginContext). Their MOC-generated
@@ -267,8 +242,8 @@ set_target_properties(scriptura PROPERTIES
 add_executable(scriptura_pluginhost
     src/pluginhost/pluginhost.cpp
     src/pluginhost/pluginhost.h
-    src/internals/lengthprefixedframer.cpp
-    src/internals/lengthprefixedframer.h
+    # removed: src/internals/lengthprefixedframer.cpp
+    # removed: src/internals/lengthprefixedframer.h
 )
 set_target_properties(scriptura_pluginhost PROPERTIES
     FOLDER "Internal"
@@ -276,6 +251,7 @@ set_target_properties(scriptura_pluginhost PROPERTIES
 )
 target_link_libraries(scriptura_pluginhost PRIVATE
     scriptura_core
+    "${RUST_LIB_REL_PATH}"
     Qt${QT_VERSION_MAJOR}::Core
     Qt${QT_VERSION_MAJOR}::Widgets
 )
