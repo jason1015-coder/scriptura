@@ -212,8 +212,6 @@ private:
     FindReplaceBar *findReplaceBar;
     ProjectSearchPanel *projectSearchPanel;
     CommandPalette *commandPalette;
-    // Welcome menu screen is now a standalone window (WelcomeMenuScreen)
-    // shown before the main window, so the in-editor welcome widget is removed.
     QStackedWidget *editorStack;
     ProblemPanel *problemPanel;
     TodoPanel    *todoPanel;
@@ -314,7 +312,6 @@ private:
     QPushButton* createSettingsTabCloseButton(int tabIndex);
     QString findTerminal();
     QPlainTextEdit* getCurrentEditor();
-    // createWelcomeWidget() removed — welcome menu is now a standalone pre-launch screen
     QWidget* createUnifiedSettingsWidget();
     void startLanguageServer(const QString &filePath);
     void startLanguageServerForProject(const QString &projectPath);

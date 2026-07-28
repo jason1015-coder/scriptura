@@ -93,7 +93,9 @@ void MainWindow::loadProjectDirectory(const QString &dirName)
 
     // Update git panel project path (enables staging/diff/branches)
     gitPanel->setProjectPath(projectDir);
+
 }
+
 
 void MainWindow::on_action_save_triggered()
 {

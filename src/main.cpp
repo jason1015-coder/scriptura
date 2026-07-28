@@ -1,6 +1,9 @@
 #include "mainwindow.h"
 #include "crashhandler.h"
 #include "splashscreen.h"
+#include <QFileDialog>
+#include <QSettings>
+#include "welcomemenuscreen.h"
 
 #include <QApplication>
 #include <QLocale>
@@ -727,34 +730,92 @@ QDialogButtonBox > QPushButton {
 #endif
         });
     } else {
-        // Show splash, then open the main window directly (menu screen removed)
+        // Show splash briefly, then present the WelcomeMenuScreen
         SplashScreen *splash = new SplashScreen;
         splash->setThemeBackground(themeWindowColor);
-        splash->showWithDelay(2000);
+        splash->showWithDelay(1000);
 
-        QTimer::singleShot(2000, [splash]() {
-            qDebug() << "[DIAG] splash timer fired; creating MainWindow...";
-
-            MainWindow *mainWindow = new MainWindow();
-            mainWindow->show();
-
-            QScreen *screen = QApplication::primaryScreen();
-            if (screen) {
-                QRect available = screen->availableGeometry();
-                mainWindow->resize(qMin(available.width() * 7 / 10, 900),
-                                   qMin(available.height() * 7 / 10, 800));
-                int x = (available.width() - mainWindow->width()) / 2;
-                int y = (available.height() - mainWindow->height()) / 2;
-                mainWindow->move(x, y);
-            }
+        QTimer::singleShot(1000, [splash, themeWindowColor]() {
+            qDebug() << "[DIAG] splash timer fired; showing WelcomeMenuScreen...";
 
             splash->close();
             splash->deleteLater();
 
+            WelcomeMenuScreen *welcome = new WelcomeMenuScreen();
+            welcome->setThemeBackground(themeWindowColor);
+
+            // Center the welcome screen on the primary screen
+            QScreen *screen = QApplication::primaryScreen();
+            if (screen) {
+                QRect available = screen->availableGeometry();
+                int x = (available.width() - welcome->width()) / 2;
+                int y = (available.height() - welcome->height()) / 2;
+                welcome->move(x, y);
+            }
+
+            // When user requests to open a project, launch MainWindow
+            QObject::connect(welcome, &WelcomeMenuScreen::openProjectRequested, welcome, [welcome]() {
+                QString dirName = QFileDialog::getExistingDirectory(
+                    nullptr, WelcomeMenuScreen::tr("Open Project"), QString(),
+                    QFileDialog::DontUseNativeDialog);
+                if (dirName.isEmpty())
+                    return;
+                // Save recent project
+                QSettings settings;
+                QStringList recent = settings.value("recentProjects").toStringList();
+                if (!recent.contains(dirName)) {
+                    recent.prepend(dirName);
+                    while (recent.size() > 10)
+                        recent.removeLast();
+                    settings.setValue("recentProjects", recent);
+                }
+                welcome->close();
+                welcome->deleteLater();
+                MainWindow *mainWindow = new MainWindow(dirName);
+                mainWindow->show();
+                QScreen *screen = QApplication::primaryScreen();
+                if (screen) {
+                    QRect available = screen->availableGeometry();
+                    mainWindow->resize(qMin(available.width() * 7 / 10, 900),
+                                       qMin(available.height() * 7 / 10, 800));
+                    int x = (available.width() - mainWindow->width()) / 2;
+                    int y = (available.height() - mainWindow->height()) / 2;
+                    mainWindow->move(x, y);
+                }
 #ifdef Q_OS_WIN
-            HWND hwnd = reinterpret_cast<HWND>(mainWindow->winId());
-            mainWindow->enableMicaEffect(hwnd, mainWindow->isDarkModeEnabled());
+                HWND hwnd = reinterpret_cast<HWND>(mainWindow->winId());
+                mainWindow->enableMicaEffect(hwnd, mainWindow->isDarkModeEnabled());
 #endif
+            });
+
+            // When user selects a recent project, launch MainWindow directly
+            QObject::connect(welcome, &WelcomeMenuScreen::recentProjectSelected, welcome, [welcome](const QString &path) {
+                welcome->close();
+                welcome->deleteLater();
+                MainWindow *mainWindow = new MainWindow(path);
+                mainWindow->show();
+                QScreen *screen = QApplication::primaryScreen();
+                if (screen) {
+                    QRect available = screen->availableGeometry();
+                    mainWindow->resize(qMin(available.width() * 7 / 10, 900),
+                                       qMin(available.height() * 7 / 10, 800));
+                    int x = (available.width() - mainWindow->width()) / 2;
+                    int y = (available.height() - mainWindow->height()) / 2;
+                    mainWindow->move(x, y);
+                }
+#ifdef Q_OS_WIN
+                HWND hwnd = reinterpret_cast<HWND>(mainWindow->winId());
+                mainWindow->enableMicaEffect(hwnd, mainWindow->isDarkModeEnabled());
+#endif
+            });
+
+            // No explicit quit handler needed — QApplication quits automatically
+            // when the last visible window is closed (default WA_QuitOnClose behavior).
+            // If the user closes the WelcomeMenuScreen without selecting a project,
+            // it's the only window, so the app exits. If a MainWindow was created,
+            // the WelcomeMenuScreen closes but the MainWindow keeps the app alive.
+
+            welcome->show();
         });
     }
 

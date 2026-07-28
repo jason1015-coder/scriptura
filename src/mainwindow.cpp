@@ -374,8 +374,6 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
     tabBar = ui->tabBar;
     bottomPanelTabs = ui->bottomPanelTabs;
 
-    // In-editor welcome widget removed — replaced by standalone WelcomeMenuScreen
-    // shown between splash and main window startup.
     editorStack->addWidget(ui->tabWidget);
     editorStack->addWidget(todoPanel);
     editorStack->addWidget(terminalPanel);
@@ -386,6 +384,9 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
     // Create unified scrollable settings page (tab added when user opens settings)
     unifiedSettingsWidget = createUnifiedSettingsWidget();
     editorStack->addWidget(unifiedSettingsWidget);
+
+    // Welcome page is now a standalone pre-launch window (WelcomeMenuScreen)
+    // shown in main.cpp before MainWindow is created.
 
     bottomPanelStack->addWidget(problemPanel);
     bottomPanelStack->addWidget(gitPanel);
@@ -870,9 +871,7 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
         qDebug() << "Replace all complete:" << count;
     });
 
-    // The native menu bar is empty and hidden — all actions are accessed via
-    // keyboard shortcuts, command palette (Ctrl+Shift+P), and right-click context menus.
-    ui->menubar->hide();
+    ui->menubar->show();
 
     connect(projectSearchPanel, &ProjectSearchPanel::resultActivated, this, [this](const QString &filePath, int line, int column) {
         QModelIndex index = fileModel->index(filePath);
@@ -1465,6 +1464,6 @@ QPushButton* MainWindow::createTabCloseButton(const QString &filePath)
     return closeBtn;
 }
 
-// createWelcomeWidget() removed — replaced by standalone WelcomeMenuScreen
-// shown between splash and main window startup.
+// In-editor welcome widget removed — replaced by standalone WelcomeMenuScreen
+// shown before MainWindow startup in main.cpp.
 
