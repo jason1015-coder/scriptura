@@ -11,6 +11,10 @@
 //! Callbacks use C function pointers to notify the C++ side of async events.
 //! The C++ adapter layer translates these callbacks into Qt signals.
 
+// Many types and functions in this crate are consumed by the C++ side
+// via FFI and appear "unused" to Rust's dead code analysis.
+#![allow(dead_code)]
+
 mod archive_extractor;
 mod config_validator;
 mod dap;

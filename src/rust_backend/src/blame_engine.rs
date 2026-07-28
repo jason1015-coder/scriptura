@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 
 /// Blame info for a single line
 #[derive(Clone, Debug)]

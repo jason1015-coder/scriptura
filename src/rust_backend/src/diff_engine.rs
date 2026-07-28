@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 
 /// Represents a single diff line with its type
 #[derive(Clone, Debug)]

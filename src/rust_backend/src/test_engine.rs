@@ -53,7 +53,7 @@ pub fn detect_framework(project_path: &str) -> String {
     "unknown".to_string()
 }
 
-pub fn build_command(framework: &str, project_path: &str, filter: &str) -> String {
+pub fn build_command(framework: &str, _project_path: &str, filter: &str) -> String {
     match framework {
         "cargo_test" => {
             if filter.is_empty() {

@@ -1,6 +1,5 @@
 /// Encoding detection and conversion engine for files
 use std::fs;
-use std::path::Path;
 
 /// Detect BOM (Byte Order Mark) and return encoding name
 pub fn detect_bom(data: &[u8]) -> Option<&'static str> {
