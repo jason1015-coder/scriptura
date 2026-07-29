@@ -315,12 +315,12 @@ if(WIN32)
     set(CPACK_NSIS_MUI_ICON "${CMAKE_CURRENT_SOURCE_DIR}/deployment/windows/icon.ico")
     set(CPACK_NSIS_MUI_UNIICON "${CMAKE_CURRENT_SOURCE_DIR}/deployment/windows/icon.ico")
     set(CPACK_NSIS_CREATE_ICONS_EXTRA "
-        CreateShortCut \\\"$SMPROGRAMS\\$STARTMENU_FOLDER\\${CPACK_PACKAGE_NAME}.lnk\\\" \\\"$INSTDIR\\scriptura.exe\\\"
-        CreateShortCut \\\"$SMPROGRAMS\\$STARTMENU_FOLDER\\Uninstall.lnk\\\" \\\"$INSTDIR\\Uninstall.exe\\\"
+        CreateShortCut \"\$SMPROGRAMS\\\$STARTMENU_FOLDER\\${CPACK_PACKAGE_NAME}.lnk\" \"\$INSTDIR\\scriptura.exe\"
+        CreateShortCut \"\$SMPROGRAMS\\\$STARTMENU_FOLDER\\Uninstall.lnk\" \"\$INSTDIR\\Uninstall.exe\"
     ")
     set(CPACK_NSIS_DELETE_ICONS_EXTRA "
-        Delete \\\"$SMPROGRAMS\\$STARTMENU_FOLDER\\${CPACK_PACKAGE_NAME}.lnk\\\"
-        Delete \\\"$SMPROGRAMS\\$STARTMENU_FOLDER\\Uninstall.lnk\\\"
+        Delete \"\$SMPROGRAMS\\\$STARTMENU_FOLDER\\${CPACK_PACKAGE_NAME}.lnk\"
+        Delete \"\$SMPROGRAMS\\\$STARTMENU_FOLDER\\Uninstall.lnk\"
     ")
     set(CPACK_NSIS_ENABLE_AUTO_DIRECTORY true)
     set(CPACK_NSIS_MODIFY_PATH "ON")

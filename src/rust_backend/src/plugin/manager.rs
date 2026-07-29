@@ -47,6 +47,12 @@ pub struct PluginManager {
     on_error_data: *mut c_void,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PluginType {
+    Plugin,
+    Application,
+}
+
 #[derive(Debug, Clone)]
 pub struct PluginInfo {
     #[allow(dead_code)]
@@ -60,6 +66,7 @@ pub struct PluginInfo {
     #[allow(dead_code)]
     pub dependencies: Vec<String>,
     pub version: String,
+    pub plugin_type: PluginType,
 }
 
 #[allow(dead_code)]
@@ -107,6 +114,10 @@ impl PluginManager {
                     if let Ok(metadata_str) = std::fs::read_to_string(&json_path) {
                         if let Ok(metadata) = serde_json::from_str::<Value>(&metadata_str) {
                             if let Some(id) = metadata.get("id").and_then(|v| v.as_str()) {
+                                let plugin_type = match metadata.get("type").and_then(|v| v.as_str()) {
+                                    Some("application") => PluginType::Application,
+                                    _ => PluginType::Plugin,
+                                };
                                 self.plugins.insert(id.to_string(), PluginInfo {
                                     id: id.to_string(),
                                     file_path: file_path.to_string_lossy().to_string(),
@@ -127,6 +138,7 @@ impl PluginManager {
                                         .and_then(|v| v.as_str())
                                         .unwrap_or("0.0.0")
                                         .to_string(),
+                                    plugin_type,
                                 });
 
                                 loaded += 1;
@@ -173,6 +185,11 @@ impl PluginManager {
             .map(|p| p.to_string_lossy().to_string())
             .unwrap_or_default();
 
+        let plugin_type = match metadata.get("type").and_then(|v| v.as_str()) {
+            Some("application") => PluginType::Application,
+            _ => PluginType::Plugin,
+        };
+
         self.plugins.insert(id.to_string(), PluginInfo {
             id: id.to_string(),
             file_path: plugin_dir,
@@ -189,6 +206,7 @@ impl PluginManager {
                 .and_then(|v| v.as_str())
                 .unwrap_or("0.0.0")
                 .to_string(),
+            plugin_type,
         });
 
         if let Some(cb) = self.on_loaded {
@@ -232,6 +250,18 @@ impl PluginManager {
             .filter(|(_, p)| p.state == PluginState::Loaded)
             .map(|(id, _)| id.clone())
             .collect()
+    }
+
+    pub fn list_loaded_by_type(&self, ptype: PluginType) -> Vec<String> {
+        self.plugins
+            .iter()
+            .filter(|(_, p)| p.state == PluginState::Loaded && p.plugin_type == ptype)
+            .map(|(id, _)| id.clone())
+            .collect()
+    }
+
+    pub fn plugin_type(&self, id: &str) -> Option<PluginType> {
+        self.plugins.get(id).map(|p| p.plugin_type)
     }
 
     pub fn build_dependency_graph(&mut self, metadata_jsons: &[&str]) -> Result<(), String> {

@@ -82,6 +82,8 @@ class DebugPanel;
 class FindReplaceBar;
 class ProjectSearchPanel;
 class CommandPalette;
+class ApplicationDock;
+class ApplicationManager;
 
 #include "themedefs.h"
 #include "breadcrumbbar.h"
@@ -125,6 +127,7 @@ protected:
     void closeEvent(QCloseEvent *event) override;
     bool eventFilter(QObject *watched, QEvent *event) override;
     void showEvent(QShowEvent *event) override;
+    void resizeEvent(QResizeEvent *event) override;
 
 #ifdef Q_OS_WIN
     bool nativeEvent(const QByteArray &eventType, void *message, qintptr *result) override;
@@ -274,6 +277,14 @@ private:
     RustPluginRegistryAdapter *m_pluginRegistry;
     BreadcrumbBarWidget *m_breadcrumbBar;
     QMetaObject::Connection m_cssBreadcrumbConnection;
+
+    // Application Dock (floating bottom bar for applications)
+    ApplicationDock *m_appDock = nullptr;
+    ApplicationManager *m_appManager = nullptr;
+
+    void setupApplicationDock();
+    void showApplicationTab(const QString &appId);
+    void repositionDock();
 
     // P0/P1/P2/P3 Feature Modules
     ZenMode *m_zenMode;

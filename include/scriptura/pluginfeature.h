@@ -6,65 +6,69 @@
 
 /**
  * @file pluginfeature.h
- * @brief 定義插件功能特徵枚舉，用於描述插件提供的功能類型
- * 
- * 這個枚舉定義了 Scriptura 插件系統中所有可能的功能特徵，
- * 插件可以通過 hasFeature() 方法聲明它支持哪些功能。
+ * @brief Defines plugin feature types for the two-tier plugin system
+ *
+ * Scriptura now has two distinct extension types:
+ *
+ * 1. **Plugins** (ScripturaPlugin) — Full plugins that interact with the core UI,
+ *    modify menus, toolbars, editors, themes, etc. These implement the full
+ *    ScripturaPlugin interface and have access to the complete PluginUIApi.
+ *
+ * 2. **Applications** (ScripturaApplication) — Self-contained UI panels that get
+ *    an icon in the floating dock and a bottom-panel tab. They are simpler,
+ *    only need an SVG icon, a name, and a content widget.
+ *
+ * The 'Application' feature type below is used for the new Application system.
  */
 
-/**
- * @enum PluginFeature
- * @brief 插件功能特徵類型
- * 
- * 每個值代表插件可能提供的特定功能類別，
- * 用於插件發現、功能查詢和依賴解析。
- */
 enum class PluginFeature {
-    // 編輯器功能
-    EditorExtension,        ///< 編輯器擴展
-    SyntaxHighlighting,     ///< 語法高亮
-    CodeCompletion,         ///< 程式碼補全
+    // ── Application Feature ──────────────────────────────────────
+    Application,            ///< Self-contained app with dock icon + tab (ScripturaApplication)
 
-    // UI 控制功能
-    MenuAction,             ///< 選單動作
-    ToolbarButton,          ///< 工具列按鈕
-    StatusBarWidget,        ///< 狀態列元件
-    SidePanel,              ///< 側邊面板
-    BottomPanel,            ///< 底部面板
-    SidebarButton,          ///< 側邊欄按鈕
+    // ── Editor Features ──────────────────────────────────────────
+    EditorExtension,        ///< Editor extension
+    SyntaxHighlighting,     ///< Syntax highlighting
+    CodeCompletion,         ///< Code completion
 
-    // 工具功能
-    ToolPanel,              ///< 工具面板
+    // ── UI Control Features ──────────────────────────────────────
+    MenuAction,             ///< Menu action
+    ToolbarButton,          ///< Toolbar button
+    StatusBarWidget,        ///< Status bar widget
+    SidePanel,              ///< Side panel
+    BottomPanel,            ///< Bottom panel
+    SidebarButton,          ///< Sidebar button
 
-    // 專案功能
-    ProjectWizard,          ///< 專案精靈
-    BuildSystem,            ///< 構建系統
-    FileExplorer,           ///< 檔案瀏覽
+    // ── Tool Features ────────────────────────────────────────────
+    ToolPanel,              ///< Tool panel
 
-    // 編輯器擴展功能
-    EditorDecoration,       ///< 編輯器裝飾
-    EditorAnnotation,       ///< 編輯器註釋
-    InlineCompletion,       ///< 行內補全
+    // ── Project Features ─────────────────────────────────────────
+    ProjectWizard,          ///< Project wizard
+    BuildSystem,            ///< Build system
+    FileExplorer,           ///< File explorer
 
-    // 通知功能
-    Notification,           ///< 通知顯示
-    ProgressIndicator,      ///< 進度指示器
+    // ── Editor Extension Features ────────────────────────────────
+    EditorDecoration,       ///< Editor decoration
+    EditorAnnotation,       ///< Editor annotation
+    InlineCompletion,       ///< Inline completion
 
-    // 分析功能
-    LSPProvider,            ///< LSP 提供者
-    DiagnosticsProvider,    ///< 診斷提供者
-    Formatter,              ///< 格式化工具
+    // ── Notification Features ────────────────────────────────────
+    Notification,           ///< Notification display
+    ProgressIndicator,      ///< Progress indicator
 
-    // 整合功能
-    VCSIntegration,         ///< 版本控制
-    TerminalEmulator,       ///< 終端機
-    ExternalTool,           ///< 外部工具
+    // ── Analysis Features ────────────────────────────────────────
+    LSPProvider,            ///< LSP provider
+    DiagnosticsProvider,    ///< Diagnostics provider
+    Formatter,              ///< Formatter tool
 
-    // 主題功能
-    ThemeProvider           ///< 主題提供者 (可自訂顏色主題)
+    // ── Integration Features ─────────────────────────────────────
+    VCSIntegration,         ///< Version control
+    TerminalEmulator,       ///< Terminal emulator
+    ExternalTool,           ///< External tool
+
+    // ── Theme Features ───────────────────────────────────────────
+    ThemeProvider           ///< Theme provider (custom color themes)
 };
 
-// 註冊為 QMetaType 以支援 QVariant 封裝
 Q_DECLARE_METATYPE(PluginFeature)
 
 #endif // PLUGINFEATURE_H
