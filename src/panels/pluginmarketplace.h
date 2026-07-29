@@ -10,6 +10,8 @@
 #include <QHBoxLayout>
 #include <QJsonObject>
 #include <QJsonArray>
+#include <QNetworkAccessManager>
+#include <QUrl>
 
 class RustPluginRegistryAdapter;
 
@@ -45,6 +47,8 @@ private:
     void setupUI();
     void populateTree(const QJsonArray &plugins);
     void updateButtonStates();
+    QUrl resolveDownloadUrl(const QString &downloadUrl) const;
+    bool copyDirectory(const QString &srcPath, const QString &dstPath);
 
     QLineEdit *m_searchEdit;
     QTreeWidget *m_pluginTree;
@@ -55,6 +59,7 @@ private:
     QPushButton *m_refreshBtn;
     RustPluginRegistryAdapter *m_registry;
     QJsonArray m_allPlugins;
+    QNetworkAccessManager *m_network;
 };
 
 #endif // PLUGINMARKETPLACE_H

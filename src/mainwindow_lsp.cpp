@@ -261,22 +261,14 @@ void MainWindow::on_action_git_commit_triggered()
             gitPanel->setOutput(output + error);
         } else {
             gitPanel->setOutput(tr("Failed to run git commit. The operation may have timed out."));
+        }    if (editorStack->currentWidget() == terminalPanel || editorStack->currentWidget() == todoPanel) {
+        if (m_previousEditorStackIndex >= 0 && m_previousEditorStackIndex < editorStack->count()) {
+            editorStack->setCurrentIndex(m_previousEditorStackIndex);
         }
-        if (terminalButton->isChecked()) {
-            QSignalBlocker blocker(terminalButton);
-            terminalButton->setChecked(false);
-            if (m_previousEditorStackIndex >= 0 && m_previousEditorStackIndex < editorStack->count()) {
-                editorStack->setCurrentIndex(m_previousEditorStackIndex);
-            }
-        }
-        if (placeholderButton->isChecked()) {
-            QSignalBlocker blocker(placeholderButton);
-            placeholderButton->setChecked(false);
-        }
-        if (problemPanel->isVisible()) {
-            problemPanel->hide();
-            problemsButton->setChecked(false);
-        }
+    }
+    if (problemPanel->isVisible()) {
+        problemPanel->hide();
+    }
         showGitPanel();
     }
 }
@@ -298,45 +290,15 @@ void MainWindow::on_action_git_push_triggered()
     } else {
         gitPanel->setOutput(tr("Failed to run git push. The operation may have timed out."));
     }
-    if (terminalButton->isChecked()) {
-        QSignalBlocker blocker(terminalButton);
-        terminalButton->setChecked(false);
+    if (editorStack->currentWidget() == terminalPanel || editorStack->currentWidget() == todoPanel) {
         if (m_previousEditorStackIndex >= 0 && m_previousEditorStackIndex < editorStack->count()) {
             editorStack->setCurrentIndex(m_previousEditorStackIndex);
         }
-    }
-    if (placeholderButton->isChecked()) {
-        QSignalBlocker blocker(placeholderButton);
-        placeholderButton->setChecked(false);
     }
     if (problemPanel->isVisible()) {
         problemPanel->hide();
-        problemsButton->setChecked(false);
     }
     showGitPanel();
-}
-
-void MainWindow::on_placeholderButton_clicked(bool checked)
-{
-    if (checked) {
-        m_previousEditorStackIndex = editorStack->currentIndex();
-        if (editorStack->currentWidget() == terminalPanel) {
-            QSignalBlocker blocker(terminalButton);
-            terminalButton->setChecked(false);
-        }
-        if (problemPanel->isVisible()) {
-            problemPanel->hide();
-            problemsButton->setChecked(false);
-        }
-        if (gitPanel->isVisible()) {
-            gitPanel->hide();
-        }
-        editorStack->setCurrentWidget(todoPanel);
-    } else {
-        if (m_previousEditorStackIndex >= 0 && m_previousEditorStackIndex < editorStack->count()) {
-            editorStack->setCurrentIndex(m_previousEditorStackIndex);
-        }
-    }
 }
 
 void MainWindow::onEditorTextChanged()
@@ -356,9 +318,8 @@ void MainWindow::onEditorTextChanged()
         m_codeLensManager->requestCodeLens(editor, lspClient, uri);
     }
 
-    if (placeholderButton->isChecked()) {
-        todoPanel->parseDocument(editor->toPlainText(), currentFile);
-    }
+    // Always parse todos when text changes — the dock controls visibility
+    todoPanel->parseDocument(editor->toPlainText(), currentFile);
 }
 
 void MainWindow::requestHover()

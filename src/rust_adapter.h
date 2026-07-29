@@ -486,6 +486,24 @@ private:
 };
 
 // ─────────────────────────────────────────────────────────────────────
+//  RustArchiveExtractorAdapter — wraps Rust FFI ArchiveExtractor
+// ─────────────────────────────────────────────────────────────────────
+class RustArchiveExtractorAdapter : public QObject
+{
+    Q_OBJECT
+public:
+    explicit RustArchiveExtractorAdapter(QObject *parent = nullptr);
+    ~RustArchiveExtractorAdapter() override;
+
+    /// Extract a ZIP archive from a byte buffer to a destination directory.
+    /// Returns true on success.
+    bool extract(const QByteArray &archiveData, const QString &destDir);
+
+private:
+    RustArchiveExtractor *m_extractor = nullptr;
+};
+
+// ─────────────────────────────────────────────────────────────────────
 //  RustBackend — singleton root that owns all Rust backend instances
 // ─────────────────────────────────────────────────────────────────────
 class RustBackend : public QObject
@@ -508,6 +526,7 @@ public:
     RustServiceLocatorAdapter*         serviceLocator() const { return m_serviceLocator; }
     RustPluginCrashHandlerAdapter*     crashHandler() const { return m_crashHandler; }
     RustDependencyResolverAdapter*     dependencyResolver() const { return m_dependencyResolver; }
+    RustArchiveExtractorAdapter*       archiveExtractor() const { return m_archiveExtractor; }
 
 private:
     RustBackend(QObject *parent = nullptr);
@@ -528,6 +547,7 @@ private:
     RustServiceLocatorAdapter*         m_serviceLocator = nullptr;
     RustPluginCrashHandlerAdapter*     m_crashHandler = nullptr;
     RustDependencyResolverAdapter*     m_dependencyResolver = nullptr;
+    RustArchiveExtractorAdapter*       m_archiveExtractor = nullptr;
 
     static RustBackend* s_instance;
 };

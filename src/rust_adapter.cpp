@@ -1216,6 +1216,34 @@ void RustPluginCrashHandlerAdapter::onCrashCb(const char *pluginId, const char *
 }
 
 // ═══════════════════════════════════════════════════════════════════════
+//  RustArchiveExtractorAdapter
+// ═══════════════════════════════════════════════════════════════════════
+
+RustArchiveExtractorAdapter::RustArchiveExtractorAdapter(QObject *parent)
+    : QObject(parent)
+{
+    m_extractor = rust_archive_extractor_new();
+}
+
+RustArchiveExtractorAdapter::~RustArchiveExtractorAdapter()
+{
+    if (m_extractor) {
+        rust_archive_extractor_free(m_extractor);
+        m_extractor = nullptr;
+    }
+}
+
+bool RustArchiveExtractorAdapter::extract(const QByteArray &archiveData, const QString &destDir)
+{
+    if (!m_extractor) return false;
+    QByteArray dirBytes = destDir.toUtf8();
+    return rust_archive_extractor_extract(m_extractor,
+        reinterpret_cast<const uint8_t*>(archiveData.constData()),
+        archiveData.size(),
+        dirBytes.constData());
+}
+
+// ═══════════════════════════════════════════════════════════════════════
 //  RustDependencyResolverAdapter — uses Rust FFI directly
 // ═══════════════════════════════════════════════════════════════════════
 
@@ -1345,6 +1373,7 @@ RustBackend::RustBackend(QObject *parent)
     m_serviceLocator = new RustServiceLocatorAdapter(this);
     m_crashHandler = new RustPluginCrashHandlerAdapter(this);
     m_dependencyResolver = new RustDependencyResolverAdapter(this);
+    m_archiveExtractor = new RustArchiveExtractorAdapter(this);
 }
 
 RustBackend::~RustBackend()

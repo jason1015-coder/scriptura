@@ -11,6 +11,7 @@
 #include <QDebug>
 #include <QStandardPaths>
 #include <QApplication>
+#include <QPluginLoader>
 
 ApplicationManager::ApplicationManager(QObject* parent)
     : QObject(parent)
@@ -293,16 +294,17 @@ ApplicationManager::LoadedApp* ApplicationManager::findLoaded(const QString& id)
     return (it != m_apps.end()) ? &(*it) : nullptr;
 }
 
-// ── Default Applications ─────────────────────────────────────────
+// ── Available Applications ─────────────────────────────────────
 
-void ApplicationManager::registerBuiltins()
+void ApplicationManager::registerAvailableApps()
 {
-    // Built-in applications are registered with metadata only
-    // They are loaded by MainWindow when it creates their widgets
+    // All applications are registered with metadata and GitHub repo placeholders.
+    // They are not built-in — the user is prompted to install them on first run.
+    // The GitHub URLs are placeholders and should be replaced with actual repos.
 
-    auto registerBuiltin = [this](const QString& id, const QString& name,
-                                   const QString& icon, const QString& tooltip,
-                                   const QString& desc) {
+    auto registerApp = [this](const QString& id, const QString& name,
+                               const QString& icon, const QString& tooltip,
+                               const QString& desc, const QString& githubRepo) {
         if (m_apps.contains(id)) return;
         AppInfo info;
         info.id = id;
@@ -310,6 +312,7 @@ void ApplicationManager::registerBuiltins()
         info.iconPath = icon;
         info.tooltip = tooltip;
         info.description = desc;
+        info.githubRepo = githubRepo;
         info.loaded = false;
         info.enabled = true;
         LoadedApp loaded;
@@ -317,24 +320,51 @@ void ApplicationManager::registerBuiltins()
         m_apps[id] = loaded;
     };
 
-    registerBuiltin("com.scriptura.git",       "Git",        ":/icons/git.svg",
-                     "Git",         "Git version control integration");
-    registerBuiltin("com.scriptura.httpclient", "HTTP Client", ":/icons/http.svg",
-                     "HTTP Client", "REST API client for testing endpoints");
-    registerBuiltin("com.scriptura.database",   "Database",    ":/icons/database.svg",
-                     "Database",    "SQLite database viewer");
-    registerBuiltin("com.scriptura.regex",      "Regex",       ":/icons/regex.svg",
-                     "Regex Tester","Regular expression testing tool");
-    registerBuiltin("com.scriptura.formatter",  "Format",      ":/icons/format.svg",
-                     "Data Formatter","JSON, YAML, XML formatter");
-    registerBuiltin("com.scriptura.preview",    "Preview",     ":/icons/preview.svg",
-                     "Markdown Preview","Live markdown preview");
-    registerBuiltin("com.scriptura.replacer",   "Replace",     ":/icons/replace.svg",
-                     "Global Replace","Find and replace with preview");
-    registerBuiltin("com.scriptura.diff",       "Diff",        ":/icons/diff.svg",
-                     "Diff Viewer","Side-by-side file comparison");
-    registerBuiltin("com.scriptura.stash",      "Stash",       ":/icons/stash.svg",
-                     "Git Stash","Git stash management");
-    registerBuiltin("com.scriptura.test",       "Test",        ":/icons/test.svg",
-                     "Test Runner","Run and view test results");
+    registerApp("com.scriptura.git",       "Git",          ":/icons/git.svg",
+                 "Git",         "Git version control integration",
+                 "https://github.com/scriptura/git-app");
+    registerApp("com.scriptura.httpclient", "HTTP Client",  ":/icons/http.svg",
+                 "HTTP Client", "REST API client for testing endpoints",
+                 "https://github.com/scriptura/httpclient-app");
+    registerApp("com.scriptura.database",   "Database",     ":/icons/database.svg",
+                 "Database",    "SQLite database viewer",
+                 "https://github.com/scriptura/sqlite-app");
+    registerApp("com.scriptura.regex",      "Regex",        ":/icons/regex.svg",
+                 "Regex",        "Regular expression testing tool",
+                 "https://github.com/scriptura/regex-app");
+    registerApp("com.scriptura.formatter",  "Format",       ":/icons/format.svg",
+                 "Format",       "Data formatter for JSON, YAML, XML",
+                 "https://github.com/scriptura/formatter-app");
+    registerApp("com.scriptura.preview",    "Preview",      ":/icons/preview.svg",
+                 "Preview",      "Live Markdown preview",
+                 "https://github.com/scriptura/preview-app");
+    registerApp("com.scriptura.replacer",   "Replace",      ":/icons/replace.svg",
+                 "Replace",      "Global find-and-replace with preview",
+                 "https://github.com/scriptura/replace-app");
+    registerApp("com.scriptura.diff",       "Diff",         ":/icons/diff.svg",
+                 "Diff",         "Side-by-side file comparison viewer",
+                 "https://github.com/scriptura/diff-app");
+    registerApp("com.scriptura.test",       "Test",         ":/icons/test.svg",
+                 "Test",         "Test runner for test suites and results",
+                 "https://github.com/scriptura/test-app");
+
+    // Sidebar apps migrated to dock
+    registerApp("com.scriptura.todo",       "Todo",         ":/icons/todo.svg",
+                 "Todo",         "TODO, FIXME, and annotation tracker",
+                 "https://github.com/scriptura/todo-app");
+    registerApp("com.scriptura.problems",   "Problems",     ":/icons/problems.svg",
+                 "Problems",     "LSP diagnostic problems panel",
+                 "https://github.com/scriptura/problem-app");
+    registerApp("com.scriptura.terminal",   "Terminal",     ":/icons/terminal.svg",
+                 "Terminal",     "Embedded terminal emulator",
+                 "https://github.com/scriptura/terminal-app");
+    registerApp("com.scriptura.debug",      "Debug",        ":/icons/debug.svg",
+                 "Debug",        "DAP-based debugger for programs",
+                 "https://github.com/scriptura/debug-app");
+}
+
+bool ApplicationManager::isInstalled(const QString& id) const
+{
+    auto it = m_apps.constFind(id);
+    return it != m_apps.constEnd() && it->info.loaded;
 }

@@ -1,10 +1,23 @@
 #include "pluginmarketplace.h"
 #include "rust_adapter.h"
 #include <QJsonDocument>
+#include <QJsonObject>
+#include <QJsonArray>
+#include <QNetworkReply>
+#include <QNetworkRequest>
+#include <QTemporaryDir>
+#include <QDir>
+#include <QDirIterator>
+#include <QFile>
+#include <QFileInfo>
+#include <QMessageBox>
+#include <QStandardPaths>
+#include <QUrl>
 
 PluginMarketplaceWidget::PluginMarketplaceWidget(RustPluginRegistryAdapter *registry, QWidget *parent)
     : QWidget(parent)
     , m_registry(registry)
+    , m_network(new QNetworkAccessManager(this))
 {
     setupUI();
 
@@ -58,9 +71,9 @@ void PluginMarketplaceWidget::setupUI()
 
     QHBoxLayout *btnLayout = new QHBoxLayout();
     m_installBtn = new QPushButton(tr("Install"), this);
-    m_installBtn->setToolTip(tr("Plugin installation will be available in a future release"));
+    m_installBtn->setToolTip(tr("Download and install the selected plugin from the registry"));
     m_uninstallBtn = new QPushButton(tr("Uninstall"), this);
-    m_uninstallBtn->setToolTip(tr("Plugin uninstallation will be available in a future release"));
+    m_uninstallBtn->setToolTip(tr("Remove the selected installed plugin"));
     m_refreshBtn = new QPushButton(tr("Refresh"), this);
     m_installBtn->setEnabled(false);
     m_uninstallBtn->setEnabled(false);
@@ -135,8 +148,124 @@ void PluginMarketplaceWidget::onInstallClicked()
     if (!item) return;
 
     QJsonObject plugin = QJsonDocument::fromJson(item->data(0, Qt::UserRole).toByteArray()).object();
+    QString pluginId = plugin["id"].toString();
     QString pluginName = plugin["name"].toString();
-    m_statusLabel->setText(tr("%1 \u2014 installation coming soon").arg(pluginName));
+    QString downloadUrl = plugin["downloadUrl"].toString();
+
+    if (downloadUrl.isEmpty()) {
+        m_statusLabel->setText(tr("Cannot install %1: no download URL in registry").arg(pluginName));
+        return;
+    }
+
+    m_installBtn->setEnabled(false);
+    m_refreshBtn->setEnabled(false);
+    m_statusLabel->setText(tr("Downloading %1...").arg(pluginName));
+
+    // Resolve download URL (handle GitHub repos -> archive ZIP conversion)
+    QUrl url = resolveDownloadUrl(downloadUrl);
+
+    QNetworkRequest req(url);
+    req.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::NoLessSafeRedirectPolicy);
+    QNetworkReply *reply = m_network->get(req);
+
+    connect(reply, &QNetworkReply::finished, this, [this, reply, pluginId, pluginName]() {
+        reply->deleteLater();
+        m_refreshBtn->setEnabled(true);
+
+        if (reply->error() != QNetworkReply::NoError) {
+            m_statusLabel->setText(tr("Download failed for %1: %2").arg(pluginName, reply->errorString()));
+            m_installBtn->setEnabled(true);
+            return;
+        }
+
+        QByteArray archiveData = reply->readAll();
+        if (archiveData.isEmpty()) {
+            m_statusLabel->setText(tr("Downloaded empty archive for %1").arg(pluginName));
+            m_installBtn->setEnabled(true);
+            return;
+        }
+
+        m_statusLabel->setText(tr("Extracting %1...").arg(pluginName));
+
+        // Extract to a temporary directory using the Rust ArchiveExtractor
+        QTemporaryDir tempDir;
+        if (!tempDir.isValid()) {
+            m_statusLabel->setText(tr("Failed to create temporary directory"));
+            m_installBtn->setEnabled(true);
+            return;
+        }
+
+        RustArchiveExtractorAdapter *extractor = RustBackend::instance()->archiveExtractor();
+        if (!extractor || !extractor->extract(archiveData, tempDir.path())) {
+            m_statusLabel->setText(tr("Failed to extract %1 archive — corrupted or unsupported format").arg(pluginName));
+            m_installBtn->setEnabled(true);
+            return;
+        }
+
+        // Find plugin.json in the extracted files (may be in a subdirectory)
+        QString pluginSourceDir;
+        QDirIterator it(tempDir.path(), QDir::Dirs | QDir::NoDotAndDotDot, QDirIterator::Subdirectories);
+        while (it.hasNext()) {
+            it.next();
+            if (QFile::exists(it.filePath() + "/plugin.json")) {
+                pluginSourceDir = it.filePath();
+                break;
+            }
+        }
+        // Also check the root
+        if (pluginSourceDir.isEmpty() && QFile::exists(tempDir.path() + "/plugin.json")) {
+            pluginSourceDir = tempDir.path();
+        }
+
+        if (pluginSourceDir.isEmpty()) {
+            m_statusLabel->setText(tr("No plugin.json found in the downloaded archive for %1").arg(pluginName));
+            m_installBtn->setEnabled(true);
+            return;
+        }
+
+        m_statusLabel->setText(tr("Installing %1...").arg(pluginName));
+
+        // Determine install directory
+        QString installDir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation)
+                             + "/plugins/" + pluginId;
+        QDir().mkpath(installDir);
+
+        // Remove any previous installation
+        if (QDir(installDir).exists()) {
+            QDir oldDir(installDir);
+            oldDir.removeRecursively();
+        }
+
+        // Copy the plugin files
+        if (!copyDirectory(pluginSourceDir, installDir)) {
+            m_statusLabel->setText(tr("Failed to copy plugin files for %1").arg(pluginName));
+            m_installBtn->setEnabled(true);
+            return;
+        }
+
+        // Ensure shared libraries are executable (QFile::copy does not preserve permissions)
+        QDirIterator libIt(installDir, {"*.so", "*.dylib", "*.dll"}, QDir::Files, QDirIterator::Subdirectories);
+        while (libIt.hasNext()) {
+            QFile::setPermissions(libIt.next(),
+                QFile::ReadOwner | QFile::WriteOwner | QFile::ExeOwner |
+                QFile::ReadGroup | QFile::ExeGroup |
+                QFile::ReadOther | QFile::ExeOther);
+        }
+
+        // Load the plugin into the Rust plugin manager
+        RustPluginManagerAdapter *pm = RustBackend::instance()->pluginManager();
+        if (pm) {
+            pm->loadPlugin(installDir);
+        }
+
+        m_statusLabel->setText(tr("%1 installed successfully! Restart Scriptura to activate.").arg(pluginName));
+        m_installBtn->setEnabled(true);
+
+        // Refresh the registry to update the installed status
+        refreshPlugins();
+
+        emit pluginInstalled(pluginId);
+    });
 }
 
 void PluginMarketplaceWidget::onUninstallClicked()
@@ -145,8 +274,49 @@ void PluginMarketplaceWidget::onUninstallClicked()
     if (!item) return;
 
     QJsonObject plugin = QJsonDocument::fromJson(item->data(0, Qt::UserRole).toByteArray()).object();
+    QString pluginId = plugin["id"].toString();
     QString pluginName = plugin["name"].toString();
-    m_statusLabel->setText(tr("%1 \u2014 uninstallation coming soon").arg(pluginName));
+
+    QString installDir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation)
+                         + "/plugins/" + pluginId;
+
+    if (!QDir(installDir).exists()) {
+        m_statusLabel->setText(tr("%1 is not installed").arg(pluginName));
+        return;
+    }
+
+    // Confirm with user
+    QMessageBox::StandardButton reply = QMessageBox::question(
+        this,
+        tr("Uninstall Plugin"),
+        tr("Are you sure you want to uninstall '%1'?\n\nThis will remove the plugin from:\n%2")
+            .arg(pluginName, installDir));
+
+    if (reply != QMessageBox::Yes) return;
+
+    m_uninstallBtn->setEnabled(false);
+    m_statusLabel->setText(tr("Uninstalling %1...").arg(pluginName));
+
+    // Unload from the plugin manager
+    RustPluginManagerAdapter *pm = RustBackend::instance()->pluginManager();
+    if (pm && pm->isLoaded(pluginId)) {
+        pm->unloadPlugin(pluginId);
+    }
+
+    // Remove the plugin directory
+    QDir dir(installDir);
+    if (dir.removeRecursively()) {
+        m_statusLabel->setText(tr("%1 uninstalled successfully. Restart Scriptura to complete.").arg(pluginName));
+
+        // Refresh the registry to update the installed status
+        refreshPlugins();
+
+        emit pluginUninstalled(pluginId);
+    } else {
+        m_statusLabel->setText(tr("Failed to remove %1 — the directory may be in use").arg(pluginName));
+    }
+
+    m_uninstallBtn->setEnabled(true);
 }
 
 void PluginMarketplaceWidget::onRefreshClicked()
@@ -180,4 +350,53 @@ void PluginMarketplaceWidget::onItemSelectionChanged()
 void PluginMarketplaceWidget::updateButtonStates()
 {
     onItemSelectionChanged();
+}
+
+/// Resolve a plugin download URL to a downloadable archive URL.
+/// - GitHub repo URLs are converted to archive ZIP URLs.
+/// - Direct .zip URLs are used as-is.
+QUrl PluginMarketplaceWidget::resolveDownloadUrl(const QString &downloadUrl) const
+{
+    // GitHub repo URL -> archive download
+    // e.g. https://github.com/scriptura/git-app -> https://github.com/scriptura/git-app/archive/refs/heads/main.zip
+    static const QString githubPrefix = "https://github.com/";
+    if (downloadUrl.startsWith(githubPrefix)) {
+        QString base = downloadUrl;
+        if (base.endsWith('/')) base.chop(1);
+        if (base.endsWith(".git")) base.chop(4);
+        return QUrl(base + "/archive/refs/heads/main.zip");
+    }
+
+    // Direct ZIP URL
+    if (downloadUrl.endsWith(".zip", Qt::CaseInsensitive)) {
+        return QUrl(downloadUrl);
+    }
+
+    // Fallback: append /archive/master.zip for generic git hosting
+    QString base = downloadUrl;
+    if (base.endsWith('/')) base.chop(1);
+    return QUrl(base + "/archive/master.zip");
+}
+
+/// Recursively copy a directory tree from srcPath to dstPath.
+bool PluginMarketplaceWidget::copyDirectory(const QString &srcPath, const QString &dstPath)
+{
+    QDir srcDir(srcPath);
+    QDir dstDir(dstPath);
+
+    if (!dstDir.mkpath("."))
+        return false;
+
+    QFileInfoList entries = srcDir.entryInfoList(QDir::Dirs | QDir::Files | QDir::NoDotAndDotDot);
+    for (const QFileInfo &info : entries) {
+        QString dest = dstDir.absoluteFilePath(info.fileName());
+        if (info.isDir()) {
+            if (!copyDirectory(info.absoluteFilePath(), dest))
+                return false;
+        } else {
+            if (!QFile::copy(info.absoluteFilePath(), dest))
+                return false;
+        }
+    }
+    return true;
 }

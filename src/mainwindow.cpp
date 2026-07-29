@@ -18,9 +18,9 @@
 #include "splitmanager.h"
 #include "breadcrumb.h"
 #include "aiinlinecompletion.h"
-#include "httpclientpanel.h"
 #include "codeactionui.h"
-#include "sqliteviewer.h"
+#include "pluginmarketplace.h"
+#include "themarketplace.h"
 #include "plugins/api/uiapi.h"
 #include "plugins/api/editorapi.h"
 #include "plugins/api/notificationapi.h"
@@ -32,10 +32,6 @@
 #include "snippetmanager.h"
 #include "filewatcher.h"
 #include "outlinepanel.h"
-#include "regextester.h"
-#include "dataformatter.h"
-#include "markdownpreview.h"
-#include "globalreplacepreview.h"
 #include "rust_adapter.h"
 
 #include <QFileDialog>
@@ -137,17 +133,11 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
     , m_splitManager(new SplitManager(this))
     , m_breadcrumb(nullptr)
     , m_aiInline(new AiInlineCompletion(this))
-    , m_httpClient(new HttpClientPanel(this))
     , m_codeActionCtrl(new CodeActionController(this))
-    , m_sqliteViewer(new SqliteViewerPanel(this))
     , m_pluginRegistry(RustBackend::instance()->pluginRegistry())
     , m_zenMode(nullptr)
     , m_fileWatcher(nullptr)
     , m_outlinePanel(nullptr)
-    , m_regexTester(nullptr)
-    , m_dataFormatter(nullptr)
-    , m_markdownPreview(nullptr)
-    , m_globalReplacePreview(nullptr)
     , m_sessionManager(nullptr)
     , m_refactoringManager(nullptr)
     , m_codeLensManager(nullptr)
@@ -156,12 +146,9 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
     , m_encodingManager(nullptr)
     , m_diffViewer(nullptr)
     , m_notificationCenter(nullptr)
-    , m_gitStash(nullptr)
     , m_gitRebase(nullptr)
     , m_taskRunnerUI(nullptr)
     , m_bookmarkPanel(nullptr)
-    , m_pluginMarketplace(nullptr)
-    , m_themeMarketplace(nullptr)
 {
     ui->setupUi(this);
 
@@ -444,45 +431,13 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
     fileTreeToggleButton->setFixedSize(32, 32);
     ui->sidebarDrawerLayout->addWidget(fileTreeToggleButton);
 
+    // Keep an empty iconBar for plugins to add custom buttons via UI API
     QWidget *iconBar = new QWidget(ui->sidebarDrawer);
     iconBar->setObjectName("sidebarIconBar");
     QHBoxLayout *iconBarLayout = new QHBoxLayout(iconBar);
     iconBarLayout->setContentsMargins(6, 8, 6, 8);
     iconBarLayout->setSpacing(6);
     iconBarLayout->setAlignment(Qt::AlignCenter);
-
-    placeholderButton = new QToolButton(iconBar);
-    ThemeIcons::instance()->setIcon(placeholderButton, ":/icons/todo.svg");
-    placeholderButton->setIconSize(QSize(20, 20));
-    placeholderButton->setToolTip(tr("Todo"));
-    placeholderButton->setCheckable(true);
-    placeholderButton->setFixedSize(32, 32);
-    iconBarLayout->addWidget(placeholderButton);
-
-    terminalButton = new QToolButton(iconBar);
-    ThemeIcons::instance()->setIcon(terminalButton, ":/icons/terminal.svg");
-    terminalButton->setIconSize(QSize(20, 20));
-    terminalButton->setToolTip(tr("Terminal"));
-    terminalButton->setCheckable(true);
-    terminalButton->setFixedSize(32, 32);
-    iconBarLayout->addWidget(terminalButton);
-
-    problemsButton = new QToolButton(iconBar);
-    ThemeIcons::instance()->setIcon(problemsButton, ":/icons/problems.svg");
-    problemsButton->setIconSize(QSize(20, 20));
-    problemsButton->setToolTip(tr("Problems"));
-    problemsButton->setCheckable(true);
-    problemsButton->setFixedSize(32, 32);
-    iconBarLayout->addWidget(problemsButton);
-
-    gitButton = new QToolButton(iconBar);
-    ThemeIcons::instance()->setIcon(gitButton, ":/icons/git.svg");
-    gitButton->setIconSize(QSize(20, 20));
-    gitButton->setToolTip(tr("Git"));
-    gitButton->setCheckable(true);
-    gitButton->setFixedSize(32, 32);
-    iconBarLayout->addWidget(gitButton);
-
     ui->sidebarDrawerLayout->addWidget(iconBar);
 
     // --- Right-side Inspector Drawer ---
@@ -643,36 +598,7 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
         }
     });
 
-    // Panel button connections
-    connect(placeholderButton, &QToolButton::toggled, this, &MainWindow::toggleTodoPanel);
-    connect(terminalButton, &QToolButton::toggled, this, &MainWindow::toggleTerminalPanel);
-    connect(problemsButton, &QToolButton::toggled, this, &MainWindow::toggleProblemPanel);
-    connect(gitButton, &QToolButton::toggled, this, [this](bool checked) {
-        if (checked) {
-            ui->bottomPanelContainer->show();
-            bottomPanelTabs->setCurrentIndex(1);
-            bottomPanelStack->setCurrentIndex(1);
-            gitPanel->show();
-            if (placeholderButton->isChecked()) {
-                QSignalBlocker blocker(placeholderButton);
-                placeholderButton->setChecked(false);
-            }
-            if (terminalButton->isChecked()) {
-                QSignalBlocker blocker(terminalButton);
-                terminalButton->setChecked(false);
-                if (m_previousEditorStackIndex >= 0 && m_previousEditorStackIndex < editorStack->count()) {
-                    editorStack->setCurrentIndex(m_previousEditorStackIndex);
-                }
-            }
-            if (problemPanel->isVisible()) {
-                problemPanel->hide();
-                problemsButton->setChecked(false);
-            }
-        } else {
-            ui->bottomPanelContainer->hide();
-            gitPanel->hide();
-         }
-     });
+    // handleDockAppClicked() in mainwindow_applicationdock.cpp routes dock clicks
 
     connect(gitPanel, &GitPanel::commitRequested, this, &MainWindow::on_action_git_commit_triggered);
     connect(gitPanel, &GitPanel::pushRequested, this, &MainWindow::on_action_git_push_triggered);
@@ -1041,36 +967,6 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
         }
     });
 
-    // HTTP Client - add bottom panel tab
-    int httpIdx = bottomPanelTabs->addTab(tr("HTTP"));
-    bottomPanelStack->addWidget(m_httpClient);
-    m_httpClient->hide();
-
-    int sqliteIdx = bottomPanelTabs->addTab(tr("Database"));
-    bottomPanelStack->addWidget(m_sqliteViewer);
-    m_sqliteViewer->hide();
-
-    // New feature panels — added to bottom panel
-    m_regexTester = new RegexTester(this);
-    bottomPanelTabs->addTab(tr("Regex"));
-    bottomPanelStack->addWidget(m_regexTester);
-    m_regexTester->hide();
-
-    m_dataFormatter = new DataFormatter(this);
-    bottomPanelTabs->addTab(tr("Format"));
-    bottomPanelStack->addWidget(m_dataFormatter);
-    m_dataFormatter->hide();
-
-    m_markdownPreview = new MarkdownPreview(this);
-    bottomPanelTabs->addTab(tr("Preview"));
-    bottomPanelStack->addWidget(m_markdownPreview);
-    m_markdownPreview->hide();
-
-    m_globalReplacePreview = new GlobalReplacePreview(this);
-    bottomPanelTabs->addTab(tr("Replace"));
-    bottomPanelStack->addWidget(m_globalReplacePreview);
-    m_globalReplacePreview->hide();
-
     // ── P0/P1/P2 Feature Modules ──────────────────────────────────────
     m_sessionManager = new SessionManager(this, ui->tabWidget, this);
     m_refactoringManager = new RefactoringManager(this);
@@ -1108,12 +1004,7 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
     m_statusBarWidget->setLineEnding("LF");
     m_statusBarWidget->setIndentation("Spaces: 4");
 
-    // ── P1/P2 Feature Modules ─────────────────────────────────────────
-    m_gitStash = new GitStashWidget(this);
-    bottomPanelTabs->addTab(tr("Stash"));
-    bottomPanelStack->addWidget(m_gitStash);
-    m_gitStash->hide();
-
+    // ── P1/P2 Feature Modules (infrastructure, not standalone apps) ───
     m_gitRebase = new GitRebaseWidget(this);
     bottomPanelTabs->addTab(tr("Rebase"));
     bottomPanelStack->addWidget(m_gitRebase);
@@ -1131,25 +1022,6 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
     bottomPanelStack->addWidget(m_bookmarkPanel);
     m_bookmarkPanel->hide();
 
-    // Test Panel
-    m_testPanel = new TestPanel(this);
-    bottomPanelTabs->addTab(tr("Tests"));
-    bottomPanelStack->addWidget(m_testPanel);
-    m_testPanel->hide();
-
-    // P3: Plugin Marketplace
-    m_pluginMarketplace = new PluginMarketplaceWidget(m_pluginRegistry, this);
-    bottomPanelTabs->addTab(tr("Marketplace"));
-    bottomPanelStack->addWidget(m_pluginMarketplace);
-    m_pluginMarketplace->hide();
-
-    // P3: Theme Marketplace
-    m_themeMarketplace = new ThemeMarketplaceWidget(this);
-    m_themeMarketplace->loadBuiltinThemes();
-    bottomPanelTabs->addTab(tr("Themes"));
-    bottomPanelStack->addWidget(m_themeMarketplace);
-    m_themeMarketplace->hide();
-
     // P2: CSS Breadcrumb parser
     m_cssBreadcrumbParser = new CssBreadcrumbParser(this);
 
@@ -1157,32 +1029,28 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
     m_breadcrumbBar = new BreadcrumbBarWidget(ui->editorContainer);
     ui->editorContainerLayout->insertWidget(1, m_breadcrumbBar);
 
-    // Connect theme marketplace to theme manager
+    // P3: Plugin Marketplace — kept as built-in (no app wrapper yet)
+    m_pluginMarketplace = new PluginMarketplaceWidget(m_pluginRegistry, this);
+    bottomPanelTabs->addTab(tr("Marketplace"));
+    bottomPanelStack->addWidget(m_pluginMarketplace);
+    m_pluginMarketplace->hide();
+
+    // P3: Theme Marketplace — kept as built-in (no app wrapper yet)
+    m_themeMarketplace = new ThemeMarketplaceWidget(this);
+    m_themeMarketplace->loadBuiltinThemes();
+    bottomPanelTabs->addTab(tr("Themes"));
+    bottomPanelStack->addWidget(m_themeMarketplace);
+    m_themeMarketplace->hide();
+
+    // Connect marketplace signals
     connect(m_themeMarketplace, &ThemeMarketplaceWidget::themeInstalled, this, [this](const QString &themeName) {
-        // Theme application would be handled by ThemeManager
         qDebug() << "Theme installed:" << themeName;
     });
     connect(m_pluginMarketplace, &PluginMarketplaceWidget::pluginInstalled, this, [this](const QString &pluginId) {
-        // Plugin installation handled by PluginRegistry
         qDebug() << "Plugin installed:" << pluginId;
     });
     connect(m_pluginMarketplace, &PluginMarketplaceWidget::pluginUninstalled, this, [this](const QString &pluginId) {
         qDebug() << "Plugin uninstalled:" << pluginId;
-    });
-
-    // Test Runner shortcut (Ctrl+Shift+T)
-    QShortcut *shortcutTestRun = new QShortcut(QKeySequence("Ctrl+Shift+T"), this);
-    connect(shortcutTestRun, &QShortcut::activated, this, [this]() {
-        m_testPanel->show();
-        int idx = bottomPanelTabs->count() - 1;
-        bottomPanelTabs->setCurrentIndex(idx);
-        bottomPanelStack->setCurrentIndex(idx);
-        if (m_windowAnimator) {
-            m_windowAnimator->animatePanelSlide(ui->bottomPanelContainer, 200);
-        } else {
-            ui->bottomPanelContainer->show();
-        }
-        m_testPanel->runAllTests();
     });
 
     // Task Runner shortcuts
@@ -1192,7 +1060,7 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
         QString projectPath = projectDir.isEmpty() ? QDir::homePath() : projectDir;
         m_taskRunnerUI->detectTasks(projectPath);
         ui->bottomPanelContainer->show();
-        int idx = bottomPanelTabs->count() - 2; // Tasks tab
+        int idx = 6; // Tasks tab (index 6 out of 10 total bottom tabs)
         bottomPanelTabs->setCurrentIndex(idx);
         bottomPanelStack->setCurrentIndex(idx);
     });
@@ -1204,18 +1072,8 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
             m_taskRunnerUI->detectTasks(projectPath);
             return;
         }
-        // Show terminal and run command
-        ui->bottomPanelContainer->show();
-        editorStack->setCurrentWidget(terminalPanel);
-        terminalButton->setChecked(true);
-    });
-
-    // Connect GitStash refresh to Git panel
-    connect(m_gitStash, &GitStashWidget::stashApplied, this, [this](int) {
-        qDebug() << "Stash applied";
-    });
-    connect(m_gitStash, &GitStashWidget::stashPopped, this, [this](int) {
-        qDebug() << "Stash popped";
+        // Show terminal via dock
+        toggleTerminalPanel();
     });
 
     // Connect notification center to status bar
@@ -1404,10 +1262,6 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
             m_refactoringManager->extractVariable(editor, lspClient, currentFile);
         }
     });
-    connect(m_httpClient, &HttpClientPanel::requestSent, this, [](const QString &url, int code) {
-        qDebug() << "HTTP request:" << url << "->" << code;
-    });
-
     // Plugin registry (uses Rust adapter)
     m_pluginRegistry->setRegistryUrl(registryUrl);
     QTimer::singleShot(5000, m_pluginRegistry, [this]() {
@@ -1464,6 +1318,4 @@ QPushButton* MainWindow::createTabCloseButton(const QString &filePath)
     return closeBtn;
 }
 
-// In-editor welcome widget removed — replaced by standalone WelcomeMenuScreen
-// shown before MainWindow startup in main.cpp.
 

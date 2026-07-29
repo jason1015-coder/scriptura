@@ -12,6 +12,7 @@
 #include "themeicons.h"
 #include "rust_adapter.h"
 #include "windowanimator.h"
+#include "applicationdock.h"
 
 #include <QFileDialog>
 #include <QFile>
@@ -155,19 +156,15 @@ void MainWindow::toggleTerminalPanel()
         if (m_previousEditorStackIndex >= 0 && m_previousEditorStackIndex < editorStack->count()) {
             editorStack->setCurrentIndex(m_previousEditorStackIndex);
         }
-        terminalButton->setChecked(false);
+        m_activeDockAppId.clear();
     } else {
         m_previousEditorStackIndex = editorStack->currentIndex();
         editorStack->setCurrentWidget(terminalPanel);
-        terminalButton->setChecked(true);
-        if (placeholderButton->isChecked()) {
-            QSignalBlocker blocker(placeholderButton);
-            placeholderButton->setChecked(false);
-        }
+        m_activeDockAppId = "com.scriptura.terminal";
         if (ui->bottomPanelContainer->isVisible()) {
             ui->bottomPanelContainer->hide();
-            problemsButton->setChecked(false);
-            gitButton->setChecked(false);
+            problemPanel->hide();
+            gitPanel->hide();
         }
         if (!terminalPanel->isRunning()) {
             terminalPanel->startShell(projectDir.isEmpty() ? QDir::currentPath() : projectDir);
@@ -175,6 +172,7 @@ void MainWindow::toggleTerminalPanel()
             terminalPanel->setWorkingDirectory(projectDir.isEmpty() ? QDir::currentPath() : projectDir);
         }
     }
+    if (m_appDock) m_appDock->setActiveApp(m_activeDockAppId);
 }
 
 void MainWindow::toggleSidebar()
@@ -199,28 +197,28 @@ void MainWindow::toggleSidebar()
 
 void MainWindow::toggleTodoPanel()
 {
-    if (placeholderButton->isChecked()) {
-        m_previousEditorStackIndex = editorStack->currentIndex();
-        editorStack->setCurrentWidget(todoPanel);
-        if (terminalButton->isChecked()) {
-            QSignalBlocker blocker(terminalButton);
-            terminalButton->setChecked(false);
-        }
-        if (ui->bottomPanelContainer->isVisible()) {
-            ui->bottomPanelContainer->hide();
-            problemsButton->setChecked(false);
-            gitButton->setChecked(false);
-        }
-    } else {
+    if (editorStack->currentWidget() == todoPanel) {
         if (m_previousEditorStackIndex >= 0 && m_previousEditorStackIndex < editorStack->count()) {
             editorStack->setCurrentIndex(m_previousEditorStackIndex);
         }
+        m_activeDockAppId.clear();
+    } else {
+        m_previousEditorStackIndex = editorStack->currentIndex();
+        editorStack->setCurrentWidget(todoPanel);
+        m_activeDockAppId = "com.scriptura.todo";
+        if (ui->bottomPanelContainer->isVisible()) {
+            ui->bottomPanelContainer->hide();
+            problemPanel->hide();
+            gitPanel->hide();
+        }
     }
+    if (m_appDock) m_appDock->setActiveApp(m_activeDockAppId);
 }
 
 void MainWindow::toggleProblemPanel()
 {
-    if (problemsButton->isChecked()) {
+    bool isVisible = problemPanel->isVisible() && ui->bottomPanelContainer->isVisible();
+    if (!isVisible) {
         bottomPanelTabs->setCurrentIndex(0);
         bottomPanelStack->setCurrentIndex(0);
         problemPanel->show();
@@ -229,22 +227,14 @@ void MainWindow::toggleProblemPanel()
         } else {
             ui->bottomPanelContainer->show();
         }
-        if (placeholderButton->isChecked()) {
-            QSignalBlocker blocker(placeholderButton);
-            placeholderButton->setChecked(false);
-        }
-        if (terminalButton->isChecked()) {
-            QSignalBlocker blocker(terminalButton);
-            terminalButton->setChecked(false);
+        // Close other panels
+        if (editorStack->currentWidget() == todoPanel || editorStack->currentWidget() == terminalPanel) {
             if (m_previousEditorStackIndex >= 0 && m_previousEditorStackIndex < editorStack->count()) {
                 editorStack->setCurrentIndex(m_previousEditorStackIndex);
             }
         }
-        if (gitButton->isChecked()) {
-            QSignalBlocker blocker(gitButton);
-            gitButton->setChecked(false);
-            gitPanel->hide();
-        }
+        if (gitPanel->isVisible()) gitPanel->hide();
+        m_activeDockAppId = "com.scriptura.problems";
     } else {
         if (m_windowAnimator) {
             m_windowAnimator->animatePanelSlide(ui->bottomPanelContainer, false, 200);
@@ -252,7 +242,9 @@ void MainWindow::toggleProblemPanel()
             ui->bottomPanelContainer->hide();
         }
         problemPanel->hide();
+        m_activeDockAppId.clear();
     }
+    if (m_appDock) m_appDock->setActiveApp(m_activeDockAppId);
 }
 
 void MainWindow::showGitPanel()
@@ -265,18 +257,13 @@ void MainWindow::showGitPanel()
     } else {
         ui->bottomPanelContainer->show();
     }
-    QSignalBlocker blocker1(placeholderButton);
-    placeholderButton->setChecked(false);
-    if (terminalButton->isChecked()) {
-        QSignalBlocker blocker(terminalButton);
-        terminalButton->setChecked(false);
+    if (editorStack->currentWidget() == todoPanel || editorStack->currentWidget() == terminalPanel) {
         if (m_previousEditorStackIndex >= 0 && m_previousEditorStackIndex < editorStack->count())
             editorStack->setCurrentIndex(m_previousEditorStackIndex);
     }
-    if (problemPanel->isVisible()) {
-        problemPanel->hide();
-        problemsButton->setChecked(false);
-    }
+    if (problemPanel->isVisible()) problemPanel->hide();
+    m_activeDockAppId = "com.scriptura.git";
+    if (m_appDock) m_appDock->setActiveApp(m_activeDockAppId);
 }
 
 void MainWindow::on_action_about_triggered()
@@ -543,21 +530,14 @@ void MainWindow::on_action_git_pull_triggered()
     } else {
         gitPanel->setOutput(tr("Failed to run git pull. The operation may have timed out."));
     }
-    // Close other panels that occupy the same area (block signals to prevent recursion)
-    if (terminalButton->isChecked()) {
-        QSignalBlocker blocker(terminalButton);
-        terminalButton->setChecked(false);
+    // Close other panels
+    if (editorStack->currentWidget() == terminalPanel || editorStack->currentWidget() == todoPanel) {
         if (m_previousEditorStackIndex >= 0 && m_previousEditorStackIndex < editorStack->count()) {
             editorStack->setCurrentIndex(m_previousEditorStackIndex);
         }
     }
-    if (placeholderButton->isChecked()) {
-        QSignalBlocker blocker(placeholderButton);
-        placeholderButton->setChecked(false);
-    }
     if (problemPanel->isVisible()) {
         problemPanel->hide();
-        problemsButton->setChecked(false);
     }
     showGitPanel();
 }
@@ -578,21 +558,14 @@ void MainWindow::on_action_git_fetch_triggered()
     } else {
         gitPanel->setOutput(tr("Failed to run git fetch. The operation may have timed out."));
     }
-    // Close other panels that occupy the same area (block signals to prevent recursion)
-    if (terminalButton->isChecked()) {
-        QSignalBlocker blocker(terminalButton);
-        terminalButton->setChecked(false);
+    // Close other panels
+    if (editorStack->currentWidget() == terminalPanel || editorStack->currentWidget() == todoPanel) {
         if (m_previousEditorStackIndex >= 0 && m_previousEditorStackIndex < editorStack->count()) {
             editorStack->setCurrentIndex(m_previousEditorStackIndex);
         }
     }
-    if (placeholderButton->isChecked()) {
-        QSignalBlocker blocker(placeholderButton);
-        placeholderButton->setChecked(false);
-    }
     if (problemPanel->isVisible()) {
         problemPanel->hide();
-        problemsButton->setChecked(false);
     }
     showGitPanel();
 }

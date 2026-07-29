@@ -24,6 +24,9 @@
 #include <QSignalBlocker>
 #include <QStringConverter>
 #include "encodingmanager.h"
+#include "applicationdock.h"
+#include "pluginmarketplace.h"
+#include "themarketplace.h"
 
 void MainWindow::showEditorInterface()
 {
@@ -84,7 +87,6 @@ void MainWindow::loadProjectDirectory(const QString &dirName)
     problemPanel->clearAll();
     problemPanel->setCurrentFile(QString()); // Show all problems
     problemPanel->show();
-    problemsButton->setChecked(true);
 
     // Update terminal working directory
     if (terminalPanel) {
@@ -473,7 +475,6 @@ void MainWindow::on_tabWidget_tabCloseRequested(int index)
         setWindowTitle(projectDir.isEmpty() ? "Scriptura" : QFileInfo(projectDir).fileName() + " - Scriptura");
         showSearchBar(false);
         problemPanel->hide();
-        problemsButton->setChecked(false);
     }
 }
 
@@ -667,18 +668,22 @@ void MainWindow::onBottomTabChanged(int index)
 {
     bottomPanelStack->setCurrentIndex(index);
     // Build a list of all possible bottom panels — show only the selected one
+    // Note: standalone app panels (HTTP, SQLite, Regex, Format, Preview, Test, etc.)
+    // are now registered as downloadable apps from GitHub, not built-in.
     QList<QWidget*> panels = {
-        problemPanel, gitPanel, projectSearchPanel, debugPanel,
-        m_httpClient, m_sqliteViewer, m_diffViewer,
-        m_regexTester, m_dataFormatter, m_markdownPreview, m_globalReplacePreview,
-        m_gitStash, m_gitRebase, m_taskRunnerUI, m_bookmarkPanel, m_testPanel,
-        m_pluginMarketplace, m_themeMarketplace
+        static_cast<QWidget*>(problemPanel), static_cast<QWidget*>(gitPanel),
+        static_cast<QWidget*>(projectSearchPanel), static_cast<QWidget*>(debugPanel),
+        static_cast<QWidget*>(m_diffViewer),
+        static_cast<QWidget*>(m_gitRebase),
+        static_cast<QWidget*>(m_taskRunnerUI), static_cast<QWidget*>(m_bookmarkPanel),
+        static_cast<QWidget*>(m_pluginMarketplace), static_cast<QWidget*>(m_themeMarketplace)
     };
     for (int i = 0; i < panels.size(); ++i) {
         if (panels[i]) panels[i]->setVisible(i == index);
     }
-    // Update sidebar button checked states
-    problemsButton->setChecked(index == 0);
-    gitButton->setChecked(index == 1);
+    if (m_appDock) {
+        m_appDock->setActiveApp(index == 0 ? "com.scriptura.problems" :
+                                index == 1 ? "com.scriptura.git" : QString());
+    }
 }
 

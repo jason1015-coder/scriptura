@@ -70,6 +70,7 @@ public:
         QString iconPath;
         QString tooltip;
         QString appDir;
+        QString githubRepo;      ///< GitHub repository URL for installation (placeholder)
         bool loaded = false;
         bool enabled = true;
     };
@@ -93,15 +94,21 @@ public:
      */
     QString tabTitle(const QString& id) const;
 
-    // ── Default Applications ─────────────────────────────────────
+    // ── Available Applications ───────────────────────────────────
 
     /**
-     * @brief Register built-in applications that ship with Scriptura
+     * @brief Register all available applications that can be installed
      *
-     * These are registered from the mainwindow's existing panels:
-     * - Git, HTTP Client, Database, Regex, Format, Preview, Replace, Diff, Stash, Test
+     * These are registered from GitHub repositories as installable apps.
+     * On first run, the user is prompted to install them.
+     * Each app has a placeholder GitHub repo URL.
      */
-    void registerBuiltins();
+    void registerAvailableApps();
+
+    /**
+     * @brief Check if an app is installed (loaded from disk)
+     */
+    bool isInstalled(const QString& id) const;
 
 signals:
     void applicationLoaded(const QString& id, const QString& name, const QString& iconPath);

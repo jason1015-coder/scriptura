@@ -39,10 +39,6 @@
 #include "filewatcher.h"
 #include "outlinepanel.h"
 #include "snippetmanager.h"
-#include "regextester.h"
-#include "dataformatter.h"
-#include "markdownpreview.h"
-#include "globalreplacepreview.h"
 #include "sessionmanager.h"
 #include "refactoringmanager.h"
 #include "codelensmanager.h"
@@ -51,16 +47,12 @@
 #include "encodingmanager.h"
 #include "diffviewer.h"
 #include "notificationcenter.h"
-#include "gitstash.h"
 #include "gitrebase.h"
 #include "shortcuteditor.h"
 #include "taskrunnerui.h"
 #include "bookmarkpanel.h"
 #include "cssbreadcrumb.h"
 #include "testrunner.h"
-#include "testpanel.h"
-#include "pluginmarketplace.h"
-#include "themarketplace.h"
 #include "snippeteditordialog.h"
 #include "projectsearch.h"
 #include "commandpalette.h"
@@ -69,21 +61,20 @@
 #include "breadcrumb.h"
 #include "aiinlinecompletion.h"
 #include "universalsearch.h"
-#include "httpclientpanel.h"
 #include "codeactionui.h"
-#include "sqliteviewer.h"
 #include "customtitlebar.h"
 #include "windowanimator.h"
 #include "thememanager.h"
 #include "themeicons.h"
 #include "rust_adapter.h"
 
-class DebugPanel;
 class FindReplaceBar;
 class ProjectSearchPanel;
 class CommandPalette;
 class ApplicationDock;
 class ApplicationManager;
+class PluginMarketplaceWidget;
+class ThemeMarketplaceWidget;
 
 #include "themedefs.h"
 #include "breadcrumbbar.h"
@@ -175,7 +166,6 @@ private slots:
     void showKeyboardShortcuts();
     void onEditorTextChanged();
     void requestHover();
-    void on_placeholderButton_clicked(bool checked);
     void on_action_run_debug_triggered();
     void on_action_stop_debug_triggered();
     void on_action_step_over_triggered();
@@ -186,6 +176,7 @@ private slots:
 
     void toggleSidebar();
     void onBottomTabChanged(int index);
+    void handleDockAppClicked(const QString &appId);
     void onTopTabChanged(int index);
 
 private:
@@ -202,11 +193,7 @@ private:
     QFileSystemModel *fileModel = nullptr;
     ThemeFileIconProvider *m_fileIconProvider = nullptr;
     QToolButton *goUpButton;
-    QToolButton *placeholderButton;
     QToolButton *fileTreeToggleButton;
-    QToolButton *terminalButton;
-    QToolButton *problemsButton;
-    QToolButton *gitButton;
     QToolButton *sidebarToggleButton;
     QToolButton *settingsButton;
     QTabBar *tabBar;
@@ -238,6 +225,7 @@ private:
     RustPluginManagerAdapter *pluginManager;
     PluginManagerDialog *pluginManagerDialog;
     int m_previousEditorStackIndex;
+    QString m_activeDockAppId; // Currently active dock app
     
     // Debugger
     RustDapClientAdapter *dapClient;
@@ -271,9 +259,7 @@ private:
     // Plugin Developer API instances (owned by PluginContext)
     void setupPluginApis();
     AiInlineCompletion *m_aiInline;
-    HttpClientPanel *m_httpClient;
     CodeActionController *m_codeActionCtrl;
-    SqliteViewerPanel *m_sqliteViewer;
     RustPluginRegistryAdapter *m_pluginRegistry;
     BreadcrumbBarWidget *m_breadcrumbBar;
     QMetaObject::Connection m_cssBreadcrumbConnection;
@@ -290,10 +276,6 @@ private:
     ZenMode *m_zenMode;
     FileWatcher *m_fileWatcher;
     OutlinePanel *m_outlinePanel;
-    RegexTester *m_regexTester;
-    DataFormatter *m_dataFormatter;
-    MarkdownPreview *m_markdownPreview;
-    GlobalReplacePreview *m_globalReplacePreview;
     SessionManager *m_sessionManager;
     RefactoringManager *m_refactoringManager;
     CodeLensManager *m_codeLensManager;
@@ -302,15 +284,13 @@ private:
     EncodingManager *m_encodingManager;
     DiffViewerWidget *m_diffViewer;
     NotificationCenter *m_notificationCenter;
-    GitStashWidget *m_gitStash;
     GitRebaseWidget *m_gitRebase;
     TaskRunnerUI *m_taskRunnerUI;
     BookmarkPanelWidget *m_bookmarkPanel;
-    TestPanel *m_testPanel;
     CssBreadcrumbParser *m_cssBreadcrumbParser;
     SnippetEditorDialog *m_snippetEditorDialog;
-    PluginMarketplaceWidget *m_pluginMarketplace;
-    ThemeMarketplaceWidget *m_themeMarketplace;
+    PluginMarketplaceWidget *m_pluginMarketplace = nullptr;
+    ThemeMarketplaceWidget *m_themeMarketplace = nullptr;
 
     void updateCursorPosition();
     void updateStatusBar();
@@ -338,7 +318,6 @@ private:
     void onUpdateAvailable(const QString &version, const QString &downloadUrl);
     void onUpdateCheckFailed(const QString &error);
     void onTestResultsReceived(const QString &output);
-    // showWelcomeScreen() removed — see WelcomeMenuScreen instead
     void showEditorInterface();
     void loadProjectDirectory(const QString &dirName);
     void openFileInTab(const QString &fileName);
