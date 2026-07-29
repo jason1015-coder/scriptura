@@ -84,17 +84,7 @@ void MainWindow::loadProjectDirectory(const QString &dirName)
         // Try to start a language server for the project
         startLanguageServerForProject(projectDir);
     }
-    problemPanel->clearAll();
-    problemPanel->setCurrentFile(QString()); // Show all problems
-    problemPanel->show();
 
-    // Update terminal working directory
-    if (terminalPanel) {
-        terminalPanel->setWorkingDirectory(projectDir);
-    }
-
-    // Update git panel project path (enables staging/diff/branches)
-    gitPanel->setProjectPath(projectDir);
 
 }
 
@@ -324,10 +314,7 @@ void MainWindow::on_fileTreeView_clicked(const QModelIndex &index)
     if (fileInfo.isDir()) {
         // Expand/collapse the directory inline instead of changing root
         ui->fileTreeView->setExpanded(index, !ui->fileTreeView->isExpanded(index));
-        // Update terminal working directory when folder is clicked
-        if (terminalPanel && terminalPanel->isRunning()) {
-            terminalPanel->setWorkingDirectory(path);
-        }
+
     } else {
         QFile file(path);
         if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
@@ -409,7 +396,6 @@ void MainWindow::on_fileTreeView_clicked(const QModelIndex &index)
         QString uri = QUrl::fromLocalFile(path).toString();
         QString langId = QFileInfo(path).suffix().toLower();
         lspClient->didOpen(uri, langId, content);
-        problemPanel->setCurrentFile(uri);
     }
 }
 
@@ -462,9 +448,7 @@ void MainWindow::on_tabWidget_tabCloseRequested(int index)
         // switch back to ui->tabWidget, causing the settings page to appear
         // blank when a file is closed while viewing settings.
         updateStatusBar();
-        // Update problem panel to show current file's problems
-        QString newCurrent = QUrl::fromLocalFile(currentFile).toString();
-        problemPanel->setCurrentFile(newCurrent);
+
     } else {
         // No file tabs remain — only show editor interface if tabBar is also
         // empty (onTopTabChanged(-1) returned early without switching).
@@ -474,7 +458,6 @@ void MainWindow::on_tabWidget_tabCloseRequested(int index)
         }
         setWindowTitle(projectDir.isEmpty() ? "Scriptura" : QFileInfo(projectDir).fileName() + " - Scriptura");
         showSearchBar(false);
-        problemPanel->hide();
     }
 }
 
@@ -668,22 +651,19 @@ void MainWindow::onBottomTabChanged(int index)
 {
     bottomPanelStack->setCurrentIndex(index);
     // Build a list of all possible bottom panels — show only the selected one
-    // Note: standalone app panels (HTTP, SQLite, Regex, Format, Preview, Test, etc.)
-    // are now registered as downloadable apps from GitHub, not built-in.
+    // Built-in panels include: ProjectSearch, GitRebase, TaskRunner, Bookmarks,
+    // PluginMarketplace, ThemeMarketplace.
+    // Standalone app panels (Git, HTTP, SQLite, Regex, Format, Preview,
+    // Replace, Diff, Test, Problems, Terminal, Todo, Debug) are registered
+    // as downloadable apps from the Plugin Marketplace, not built-in.
     QList<QWidget*> panels = {
-        static_cast<QWidget*>(problemPanel), static_cast<QWidget*>(gitPanel),
-        static_cast<QWidget*>(projectSearchPanel), static_cast<QWidget*>(debugPanel),
-        static_cast<QWidget*>(m_diffViewer),
+        static_cast<QWidget*>(projectSearchPanel),
         static_cast<QWidget*>(m_gitRebase),
         static_cast<QWidget*>(m_taskRunnerUI), static_cast<QWidget*>(m_bookmarkPanel),
         static_cast<QWidget*>(m_pluginMarketplace), static_cast<QWidget*>(m_themeMarketplace)
     };
     for (int i = 0; i < panels.size(); ++i) {
         if (panels[i]) panels[i]->setVisible(i == index);
-    }
-    if (m_appDock) {
-        m_appDock->setActiveApp(index == 0 ? "com.scriptura.problems" :
-                                index == 1 ? "com.scriptura.git" : QString());
     }
 }
 

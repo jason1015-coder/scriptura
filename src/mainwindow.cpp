@@ -3,15 +3,11 @@
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
 #include "codeeditor.h"
-#include "todopanel.h"
-#include "gitpanel.h"
-#include "terminalpanel.h"
 #include "pluginmanagerdialog.h"
 #include "version.h"
 #include "findreplace.h"
 #include "projectsearch.h"
 #include "commandpalette.h"
-#include "debugpanel.h"
 #include "debugconfiguration.h"
 #include "rundialog.h"
 #include "minimap.h"
@@ -112,10 +108,7 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
     , selectedTheme(ThemeColorFamily::Default, ThemeMode::Light)
     , autoSaveTimer(new QTimer(this))
     , lspDebounceTimer(new QTimer(this))
-    , problemPanel(new ProblemPanel(this))
-    , todoPanel(new TodoPanel(this))
-    , gitPanel(new GitPanel(this))
-    , terminalPanel(new TerminalPanel(this))
+
     , updater(RustBackend::instance()->updater())
     , configValidator(RustBackend::instance()->configValidator())
     , lspClient(RustBackend::instance()->lspClient())
@@ -123,7 +116,7 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
     , pluginManagerDialog(new PluginManagerDialog(pluginManager, nullptr, this))
     , m_previousEditorStackIndex(0)
     , dapClient(RustBackend::instance()->dapClient())
-    , debugPanel(new DebugPanel(this))
+
     , debugConfigManager(std::make_unique<DebugConfigurationManager>())
     , m_isDebugging(false)
     , m_workspace(RustBackend::instance()->workspace())
@@ -144,7 +137,6 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
     , m_gitBlame(nullptr)
     , m_statusBarWidget(nullptr)
     , m_encodingManager(nullptr)
-    , m_diffViewer(nullptr)
     , m_notificationCenter(nullptr)
     , m_gitRebase(nullptr)
     , m_taskRunnerUI(nullptr)
@@ -362,8 +354,6 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
     bottomPanelTabs = ui->bottomPanelTabs;
 
     editorStack->addWidget(ui->tabWidget);
-    editorStack->addWidget(todoPanel);
-    editorStack->addWidget(terminalPanel);
 
     // Plugin registry - load user-configured URL
     registryUrl = QSettings().value("plugin/registryUrl", "https://raw.githubusercontent.com/jason1015-coder/scriptura/main/plugin-registry.json").toString();
@@ -375,14 +365,8 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
     // Welcome page is now a standalone pre-launch window (WelcomeMenuScreen)
     // shown in main.cpp before MainWindow is created.
 
-    bottomPanelStack->addWidget(problemPanel);
-    bottomPanelStack->addWidget(gitPanel);
-    problemPanel->hide();
-    gitPanel->hide();
-
     // Create panels that need to be added to bottom stack
     projectSearchPanel = new ProjectSearchPanel(this);
-    debugPanel = new DebugPanel(this);
 
     // Top toolbar setup — buttons now live in the unified title bar or editor area
     sidebarToggleButton = new QToolButton(this);
@@ -409,9 +393,7 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
 
     // Add remaining panels to bottom stack
     bottomPanelStack->addWidget(projectSearchPanel);
-    bottomPanelStack->addWidget(debugPanel);
     projectSearchPanel->hide();
-    debugPanel->hide();
 
     // Right-side toolbar buttons (settings moved to title bar area)
     settingsButton = new QToolButton(this);
@@ -580,10 +562,7 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
     connect(ui->tabWidget, &QTabWidget::currentChanged, this, &MainWindow::updateStatusBar);
 
     // Bottom panel tabs
-    bottomPanelTabs->addTab(tr("Problems"));
-    bottomPanelTabs->addTab(tr("Git"));
     bottomPanelTabs->addTab(tr("Search Results"));
-    bottomPanelTabs->addTab(tr("Debug"));
     connect(bottomPanelTabs, &QTabBar::currentChanged, this, &MainWindow::onBottomTabChanged);
 
     // Sidebar connections
@@ -600,10 +579,7 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
 
     // handleDockAppClicked() in mainwindow_applicationdock.cpp routes dock clicks
 
-    connect(gitPanel, &GitPanel::commitRequested, this, &MainWindow::on_action_git_commit_triggered);
-    connect(gitPanel, &GitPanel::pushRequested, this, &MainWindow::on_action_git_push_triggered);
-    connect(gitPanel, &GitPanel::pullRequested, this, &MainWindow::on_action_git_pull_triggered);
-    connect(gitPanel, &GitPanel::fetchRequested, this, &MainWindow::on_action_git_fetch_triggered);
+
 
     // Settings button
     connect(settingsButton, &QToolButton::clicked, this, &MainWindow::on_action_editor_settings_triggered);
@@ -615,8 +591,6 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
     connect(ui->tabWidget, &QTabWidget::tabCloseRequested, this, &MainWindow::on_tabWidget_tabCloseRequested);
 
     editorStack->addWidget(ui->tabWidget);
-    editorStack->addWidget(todoPanel);
-    editorStack->addWidget(terminalPanel);
 
     if (!initialProject.isEmpty()) {
         loadProjectDirectory(initialProject);
@@ -891,7 +865,6 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
 
 
     // DAP connections
-    debugPanel->setClient(dapClient);
     connect(dapClient, &RustDapClientAdapter::initialized, this, &MainWindow::onDapInitialized);
     connect(dapClient, &RustDapClientAdapter::stopped, this, &MainWindow::onDapStopped);
     connect(dapClient, &RustDapClientAdapter::continued, this, &MainWindow::onDapContinued);
@@ -899,27 +872,11 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
     connect(dapClient, &RustDapClientAdapter::scopesReceived, this, &MainWindow::onScopesReceived);
     connect(dapClient, &RustDapClientAdapter::variablesReceived, this, &MainWindow::onVariablesReceived);
     connect(dapClient, &RustDapClientAdapter::evaluationReceived, this, [this](const QString &expr, const QString &result) {
-        debugPanel->showEvaluation(expr, result);
-    });
-    connect(debugPanel, &DebugPanel::frameActivated, this, [this](int frameId) {
-        if (frameId >= 0) {
-            m_currentFrameId = frameId;
-            dapClient->scopes(frameId);
-        }
-    });
-    connect(debugPanel, &DebugPanel::evaluateRequested, this, [this](const QString &expr) {
-        Q_UNUSED(expr)
-    });
-    connect(debugPanel, &DebugPanel::watchRequested, this, [this](const QString &expr) {
-        Q_UNUSED(expr)
+        qDebug() << "DAP eval:" << expr << result;
     });
     connect(dapClient, &RustDapClientAdapter::serverFailed, this, [](const QString &err) {
         qDebug() << "DAP server failed:" << err;
     });
-
-    // Problem panel connections
-    connect(problemPanel, &ProblemPanel::problemActivated, this, &MainWindow::onProblemActivated);
-    connect(problemPanel, &ProblemPanel::filterChanged, this, &MainWindow::onProblemsFilterChanged);
 
     // Updater connections
     connect(updater, &RustUpdaterAdapter::updateAvailable, this, &MainWindow::onUpdateAvailable);
@@ -941,7 +898,6 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
                 m_codeActionCtrl->attach(ce, lspClient, QUrl::fromLocalFile(currentFile).toString());
                 if (m_codeActionCtrl->isVisible())
                     m_codeActionCtrl->showCurrent();
-                todoPanel->parseDocument(ce->toPlainText(), currentFile);
             }
         }
     });
@@ -950,21 +906,6 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
     connect(lspClient, &RustLspClientAdapter::diagnosticsReceived, m_codeActionCtrl, &CodeActionController::onDiagnosticsReceived);
     connect(m_codeActionCtrl, &CodeActionController::actionTriggered, this, [](const QString &title, const QString &kind, int) {
         qDebug() << "CodeAction triggered:" << title << kind;
-    });
-
-    // Todo panel: jump to TODO comment line
-    connect(todoPanel, &TodoPanel::todoActivated, this, [this](int line) {
-        CodeEditor *editor = getCurrentCodeEditor();
-        if (!editor)
-            return;
-        QTextBlock block = editor->document()->findBlockByNumber(line);
-        if (block.isValid()) {
-            QTextCursor cursor(editor->document());
-            cursor.setPosition(block.position());
-            editor->setTextCursor(cursor);
-            editor->centerCursor();
-            editor->setFocus();
-        }
     });
 
     // ── P0/P1/P2 Feature Modules ──────────────────────────────────────
@@ -986,13 +927,7 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
     m_gitBlame = new GitBlame(this);
     m_statusBarWidget = new StatusBarWidget(this);
     m_encodingManager = new EncodingManager(this);
-    m_diffViewer = new DiffViewerWidget(this);
     m_notificationCenter = new NotificationCenter(this);
-
-    // Add DiffViewer to bottom panel tabs
-    bottomPanelTabs->addTab(tr("Diff"));
-    bottomPanelStack->addWidget(m_diffViewer);
-    m_diffViewer->hide();
 
     // Replace default status bar with custom status bar
     statusBar()->setVisible(false);
@@ -1072,8 +1007,6 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
             m_taskRunnerUI->detectTasks(projectPath);
             return;
         }
-        // Show terminal via dock
-        toggleTerminalPanel();
     });
 
     // Connect notification center to status bar

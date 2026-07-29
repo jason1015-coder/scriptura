@@ -144,36 +144,7 @@ void MainWindow::resizeEvent(QResizeEvent *event)
 
 void MainWindow::handleDockAppClicked(const QString &appId)
 {
-    // Apps that show in the editor stack (replacing the editor)
-    if (appId == "com.scriptura.terminal") {
-        toggleTerminalPanel();
-        return;
-    }
-    if (appId == "com.scriptura.todo") {
-        toggleTodoPanel();
-        return;
-    }
-
-    // Apps that show in the bottom panel
-    if (appId == "com.scriptura.problems") {
-        toggleProblemPanel();
-        return;
-    }
-    if (appId == "com.scriptura.git") {
-        // If already showing, toggle off
-        if (gitPanel->isVisible() && ui->bottomPanelContainer->isVisible() &&
-            bottomPanelTabs->currentIndex() == 1) {
-            ui->bottomPanelContainer->hide();
-            gitPanel->hide();
-            m_activeDockAppId.clear();
-            if (m_appDock) m_appDock->setActiveApp(QString());
-        } else {
-            showGitPanel();
-        }
-        return;
-    }
-
-    // All other dock apps use the ApplicationManager
+    // All dock apps use the ApplicationManager
     if (!m_appManager) return;
 
     QWidget *appWidget = m_appManager->widget(appId);
@@ -215,12 +186,6 @@ void MainWindow::handleDockAppClicked(const QString &appId)
         m_activeDockAppId.clear();
         if (m_appDock) m_appDock->setActiveApp(QString());
     } else {
-        // Close editor-stack apps first
-        if (editorStack->currentWidget() == todoPanel || editorStack->currentWidget() == terminalPanel) {
-            if (m_previousEditorStackIndex >= 0 && m_previousEditorStackIndex < editorStack->count()) {
-                editorStack->setCurrentIndex(m_previousEditorStackIndex);
-            }
-        }
         ui->bottomPanelContainer->show();
         bottomPanelTabs->setCurrentIndex(tabIndex);
         bottomPanelStack->setCurrentIndex(tabIndex);

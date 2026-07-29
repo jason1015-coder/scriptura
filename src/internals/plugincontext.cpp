@@ -101,36 +101,6 @@ RustLspClientAdapter* PluginContext::lspClient() const
     return m_mainWindow->getLspClient();
 }
 
-ProblemPanel* PluginContext::problemPanel() const
-{
-    if (!m_mainWindow) return nullptr;
-    return m_mainWindow->getProblemPanel();
-}
-
-TerminalPanel* PluginContext::terminalPanel() const
-{
-    if (!m_mainWindow) return nullptr;
-    if (!m_currentPluginId.isEmpty()) {
-        if (!RUST_BACKEND->permissionManager()->checkPermission(m_currentPluginId, Permission::ProcessExecution)) {
-            qWarning() << "Plugin" << m_currentPluginId << "denied access to terminalPanel (ProcessExecution)";
-            return nullptr;
-        }
-    }
-    return m_mainWindow->getTerminalPanel();
-}
-
-GitPanel* PluginContext::gitPanel() const
-{
-    if (!m_mainWindow) return nullptr;
-    if (!m_currentPluginId.isEmpty()) {
-        if (!RUST_BACKEND->permissionManager()->checkPermission(m_currentPluginId, Permission::ProcessExecution)) {
-            qWarning() << "Plugin" << m_currentPluginId << "denied access to gitPanel (ProcessExecution)";
-            return nullptr;
-        }
-    }
-    return m_mainWindow->getGitPanel();
-}
-
 QString PluginContext::currentProjectPath() const
 {
     if (!m_mainWindow) return QString();

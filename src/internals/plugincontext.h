@@ -13,9 +13,6 @@ class RustEventBusAdapter;
 class MainWindow;
 class CodeEditor;
 class RustLspClientAdapter;
-class ProblemPanel;
-class TerminalPanel;
-class GitPanel;
 class PluginUIApi;
 class PluginEditorApi;
 class PluginNotificationApi;
@@ -56,9 +53,6 @@ public:
     void setCurrentPluginId(const QString& pluginId);
     CodeEditor* currentEditor() const;
     RustLspClientAdapter* lspClient() const;
-    ProblemPanel* problemPanel() const;
-    TerminalPanel* terminalPanel() const;
-    GitPanel* gitPanel() const;
     QString currentProjectPath() const;
     QObject* getPlugin(const QString& id) const;
 

@@ -29,11 +29,6 @@
 #include <QScrollArea>
 #include <memory>
 #include "codeeditor.h"
-#include "problempanel.h"
-#include "todopanel.h"
-#include "gitpanel.h"
-#include "terminalpanel.h"
-#include "debugpanel.h"
 #include "findreplace.h"
 #include "zenmode.h"
 #include "filewatcher.h"
@@ -45,7 +40,6 @@
 #include "gitblame.h"
 #include "statusbarwidget.h"
 #include "encodingmanager.h"
-#include "diffviewer.h"
 #include "notificationcenter.h"
 #include "gitrebase.h"
 #include "shortcuteditor.h"
@@ -105,9 +99,7 @@ public:
     CodeEditor* getCurrentCodeEditor();
     QString currentProjectPath() const { return projectDir; }
     RustLspClientAdapter* getLspClient() const { return lspClient; }
-    ProblemPanel* getProblemPanel() const { return problemPanel; }
-    TerminalPanel* getTerminalPanel() const { return terminalPanel; }
-    GitPanel* getGitPanel() const { return gitPanel; }
+
     bool isDarkModeEnabled() const { return selectedTheme.mode == ThemeMode::Dark; }
 
 #ifdef Q_OS_WIN
@@ -203,10 +195,7 @@ private:
     ProjectSearchPanel *projectSearchPanel;
     CommandPalette *commandPalette;
     QStackedWidget *editorStack;
-    ProblemPanel *problemPanel;
-    TodoPanel    *todoPanel;
-    GitPanel     *gitPanel;
-    TerminalPanel *terminalPanel;
+
     Theme selectedTheme;
 
     // Unified scrollable settings page
@@ -229,7 +218,6 @@ private:
     
     // Debugger
     RustDapClientAdapter *dapClient;
-    DebugPanel *debugPanel;
     std::unique_ptr<DebugConfigurationManager> debugConfigManager;
     bool m_isDebugging;
     int m_currentFrameId = 0;
@@ -282,7 +270,6 @@ private:
     GitBlame *m_gitBlame;
     StatusBarWidget *m_statusBarWidget;
     EncodingManager *m_encodingManager;
-    DiffViewerWidget *m_diffViewer;
     NotificationCenter *m_notificationCenter;
     GitRebaseWidget *m_gitRebase;
     TaskRunnerUI *m_taskRunnerUI;
@@ -301,7 +288,6 @@ private:
     QIcon createSymbolIcon(QChar symbol) const;
     QPushButton* createTabCloseButton(const QString &filePath);
     QPushButton* createSettingsTabCloseButton(int tabIndex);
-    QString findTerminal();
     QPlainTextEdit* getCurrentEditor();
     QWidget* createUnifiedSettingsWidget();
     void startLanguageServer(const QString &filePath);
@@ -309,12 +295,6 @@ private:
     void stopLanguageServer();
     void onDiagnosticsReceived(const QString &uri, const QJsonArray &diagnostics);
     void onProblemActivated(const QString &fileUri, int line, int column);
-    void onProblemsFilterChanged(ProblemPanel::Filter filter);
-    void toggleProblemPanel();
-    void toggleTerminalPanel();
-    void toggleTodoPanel();
-    void showGitPanel();
-    void showBottomPanel(QWidget *panel);
     void onUpdateAvailable(const QString &version, const QString &downloadUrl);
     void onUpdateCheckFailed(const QString &error);
     void onTestResultsReceived(const QString &output);

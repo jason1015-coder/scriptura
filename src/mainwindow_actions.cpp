@@ -1,10 +1,6 @@
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
 #include "codeeditor.h"
-#include "gitpanel.h"
-#include "terminalpanel.h"
-#include "problempanel.h"
-#include "todopanel.h"
 #include "rust_adapter.h"
 #include "findreplace.h"
 #include "projectsearch.h"
@@ -149,32 +145,6 @@ void MainWindow::on_action_delete_file_directory_triggered()
     }
 }
 
-
-void MainWindow::toggleTerminalPanel()
-{
-    if (editorStack->currentWidget() == terminalPanel) {
-        if (m_previousEditorStackIndex >= 0 && m_previousEditorStackIndex < editorStack->count()) {
-            editorStack->setCurrentIndex(m_previousEditorStackIndex);
-        }
-        m_activeDockAppId.clear();
-    } else {
-        m_previousEditorStackIndex = editorStack->currentIndex();
-        editorStack->setCurrentWidget(terminalPanel);
-        m_activeDockAppId = "com.scriptura.terminal";
-        if (ui->bottomPanelContainer->isVisible()) {
-            ui->bottomPanelContainer->hide();
-            problemPanel->hide();
-            gitPanel->hide();
-        }
-        if (!terminalPanel->isRunning()) {
-            terminalPanel->startShell(projectDir.isEmpty() ? QDir::currentPath() : projectDir);
-        } else {
-            terminalPanel->setWorkingDirectory(projectDir.isEmpty() ? QDir::currentPath() : projectDir);
-        }
-    }
-    if (m_appDock) m_appDock->setActiveApp(m_activeDockAppId);
-}
-
 void MainWindow::toggleSidebar()
 {
     if (sidebarToggleButton->isChecked()) {
@@ -194,78 +164,6 @@ void MainWindow::toggleSidebar()
     }
 }
 
-
-void MainWindow::toggleTodoPanel()
-{
-    if (editorStack->currentWidget() == todoPanel) {
-        if (m_previousEditorStackIndex >= 0 && m_previousEditorStackIndex < editorStack->count()) {
-            editorStack->setCurrentIndex(m_previousEditorStackIndex);
-        }
-        m_activeDockAppId.clear();
-    } else {
-        m_previousEditorStackIndex = editorStack->currentIndex();
-        editorStack->setCurrentWidget(todoPanel);
-        m_activeDockAppId = "com.scriptura.todo";
-        if (ui->bottomPanelContainer->isVisible()) {
-            ui->bottomPanelContainer->hide();
-            problemPanel->hide();
-            gitPanel->hide();
-        }
-    }
-    if (m_appDock) m_appDock->setActiveApp(m_activeDockAppId);
-}
-
-void MainWindow::toggleProblemPanel()
-{
-    bool isVisible = problemPanel->isVisible() && ui->bottomPanelContainer->isVisible();
-    if (!isVisible) {
-        bottomPanelTabs->setCurrentIndex(0);
-        bottomPanelStack->setCurrentIndex(0);
-        problemPanel->show();
-        if (m_windowAnimator) {
-            m_windowAnimator->animatePanelSlide(ui->bottomPanelContainer, true, 200);
-        } else {
-            ui->bottomPanelContainer->show();
-        }
-        // Close other panels
-        if (editorStack->currentWidget() == todoPanel || editorStack->currentWidget() == terminalPanel) {
-            if (m_previousEditorStackIndex >= 0 && m_previousEditorStackIndex < editorStack->count()) {
-                editorStack->setCurrentIndex(m_previousEditorStackIndex);
-            }
-        }
-        if (gitPanel->isVisible()) gitPanel->hide();
-        m_activeDockAppId = "com.scriptura.problems";
-    } else {
-        if (m_windowAnimator) {
-            m_windowAnimator->animatePanelSlide(ui->bottomPanelContainer, false, 200);
-        } else {
-            ui->bottomPanelContainer->hide();
-        }
-        problemPanel->hide();
-        m_activeDockAppId.clear();
-    }
-    if (m_appDock) m_appDock->setActiveApp(m_activeDockAppId);
-}
-
-void MainWindow::showGitPanel()
-{
-    bottomPanelTabs->setCurrentIndex(1);
-    bottomPanelStack->setCurrentIndex(1);
-    gitPanel->show();
-    if (m_windowAnimator) {
-        m_windowAnimator->animatePanelSlide(ui->bottomPanelContainer, true, 200);
-    } else {
-        ui->bottomPanelContainer->show();
-    }
-    if (editorStack->currentWidget() == todoPanel || editorStack->currentWidget() == terminalPanel) {
-        if (m_previousEditorStackIndex >= 0 && m_previousEditorStackIndex < editorStack->count())
-            editorStack->setCurrentIndex(m_previousEditorStackIndex);
-    }
-    if (problemPanel->isVisible()) problemPanel->hide();
-    m_activeDockAppId = "com.scriptura.git";
-    if (m_appDock) m_appDock->setActiveApp(m_activeDockAppId);
-}
-
 void MainWindow::on_action_about_triggered()
 {
     QMessageBox::about(this, tr("About Scriptura"),
@@ -274,7 +172,6 @@ void MainWindow::on_action_about_triggered()
            "Built with C++17 and Qt Widgets.\n\n"
            "License: MIT").arg(SCRIPTURA_VERSION));
 }
-
 
 void MainWindow::toggleInspector()
 {
@@ -317,7 +214,6 @@ void MainWindow::showSearchBar(bool show)
     if (editor)
         editor->setExtraSelections(QList<QTextEdit::ExtraSelection>());
 }
-
 
 void MainWindow::updateStatusBar()
 {
@@ -450,18 +346,14 @@ void MainWindow::addRecentFile(const QString &path)
     saveRecentProjects();
 }
 
-
-
 void MainWindow::autoSave()
 {
     for (int i = 0; i < openFiles.size(); i++) {
         if (openFiles[i].modified) {
             QFileInfo fileInfo(openFiles[i].filePath);
-            // Skip if file no longer exists or path is empty
             if (openFiles[i].filePath.isEmpty() || !fileInfo.exists()) {
                 continue;
             }
-            // Skip if file is not writable
             if (!fileInfo.isWritable()) {
                 qDebug() << "Auto-save skipped (not writable):" << openFiles[i].filePath;
                 continue;
@@ -491,14 +383,12 @@ bool MainWindow::checkUnsavedChanges()
                 QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel);
 
             if (reply == QMessageBox::Save) {
-                // Find and save the modified file
                 for (int i = 0; i < openFiles.size(); ++i) {
                     if (openFiles[i].filePath == f.filePath && openFiles[i].modified) {
                         ui->tabWidget->setCurrentIndex(i);
                         currentFile = openFiles[i].filePath;
                         on_action_save_triggered();
                         if (openFiles[i].modified) {
-                            // Save failed or cancelled
                             return false;
                         }
                         break;
@@ -512,62 +402,18 @@ bool MainWindow::checkUnsavedChanges()
     return true;
 }
 
-
 void MainWindow::on_action_git_pull_triggered()
 {
-    if (QStandardPaths::findExecutable("git").isEmpty()) {
-        QMessageBox::warning(this, tr("Error"), tr("Git is not installed or not in PATH."));
-        return;
-    }
-    QProcess gitProcess(this);
-    gitProcess.setWorkingDirectory(projectDir.isEmpty() ? QDir::currentPath() : projectDir);
-    gitProcess.start("git", {"pull"});
-    if (gitProcess.waitForFinished(30000)) {
-        QString output = QString::fromLocal8Bit(gitProcess.readAllStandardOutput());
-        QString error = QString::fromLocal8Bit(gitProcess.readAllStandardError());
-        gitPanel->setOutput(output + error);
-        gitPanel->detectMergeConflicts();
-    } else {
-        gitPanel->setOutput(tr("Failed to run git pull. The operation may have timed out."));
-    }
-    // Close other panels
-    if (editorStack->currentWidget() == terminalPanel || editorStack->currentWidget() == todoPanel) {
-        if (m_previousEditorStackIndex >= 0 && m_previousEditorStackIndex < editorStack->count()) {
-            editorStack->setCurrentIndex(m_previousEditorStackIndex);
-        }
-    }
-    if (problemPanel->isVisible()) {
-        problemPanel->hide();
-    }
-    showGitPanel();
+    QMessageBox::information(this, tr("Git Pull"),
+        tr("Git functionality is provided by the Git application.\n"
+           "Install it from the Plugin Marketplace to use Git features."));
 }
 
 void MainWindow::on_action_git_fetch_triggered()
 {
-    if (QStandardPaths::findExecutable("git").isEmpty()) {
-        QMessageBox::warning(this, tr("Error"), tr("Git is not installed or not in PATH."));
-        return;
-    }
-    QProcess gitProcess(this);
-    gitProcess.setWorkingDirectory(projectDir.isEmpty() ? QDir::currentPath() : projectDir);
-    gitProcess.start("git", {"fetch"});
-    if (gitProcess.waitForFinished(30000)) {
-        QString output = QString::fromLocal8Bit(gitProcess.readAllStandardOutput());
-        QString error = QString::fromLocal8Bit(gitProcess.readAllStandardError());
-        gitPanel->setOutput(output + error);
-    } else {
-        gitPanel->setOutput(tr("Failed to run git fetch. The operation may have timed out."));
-    }
-    // Close other panels
-    if (editorStack->currentWidget() == terminalPanel || editorStack->currentWidget() == todoPanel) {
-        if (m_previousEditorStackIndex >= 0 && m_previousEditorStackIndex < editorStack->count()) {
-            editorStack->setCurrentIndex(m_previousEditorStackIndex);
-        }
-    }
-    if (problemPanel->isVisible()) {
-        problemPanel->hide();
-    }
-    showGitPanel();
+    QMessageBox::information(this, tr("Git Fetch"),
+        tr("Git functionality is provided by the Git application.\n"
+           "Install it from the Plugin Marketplace to use Git features."));
 }
 
 void MainWindow::on_action_find_triggered()
@@ -592,8 +438,8 @@ void MainWindow::on_action_project_search_triggered()
 {
     QString root = projectDir.isEmpty() ? QDir::homePath() : projectDir;
     findReplaceBar->setVisible(false);
-    bottomPanelTabs->setCurrentIndex(2);
-    bottomPanelStack->setCurrentIndex(2);
+    bottomPanelTabs->setCurrentIndex(0);
+    bottomPanelStack->setCurrentIndex(0);
     projectSearchPanel->show();
     ui->bottomPanelContainer->show();
     projectSearchPanel->setRootPath(root);
@@ -630,5 +476,4 @@ void MainWindow::on_action_command_palette_triggered()
     }});
     commandPalette->registerCommand({"theme", tr("Theme"), "Ctrl+T", [this]() { on_action_theme_triggered(); }});
     commandPalette->registerCommand({"editor-settings", tr("Editor Settings"), "", [this]() { on_action_editor_settings_triggered(); }});
-
 }

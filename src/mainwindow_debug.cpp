@@ -2,7 +2,6 @@
 #include "ui_mainwindow.h"
 #include "codeeditor.h"
 #include "rust_adapter.h"
-#include "debugpanel.h"
 #include "debugconfiguration.h"
 #include "rundialog.h"
 
@@ -168,10 +167,6 @@ void MainWindow::startDebug(const QString &configName)
     
     m_isDebugging = true;
     
-    ui->bottomPanelContainer->show();
-    bottomPanelTabs->setCurrentIndex(3);
-    bottomPanelStack->setCurrentIndex(3);
-    debugPanel->show();
 }
 
 void MainWindow::stopDebug()
@@ -187,9 +182,6 @@ void MainWindow::stopDebug()
     if (editor) {
         editor->clearBreakpoints();
     }
-    
-    debugPanel->hide();
-    ui->bottomPanelContainer->hide();
 }
 
 void MainWindow::loadDebugConfigurations()
@@ -227,15 +219,6 @@ void MainWindow::onDapStopped(const QString &reason)
     qDebug() << "DAP stopped:" << reason;
     
     dapClient->stackTrace(1); // Default thread ID 1
-
-    debugPanel->clearVariables();
-    
-    if (!debugPanel->isVisible()) {
-        ui->bottomPanelContainer->show();
-        bottomPanelTabs->setCurrentIndex(3);
-        bottomPanelStack->setCurrentIndex(3);
-        debugPanel->show();
-    }
 }
 
 void MainWindow::onDapContinued()
@@ -251,9 +234,6 @@ void MainWindow::onStackTraceReceived(int threadId, const QJsonArray &frames)
 {
     Q_UNUSED(threadId)
     qDebug() << "Stack trace received with" << frames.size() << "frames";
-    
-    // Convert QJsonArray to internal format for the debug panel
-    debugPanel->setStack(frames);
     
     if (!frames.isEmpty()) {
         QJsonObject topFrame = frames[0].toObject();
@@ -287,7 +267,7 @@ void MainWindow::onScopesReceived(int frameId, const QJsonArray &scopes)
 void MainWindow::onVariablesReceived(int variablesReference, const QJsonArray &variables)
 {
     Q_UNUSED(variablesReference)
-    debugPanel->addVariables(variables);
+    Q_UNUSED(variables)
 }
 
 void MainWindow::onDapLogMessage(const QString &msg)

@@ -918,24 +918,6 @@ void MainWindow::on_action_license_triggered()
 }
 
 
-QString MainWindow::findTerminal()
-{
-#ifdef Q_OS_WIN
-    return "cmd.exe";
-#elif defined(Q_OS_MAC)
-    return "open";
-#else
-    QStringList candidates = {"konsole", "gnome-terminal", "xfce4-terminal",
-                              "mate-terminal", "alacritty", "kitty", "xterm"};
-    for (const QString &term : candidates) {
-        if (!QStandardPaths::findExecutable(term).isEmpty())
-            return term;
-    }
-    return "xterm";
-#endif
-}
-
-
 void MainWindow::updateFamilyButtonPreview(QPushButton *btn, ThemeColorFamily family, ThemeMode mode, ThemeFeatures features)
 {
     ThemeManager::ColorFamily tmFamily = static_cast<ThemeManager::ColorFamily>(static_cast<int>(family));

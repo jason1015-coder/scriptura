@@ -5,7 +5,6 @@
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
 #include "codeeditor.h"
-#include "problempanel.h"
 #include "rust_adapter.h"
 
 #include <QUrl>
@@ -144,9 +143,6 @@ void MainWindow::stopLanguageServer()
 
 void MainWindow::onDiagnosticsReceived(const QString &uri, const QJsonArray &diagnostics)
 {
-    // Update problem panel
-    problemPanel->setProblems(uri, diagnostics);
-
     // Update squiggly underlines in editor
     for (int i = 0; i < ui->tabWidget->count(); ++i) {
         CodeEditor *editor = qobject_cast<CodeEditor*>(ui->tabWidget->widget(i));
@@ -237,11 +233,6 @@ void MainWindow::onProblemActivated(const QString &fileUri, int line, int column
     }
 }
 
-void MainWindow::onProblemsFilterChanged(ProblemPanel::Filter filter)
-{
-    Q_UNUSED(filter)
-}
-
 void MainWindow::on_action_git_commit_triggered()
 {
     if (QStandardPaths::findExecutable("git").isEmpty()) {
@@ -258,18 +249,10 @@ void MainWindow::on_action_git_commit_triggered()
         if (gitProcess.waitForFinished(10000)) {
             QString output = QString::fromLocal8Bit(gitProcess.readAllStandardOutput());
             QString error = QString::fromLocal8Bit(gitProcess.readAllStandardError());
-            gitPanel->setOutput(output + error);
+            QMessageBox::information(this, tr("Git Commit"), output + error);
         } else {
-            gitPanel->setOutput(tr("Failed to run git commit. The operation may have timed out."));
-        }    if (editorStack->currentWidget() == terminalPanel || editorStack->currentWidget() == todoPanel) {
-        if (m_previousEditorStackIndex >= 0 && m_previousEditorStackIndex < editorStack->count()) {
-            editorStack->setCurrentIndex(m_previousEditorStackIndex);
+            QMessageBox::warning(this, tr("Git Commit"), tr("Failed to run git commit."));
         }
-    }
-    if (problemPanel->isVisible()) {
-        problemPanel->hide();
-    }
-        showGitPanel();
     }
 }
 
@@ -286,19 +269,10 @@ void MainWindow::on_action_git_push_triggered()
     if (gitProcess.waitForFinished(30000)) {
         QString output = QString::fromLocal8Bit(gitProcess.readAllStandardOutput());
         QString error = QString::fromLocal8Bit(gitProcess.readAllStandardError());
-        gitPanel->setOutput(output + error);
+        QMessageBox::information(this, tr("Git Push"), output + error);
     } else {
-        gitPanel->setOutput(tr("Failed to run git push. The operation may have timed out."));
+        QMessageBox::warning(this, tr("Git Push"), tr("Failed to run git push."));
     }
-    if (editorStack->currentWidget() == terminalPanel || editorStack->currentWidget() == todoPanel) {
-        if (m_previousEditorStackIndex >= 0 && m_previousEditorStackIndex < editorStack->count()) {
-            editorStack->setCurrentIndex(m_previousEditorStackIndex);
-        }
-    }
-    if (problemPanel->isVisible()) {
-        problemPanel->hide();
-    }
-    showGitPanel();
 }
 
 void MainWindow::onEditorTextChanged()
@@ -317,9 +291,6 @@ void MainWindow::onEditorTextChanged()
     if (m_codeLensManager && m_codeLensManager->isEnabled()) {
         m_codeLensManager->requestCodeLens(editor, lspClient, uri);
     }
-
-    // Always parse todos when text changes — the dock controls visibility
-    todoPanel->parseDocument(editor->toPlainText(), currentFile);
 }
 
 void MainWindow::requestHover()
