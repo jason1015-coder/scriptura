@@ -320,47 +320,11 @@ void ApplicationManager::registerAvailableApps()
         m_apps[id] = loaded;
     };
 
-    registerApp("com.scriptura.git",       "Git",          ":/icons/git.svg",
-                 "Git",         "Git version control integration",
-                 "https://github.com/scriptura/git-app");
-    registerApp("com.scriptura.httpclient", "HTTP Client",  ":/icons/http.svg",
-                 "HTTP Client", "REST API client for testing endpoints",
-                 "https://github.com/scriptura/httpclient-app");
-    registerApp("com.scriptura.database",   "Database",     ":/icons/database.svg",
-                 "Database",    "SQLite database viewer",
-                 "https://github.com/scriptura/sqlite-app");
-    registerApp("com.scriptura.regex",      "Regex",        ":/icons/regex.svg",
-                 "Regex",        "Regular expression testing tool",
-                 "https://github.com/scriptura/regex-app");
-    registerApp("com.scriptura.formatter",  "Format",       ":/icons/format.svg",
-                 "Format",       "Data formatter for JSON, YAML, XML",
-                 "https://github.com/scriptura/formatter-app");
-    registerApp("com.scriptura.preview",    "Preview",      ":/icons/preview.svg",
-                 "Preview",      "Live Markdown preview",
-                 "https://github.com/scriptura/preview-app");
-    registerApp("com.scriptura.replacer",   "Replace",      ":/icons/replace.svg",
-                 "Replace",      "Global find-and-replace with preview",
-                 "https://github.com/scriptura/replace-app");
-    registerApp("com.scriptura.diff",       "Diff",         ":/icons/diff.svg",
-                 "Diff",         "Side-by-side file comparison viewer",
-                 "https://github.com/scriptura/diff-app");
-    registerApp("com.scriptura.test",       "Test",         ":/icons/test.svg",
-                 "Test",         "Test runner for test suites and results",
-                 "https://github.com/scriptura/test-app");
-
-    // Sidebar apps migrated to dock
-    registerApp("com.scriptura.todo",       "Todo",         ":/icons/todo.svg",
-                 "Todo",         "TODO, FIXME, and annotation tracker",
-                 "https://github.com/scriptura/todo-app");
-    registerApp("com.scriptura.problems",   "Problems",     ":/icons/problems.svg",
-                 "Problems",     "LSP diagnostic problems panel",
-                 "https://github.com/scriptura/problem-app");
-    registerApp("com.scriptura.terminal",   "Terminal",     ":/icons/terminal.svg",
-                 "Terminal",     "Embedded terminal emulator",
-                 "https://github.com/scriptura/terminal-app");
-    registerApp("com.scriptura.debug",      "Debug",        ":/icons/debug.svg",
-                 "Debug",        "DAP-based debugger for programs",
-                 "https://github.com/scriptura/debug-app");
+    // All built-in tools have been consolidated into a single Utilities app.
+    registerApp("com.scriptura.utilities", "Utilities",    ":/icons/tools.svg",
+                 "Utilities",   "All-in-one utility panel — Git, Terminal, Debug, HTTP Client, "
+                 "Database, Regex, Diff, Replace, Formatter, Preview, Problems, Tests, and Todo",
+                 "https://github.com/scriptura/utility-app");
 }
 
 bool ApplicationManager::isInstalled(const QString& id) const
