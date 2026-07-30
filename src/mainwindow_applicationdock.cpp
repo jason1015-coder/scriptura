@@ -48,6 +48,9 @@ void MainWindow::setupApplicationDock()
     m_appDock = new ApplicationDock(this);
     m_appDock->setObjectName("applicationDock");
 
+    // Wire ThemeManager for auto-update on theme changes
+    m_appDock->setThemeManager(m_themeManager);
+
     // Position the dock at the bottom center of the main window
     QTimer::singleShot(0, this, [this]() {
         if (!m_appDock) return;

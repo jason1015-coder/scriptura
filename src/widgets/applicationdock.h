@@ -5,6 +5,7 @@
 #include <QHBoxLayout>
 #include <QToolButton>
 #include <QPropertyAnimation>
+#include <QVariantAnimation>
 #include <QTimer>
 #include <QHash>
 #include <QString>
@@ -12,6 +13,8 @@
 #include <QColor>
 #include <QPointF>
 #include <QEasingCurve>
+
+class ThemeManager;
 
 /**
  * @file applicationdock.h
@@ -77,6 +80,34 @@ public:
      */
     int entryCount() const { return m_entries.size(); }
 
+    // ── Theme Support ────────────────────────────────────────────
+
+    /**
+     * @brief Update dock colors to match the current theme
+     * @param bg RGBA background color for the dock
+     * @param border RGBA border color
+     * @param accent Accent color for active indicator
+     * @param isDark Whether the current theme is dark
+     */
+    void updateTheme(const QColor& bg, const QColor& border, const QColor& accent, bool isDark);
+
+    /**
+     * @brief Connect to a ThemeManager for auto-update on theme changes
+     */
+    void setThemeManager(ThemeManager* mgr);
+
+    /**
+     * @brief Get the currently rendered theme colors (for testing / debugging)
+     */
+    struct ThemeColors {
+        QColor glassBg;
+        QColor glassBgEnd;
+        QColor borderColor;
+        QColor accentColor;
+        bool isDark;
+    };
+    ThemeColors currentThemeColors() const;
+
     // ── Magnification Property ───────────────────────────────────
 
     float magnification() const { return m_magnification; }
@@ -84,6 +115,9 @@ public:
 
 signals:
     void appClicked(const QString& appId);
+
+private slots:
+    void onThemeChanged();
 
 private:
     struct DockButton {
@@ -111,6 +145,28 @@ private:
     int m_padding = 12;
     int m_borderRadius = 16;
     QEasingCurve m_easingCurve;
+
+    // ── Theme colors (populated by updateTheme) ──────────────────
+    QColor m_glassBg      = QColor(40, 40, 40, 200);
+    QColor m_glassBgEnd   = QColor(20, 20, 20, 220);
+    QColor m_borderColor  = QColor(255, 255, 255, 30);
+    QColor m_accentColor  = QColor(0, 122, 255);
+    bool   m_isDark       = true;
+
+    // ── Theme animation (fade between themes) ────────────────────
+    QVariantAnimation* m_themeAnim = nullptr;
+    QColor m_animSrcBg;
+    QColor m_animSrcBgEnd;
+    QColor m_animSrcBorder;
+    QColor m_animSrcAccent;
+    QColor m_animTgtBg;
+    QColor m_animTgtBgEnd;
+    QColor m_animTgtBorder;
+    QColor m_animTgtAccent;
+
+    static QColor lerpColor(const QColor& from, const QColor& to, double t);
+
+    ThemeManager* m_themeManager = nullptr;
 };
 
 #endif // APPLICATIONDOCK_H

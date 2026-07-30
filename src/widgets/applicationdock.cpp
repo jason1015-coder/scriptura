@@ -1,4 +1,6 @@
 #include "applicationdock.h"
+#include "themeicons.h"
+#include "thememanager.h"
 
 #include <QPainter>
 #include <QPainterPath>
@@ -23,14 +25,34 @@ ApplicationDock::ApplicationDock(QWidget* parent)
     setMouseTracking(true);
     setAttribute(Qt::WA_TranslucentBackground);
 
-    // Frosted glass backdrop
+    // Border radius is set via stylesheet; background is custom-painted in paintEvent
+    // so it adapts to the current theme colors.
     setStyleSheet(R"(
         QWidget#applicationDock {
-            background-color: rgba(30, 30, 30, 180);
-            border: 1px solid rgba(255, 255, 255, 20);
             border-radius: 16px;
         }
     )");
+
+    // ── Theme fade animation ───────────────────────────────────────
+    m_themeAnim = new QVariantAnimation(this);
+    m_themeAnim->setDuration(300);
+    m_themeAnim->setEasingCurve(QEasingCurve::OutCubic);
+    connect(m_themeAnim, &QVariantAnimation::valueChanged, this, [this](const QVariant& value) {
+        double t = value.toDouble();
+        m_glassBg     = lerpColor(m_animSrcBg,     m_animTgtBg,     t);
+        m_glassBgEnd  = lerpColor(m_animSrcBgEnd,  m_animTgtBgEnd,  t);
+        m_borderColor = lerpColor(m_animSrcBorder, m_animTgtBorder, t);
+        m_accentColor = lerpColor(m_animSrcAccent, m_animTgtAccent, t);
+        update();
+    });
+    connect(m_themeAnim, &QVariantAnimation::finished, this, [this]() {
+        // Snap to exact target colors on finish
+        m_glassBg     = m_animTgtBg;
+        m_glassBgEnd  = m_animTgtBgEnd;
+        m_borderColor = m_animTgtBorder;
+        m_accentColor = m_animTgtAccent;
+        update();
+    });
 }
 
 ApplicationDock::~ApplicationDock()
@@ -55,7 +77,8 @@ int ApplicationDock::addEntry(const QString& id, const QString& iconPath,
     entry->entry.accentColor = accentColor;
 
     entry->button = new QToolButton(this);
-    entry->button->setIcon(QIcon(iconPath));
+    // Use ThemeIcons for theme-aware SVG tinting — icons auto-recolor on theme change
+    ThemeIcons::instance()->setIcon(entry->button, iconPath, ThemeIcons::Role::Svg);
     entry->button->setIconSize(QSize(m_iconBaseSize, m_iconBaseSize));
     entry->button->setFixedSize(m_iconBaseSize + 16, m_iconBaseSize + 16);
     entry->button->setToolTip(tooltip);
@@ -198,18 +221,18 @@ void ApplicationDock::paintEvent(QPaintEvent* event)
     QPainter painter(this);
     painter.setRenderHint(QPainter::Antialiasing);
 
-    // Draw frosted glass background
+    // Draw frosted glass background using theme-aware colors
     QPainterPath path;
     path.addRoundedRect(rect(), m_borderRadius, m_borderRadius);
 
     // Gradient backdrop
     QLinearGradient grad(0, 0, 0, height());
-    grad.setColorAt(0, QColor(40, 40, 40, 200));
-    grad.setColorAt(1, QColor(20, 20, 20, 220));
+    grad.setColorAt(0, m_glassBg);
+    grad.setColorAt(1, m_glassBgEnd);
     painter.fillPath(path, grad);
 
     // Subtle border
-    QPen borderPen(QColor(255, 255, 255, 30));
+    QPen borderPen(m_borderColor);
     borderPen.setWidthF(0.5);
     painter.setPen(borderPen);
     painter.drawPath(path);
@@ -223,7 +246,7 @@ void ApplicationDock::paintEvent(QPaintEvent* event)
 
             QColor dotColor = btn->entry.accentColor.isValid()
                                 ? btn->entry.accentColor
-                                : QColor(0, 122, 255);
+                                : m_accentColor;
 
             painter.setBrush(dotColor);
             painter.setPen(Qt::NoPen);
@@ -258,4 +281,105 @@ void ApplicationDock::leaveEvent(QEvent* event)
 
     layoutButtons();
     update();
+}
+
+// ── Theme Support ───────────────────────────────────────────────────
+
+ApplicationDock::ThemeColors ApplicationDock::currentThemeColors() const
+{
+    return { m_glassBg, m_glassBgEnd, m_borderColor, m_accentColor, m_isDark };
+}
+
+void ApplicationDock::setThemeManager(ThemeManager* mgr)
+{
+    if (m_themeManager) {
+        disconnect(m_themeManager, &ThemeManager::themeChanged,
+                   this, &ApplicationDock::onThemeChanged);
+    }
+
+    m_themeManager = mgr;
+
+    if (mgr) {
+        connect(mgr, &ThemeManager::themeChanged,
+                this, &ApplicationDock::onThemeChanged);
+        // Apply the current theme immediately
+        onThemeChanged();
+    }
+}
+
+void ApplicationDock::onThemeChanged()
+{
+    if (!m_themeManager) return;
+
+    auto theme = m_themeManager->currentTheme();
+    bool isDark = theme.isDark();
+    QColor accent = m_themeManager->accentColor();
+
+    // Compute glass colors matching the pattern used in MainWindow::applyTheme
+    QColor glassBg = isDark ? QColor(56, 58, 61, 230) : QColor(246, 246, 246, 230);
+    QColor glassBorder = isDark ? QColor(255, 255, 255, 20) : QColor(0, 0, 0, 25);
+
+    updateTheme(glassBg, glassBorder, accent, isDark);
+}
+
+void ApplicationDock::updateTheme(const QColor& bg, const QColor& border,
+                                   const QColor& accent, bool isDark)
+{
+    m_isDark = isDark;
+
+    // Compute the glassBgEnd from the base bg color
+    QColor bgEnd = isDark ? bg.darker(130) : bg.darker(110);
+
+    // Store current rendered colors as animation source
+    m_animSrcBg     = m_glassBg;
+    m_animSrcBgEnd  = m_glassBgEnd;
+    m_animSrcBorder = m_borderColor;
+    m_animSrcAccent = m_accentColor;
+
+    // Store new colors as animation target
+    m_animTgtBg     = bg;
+    m_animTgtBgEnd  = bgEnd;
+    m_animTgtBorder = border;
+    m_animTgtAccent = accent;
+
+    // Start the fade animation
+    m_themeAnim->stop();
+    m_themeAnim->setStartValue(0.0);
+    m_themeAnim->setEndValue(1.0);
+    m_themeAnim->start();
+
+    // Update button hover/press colors to match the theme (instant, no animation needed)
+    QString hoverBg  = isDark ? "rgba(255, 255, 255, 30)" : "rgba(0, 0, 0, 12)";
+    QString pressBg  = isDark ? "rgba(255, 255, 255, 50)" : "rgba(0, 0, 0, 20)";
+
+    for (auto* btn : m_entries) {
+        btn->button->setStyleSheet(QString(R"(
+            QToolButton {
+                border: none;
+                border-radius: 12px;
+                background: transparent;
+                padding: 4px;
+            }
+            QToolButton:hover {
+                background: %1;
+            }
+            QToolButton:pressed {
+                background: %2;
+            }
+        )").arg(hoverBg, pressBg));
+    }
+}
+
+// ── Color interpolation helper ───────────────────────────────────────
+
+QColor ApplicationDock::lerpColor(const QColor& from, const QColor& to, double t)
+{
+    if (t <= 0.0) return from;
+    if (t >= 1.0) return to;
+    return QColor(
+        qRound(from.red()   + (to.red()   - from.red())   * t),
+        qRound(from.green() + (to.green() - from.green()) * t),
+        qRound(from.blue()  + (to.blue()  - from.blue())  * t),
+        qRound(from.alpha() + (to.alpha() - from.alpha()) * t)
+    );
 }

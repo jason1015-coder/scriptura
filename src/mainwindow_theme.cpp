@@ -1,5 +1,6 @@
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
+#include "applicationdock.h"
 #include "codeeditor.h"
 #include "version.h"
 #include "thememanager.h"
@@ -417,6 +418,8 @@ void MainWindow::applyTheme(const Theme &theme)
     QColor glassBorder = isDark ? QColor(255, 255, 255, 20) : QColor(0, 0, 0, 25);
     QColor neumorphicLight = isDark ? QColor(255, 255, 255, 12) : QColor(255, 255, 255, 180);
     QColor neumorphicDark = isDark ? QColor(0, 0, 0, 40) : QColor(0, 0, 0, 25);
+
+    // Dock updates automatically via ThemeManager::themeChanged signal
 
     QString modernSheet = QString(R"(
         /* Xcode-Style Layout — Glassmorphism & Neumorphism */
