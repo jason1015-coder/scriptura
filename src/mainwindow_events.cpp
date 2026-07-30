@@ -175,7 +175,7 @@ void MainWindow::closeEvent(QCloseEvent *event)
         settings.setValue("mainWindow/geometry", saveGeometry());
         settings.setValue("mainWindow/state", saveState());
         settings.setValue("mainWindow/bottomPanelVisible", ui->bottomPanelContainer->isVisible());
-        settings.setValue("mainWindow/bottomPanelIndex", bottomPanelTabs->currentIndex());
+        settings.setValue("mainWindow/bottomPanelIndex", currentBottomPanelIndex());
         settings.setValue("ui/sidebarCollapsed", ui->sidebarDrawer->isHidden());
         
         event->accept();

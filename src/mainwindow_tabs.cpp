@@ -649,21 +649,9 @@ QPushButton* MainWindow::createSettingsTabCloseButton(int tabIndex)
 
 void MainWindow::onBottomTabChanged(int index)
 {
-    bottomPanelStack->setCurrentIndex(index);
-    // Build a list of all possible bottom panels — show only the selected one
-    // Built-in panels include: ProjectSearch, GitRebase, TaskRunner, Bookmarks,
-    // PluginMarketplace, ThemeMarketplace.
-    // Standalone app panels (Git, HTTP, SQLite, Regex, Format, Preview,
-    // Replace, Diff, Test, Problems, Terminal, Todo, Debug) are registered
-    // as downloadable apps from the Plugin Marketplace, not built-in.
-    QList<QWidget*> panels = {
-        static_cast<QWidget*>(projectSearchPanel),
-        static_cast<QWidget*>(m_gitRebase),
-        static_cast<QWidget*>(m_taskRunnerUI), static_cast<QWidget*>(m_bookmarkPanel),
-        static_cast<QWidget*>(m_pluginMarketplace), static_cast<QWidget*>(m_themeMarketplace)
-    };
-    for (int i = 0; i < panels.size(); ++i) {
-        if (panels[i]) panels[i]->setVisible(i == index);
-    }
+    // This slot is now called from showBottomPanelIndex() after state is updated.
+    // The stack index and panel visibility are already handled there.
+    // This slot is kept for external notification purposes (e.g., plugin API).
+    Q_UNUSED(index);
 }
 

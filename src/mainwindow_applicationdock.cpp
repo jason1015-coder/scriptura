@@ -9,12 +9,13 @@
 #include "welcomemenuscreen.h"
 
 #include <QStackedWidget>
-#include <QTabBar>
 #include <QResizeEvent>
 #include <QDebug>
 #include <QTimer>
 #include <QMessageBox>
 #include <QSettings>
+#include <QStandardPaths>
+#include <QCoreApplication>
 
 /**
  * @file mainwindow_applicationdock.cpp
@@ -32,8 +33,15 @@ void MainWindow::setupApplicationDock()
     // ── Create Application Manager ──────────────────────────────
     m_appManager = new ApplicationManager(this);
 
+    // ── Scan for installed apps FIRST ───────────────────────────
+    // Check the user's plugin directory for installed applications.
+    QString pluginDir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + "/plugins";
+    m_appManager->scanDirectory(pluginDir);
+    m_appManager->scanDirectory(QCoreApplication::applicationDirPath() + "/plugins");
+
     // Register available applications (Git, HTTP, Database, etc.)
     // These are installable apps from GitHub repos, not built-in.
+    // This runs AFTER scanning so already-discovered apps get proper appDir.
     m_appManager->registerAvailableApps();
 
     // ── Create Application Dock (floating bottom bar) ───────────
@@ -51,9 +59,10 @@ void MainWindow::setupApplicationDock()
         repositionDock();
     });
 
-    // ── Only show installed apps in the dock ───────────────────
-    // Uninstalled apps are shown via the install dialog on first run.
-    // The dock only displays apps that have been installed (loaded from disk).
+    // ── Load all discovered applications ───────────────────────
+    m_appManager->loadAll();
+
+    // ── Show loaded apps in the dock ───────────────────────────
     auto apps = m_appManager->allApplications();
     for (const auto &app : apps) {
         if (!app.iconPath.isEmpty() && app.loaded) {
@@ -165,19 +174,19 @@ void MainWindow::handleDockAppClicked(const QString &appId)
 
     QString tabTitle = m_appManager->tabTitle(appId);
     int tabIndex = -1;
-    for (int i = 0; i < bottomPanelTabs->count(); ++i) {
-        if (bottomPanelTabs->tabText(i) == tabTitle) {
+    for (int i = 0; i < m_panelButtons.size(); ++i) {
+        if (m_panelButtons[i].title == tabTitle) {
             tabIndex = i;
             break;
         }
     }
 
     if (tabIndex < 0) {
-        tabIndex = bottomPanelTabs->addTab(tabTitle);
+        tabIndex = addBottomPanelButton(":/icons/settings.svg", tabTitle, tabTitle);
         bottomPanelStack->addWidget(appWidget);
     }
 
-    bool isCurrentlyActive = (bottomPanelTabs->currentIndex() == tabIndex &&
+    bool isCurrentlyActive = (currentBottomPanelIndex() == tabIndex &&
                                ui->bottomPanelContainer->isVisible());
 
     if (isCurrentlyActive) {
@@ -187,8 +196,7 @@ void MainWindow::handleDockAppClicked(const QString &appId)
         if (m_appDock) m_appDock->setActiveApp(QString());
     } else {
         ui->bottomPanelContainer->show();
-        bottomPanelTabs->setCurrentIndex(tabIndex);
-        bottomPanelStack->setCurrentIndex(tabIndex);
+        showBottomPanelIndex(tabIndex);
         bottomPanelStack->widget(tabIndex)->show();
         m_activeDockAppId = appId;
         if (m_appDock) m_appDock->setActiveApp(appId);

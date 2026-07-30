@@ -318,7 +318,10 @@ void MainWindow::updateTopTabBar()
 
 void MainWindow::updateBottomTabBar()
 {
-    bottomPanelTabs->setCurrentIndex(bottomPanelStack->currentIndex());
+    int idx = bottomPanelStack->currentIndex();
+    if (idx >= 0 && idx < m_panelButtons.size()) {
+        showBottomPanelIndex(idx);
+    }
 }
 
 void MainWindow::loadRecentProjects()
@@ -438,8 +441,7 @@ void MainWindow::on_action_project_search_triggered()
 {
     QString root = projectDir.isEmpty() ? QDir::homePath() : projectDir;
     findReplaceBar->setVisible(false);
-    bottomPanelTabs->setCurrentIndex(0);
-    bottomPanelStack->setCurrentIndex(0);
+    showBottomPanelIndex(0);
     projectSearchPanel->show();
     ui->bottomPanelContainer->show();
     projectSearchPanel->setRootPath(root);

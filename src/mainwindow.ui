@@ -183,27 +183,44 @@
            </number>
           </property>
            <item>
-            <widget class="QTabBar" name="bottomPanelTabs">
-             <property name="documentMode">
-              <bool>
-               true
-              </bool>
+            <widget class="QWidget" name="bottomPanelButtons" native="true">
+             <property name="minimumHeight">
+              <number>
+               34
+              </number>
              </property>
-             <property name="expanding">
-              <bool>
-               false
-              </bool>
+             <property name="maximumHeight">
+              <number>
+               34
+              </number>
              </property>
-             <property name="drawBase">
-              <bool>
-               false
-              </bool>
-             </property>
-             <property name="movable">
-              <bool>
-               false
-              </bool>
-             </property>
+             <layout class="QHBoxLayout" name="bottomPanelButtonsLayout">
+              <property name="spacing">
+               <number>
+                2
+               </number>
+              </property>
+              <property name="leftMargin">
+               <number>
+                4
+               </number>
+              </property>
+              <property name="rightMargin">
+               <number>
+                4
+               </number>
+              </property>
+              <property name="topMargin">
+               <number>
+                0
+               </number>
+              </property>
+              <property name="bottomMargin">
+               <number>
+                0
+               </number>
+              </property>
+             </layout>
             </widget>
            </item>
           <item>

@@ -351,7 +351,11 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
     editorStack = ui->editorStack;
     bottomPanelStack = ui->bottomPanelStack;
     tabBar = ui->tabBar;
-    bottomPanelTabs = ui->bottomPanelTabs;
+    bottomPanelButtons = ui->bottomPanelButtons;
+    QHBoxLayout *btnLayout = qobject_cast<QHBoxLayout*>(bottomPanelButtons->layout());
+    if (btnLayout) {
+        btnLayout->addStretch();
+    }
 
     editorStack->addWidget(ui->tabWidget);
 
@@ -561,9 +565,9 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
     connect(tabBar, &QTabBar::currentChanged, this, &MainWindow::onTopTabChanged);
     connect(ui->tabWidget, &QTabWidget::currentChanged, this, &MainWindow::updateStatusBar);
 
-    // Bottom panel tabs
-    bottomPanelTabs->addTab(tr("Search Results"));
-    connect(bottomPanelTabs, &QTabBar::currentChanged, this, &MainWindow::onBottomTabChanged);
+    // Bottom panel buttons (replacing QTabBar with SVG icon buttons)
+    addBottomPanelButton(":/icons/search.svg", tr("Search Results"), tr("Search Results") + tr(" (Ctrl+Shift+F)"));
+    m_panelButtons[0].button->setChecked(true);
 
     // Sidebar connections
     connect(sidebarToggleButton, &QToolButton::toggled, this, &MainWindow::toggleSidebar);
@@ -607,9 +611,8 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
         if (settings.value("mainWindow/bottomPanelVisible", false).toBool()) {
             ui->bottomPanelContainer->show();
             int idx = settings.value("mainWindow/bottomPanelIndex", 0).toInt();
-            if (idx >= 0 && idx < bottomPanelTabs->count()) {
-                bottomPanelTabs->setCurrentIndex(idx);
-                bottomPanelStack->setCurrentIndex(idx);
+            if (idx >= 0 && idx < m_panelButtons.size()) {
+                showBottomPanelIndex(idx);
             }
         }
     }
@@ -941,21 +944,21 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
 
     // ── P1/P2 Feature Modules (infrastructure, not standalone apps) ───
     m_gitRebase = new GitRebaseWidget(this);
-    bottomPanelTabs->addTab(tr("Rebase"));
     bottomPanelStack->addWidget(m_gitRebase);
     m_gitRebase->hide();
+    addBottomPanelButton(":/icons/git.svg", tr("Git Rebase"), tr("Rebase"));
 
     m_taskRunnerUI = new TaskRunnerUI(this);
-    bottomPanelTabs->addTab(tr("Tasks"));
     bottomPanelStack->addWidget(m_taskRunnerUI);
     m_taskRunnerUI->hide();
+    addBottomPanelButton(":/icons/check.svg", tr("Task Runner"), tr("Tasks"));
 
     CodeEditor *currentEditor = getCurrentCodeEditor();
     BookmarkManager *bm = currentEditor ? currentEditor->bookmarkManager() : nullptr;
     m_bookmarkPanel = new BookmarkPanelWidget(bm, this);
-    bottomPanelTabs->addTab(tr("Bookmarks"));
     bottomPanelStack->addWidget(m_bookmarkPanel);
     m_bookmarkPanel->hide();
+    addBottomPanelButton(":/icons/file.svg", tr("Bookmarks"), tr("Bookmarks"));
 
     // P2: CSS Breadcrumb parser
     m_cssBreadcrumbParser = new CssBreadcrumbParser(this);
@@ -966,16 +969,16 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
 
     // P3: Plugin Marketplace — kept as built-in (no app wrapper yet)
     m_pluginMarketplace = new PluginMarketplaceWidget(m_pluginRegistry, this);
-    bottomPanelTabs->addTab(tr("Marketplace"));
     bottomPanelStack->addWidget(m_pluginMarketplace);
     m_pluginMarketplace->hide();
+    addBottomPanelButton(":/icons/settings.svg", tr("Plugin Marketplace"), tr("Marketplace"));
 
     // P3: Theme Marketplace — kept as built-in (no app wrapper yet)
     m_themeMarketplace = new ThemeMarketplaceWidget(this);
     m_themeMarketplace->loadBuiltinThemes();
-    bottomPanelTabs->addTab(tr("Themes"));
     bottomPanelStack->addWidget(m_themeMarketplace);
     m_themeMarketplace->hide();
+    addBottomPanelButton(":/icons/theme.svg", tr("Theme Marketplace"), tr("Themes"));
 
     // Connect marketplace signals
     connect(m_themeMarketplace, &ThemeMarketplaceWidget::themeInstalled, this, [this](const QString &themeName) {
@@ -995,9 +998,15 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
         QString projectPath = projectDir.isEmpty() ? QDir::homePath() : projectDir;
         m_taskRunnerUI->detectTasks(projectPath);
         ui->bottomPanelContainer->show();
-        int idx = 6; // Tasks tab (index 6 out of 10 total bottom tabs)
-        bottomPanelTabs->setCurrentIndex(idx);
-        bottomPanelStack->setCurrentIndex(idx);
+        // Find the Tasks button by matching title
+        int idx = 2; // Tasks is the 3rd button (Search=0, Rebase=1, Tasks=2)
+        for (int i = 0; i < m_panelButtons.size(); ++i) {
+            if (m_panelButtons[i].title == tr("Tasks")) {
+                idx = i;
+                break;
+            }
+        }
+        showBottomPanelIndex(idx);
     });
 
     // Connect task runner to terminal
@@ -1204,6 +1213,9 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
     // Init plugin developer API wiring
     setupPluginApis();
 
+    // Init application dock (apps floating at bottom center)
+    setupApplicationDock();
+
     // Config validator - validate settings on startup (Rust adapter handles this internally)
 
     setSidebarCollapsed(settings.value("ui/sidebarCollapsed", true).toBool());
@@ -1230,6 +1242,68 @@ QPlainTextEdit* MainWindow::getCurrentEditor()
 CodeEditor* MainWindow::getCurrentCodeEditor()
 {
     return qobject_cast<CodeEditor*>(ui->tabWidget->currentWidget());
+}
+
+int MainWindow::addBottomPanelButton(const QString &iconPath, const QString &tooltip, const QString &title)
+{
+    QToolButton *btn = new QToolButton(bottomPanelButtons);
+    btn->setIconSize(QSize(18, 18));
+    btn->setFixedSize(28, 28);
+    btn->setCheckable(true);
+    btn->setToolTip(tooltip);
+    btn->setCursor(Qt::PointingHandCursor);
+    ThemeIcons::instance()->setIcon(btn, iconPath);
+
+    int index = m_panelButtons.size();
+    PanelButtonEntry entry;
+    entry.button = btn;
+    entry.panelIndex = index;
+    entry.title = title;
+    m_panelButtons.append(entry);
+
+    QHBoxLayout *layout = qobject_cast<QHBoxLayout*>(bottomPanelButtons->layout());
+    if (layout) {
+        // Insert before the stretch
+        layout->insertWidget(layout->count() - 1, btn);
+    }
+
+    connect(btn, &QToolButton::clicked, this, [this, index]() {
+        showBottomPanelIndex(index);
+    });
+
+    return index;
+}
+
+void MainWindow::showBottomPanelIndex(int index)
+{
+    if (index < 0 || index >= m_panelButtons.size())
+        return;
+
+    // Update button checked states
+    for (int i = 0; i < m_panelButtons.size(); ++i) {
+        m_panelButtons[i].button->setChecked(i == index);
+    }
+
+    // QStackedWidget::setCurrentIndex shows the widget at index and hides all others
+    bottomPanelStack->setCurrentIndex(index);
+
+    onBottomTabChanged(index);
+}
+
+int MainWindow::currentBottomPanelIndex() const
+{
+    for (int i = 0; i < m_panelButtons.size(); ++i) {
+        if (m_panelButtons[i].button->isChecked())
+            return i;
+    }
+    return 0;
+}
+
+QString MainWindow::bottomPanelButtonTooltip(int index) const
+{
+    if (index >= 0 && index < m_panelButtons.size())
+        return m_panelButtons[index].button->toolTip();
+    return QString();
 }
 
 QPushButton* MainWindow::createTabCloseButton(const QString &filePath)

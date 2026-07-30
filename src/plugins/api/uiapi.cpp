@@ -7,6 +7,7 @@
 #include <QTabBar>
 #include <QVBoxLayout>
 #include <QHBoxLayout>
+#include <QToolButton>
 #include <QDebug>
 
 PluginUIApi::PluginUIApi(MainWindow *mainWindow, QObject *parent)
@@ -163,12 +164,11 @@ void PluginUIApi::registerPanel(const QString &id, const QString &title,
     entry.location = location;
 
     if (location == PanelLocation::BottomPanel) {
-        // Add to the bottom panel tab bar & stack
-        QTabBar *tabs = m_mainWindow->findChild<QTabBar*>(QStringLiteral("bottomPanelTabs"));
+        // Add to the bottom panel button bar & stack
         QStackedWidget *stack = m_mainWindow->findChild<QStackedWidget*>(QStringLiteral("bottomPanelStack"));
 
-        if (tabs && stack) {
-            entry.tabIndex = tabs->addTab(title);
+        if (stack) {
+            entry.tabIndex = m_mainWindow->addBottomPanelButton(":/icons/settings.svg", title, title);
             widget->setParent(stack);
             stack->addWidget(widget);
             widget->hide();
@@ -194,14 +194,9 @@ void PluginUIApi::showPanel(const QString &id)
     if (entry.widget)
         entry.widget->show();
 
-    // Switch to the right tab if in bottom panel
+    // Switch to the right panel if in bottom panel
     if (entry.location == PanelLocation::BottomPanel && entry.tabIndex >= 0) {
-        QTabBar *tabs = m_mainWindow->findChild<QTabBar*>();
-        QStackedWidget *stack = m_mainWindow->findChild<QStackedWidget*>();
-        if (tabs && stack && entry.tabIndex < tabs->count()) {
-            tabs->setCurrentIndex(entry.tabIndex);
-            stack->setCurrentIndex(entry.tabIndex);
-        }
+        m_mainWindow->showBottomPanelIndex(entry.tabIndex);
     }
 }
 

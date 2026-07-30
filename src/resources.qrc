@@ -20,5 +20,6 @@
     <file alias="icons/menu.svg">resources/icons/menu.svg</file>
     <file alias="icons/search.svg">resources/icons/search.svg</file>
     <file alias="icons/inspector.svg">resources/icons/inspector.svg</file>
+    <file alias="icons/tools.svg">resources/icons/tools.svg</file>
 </qresource>
 </RCC>

@@ -717,6 +717,30 @@ void MainWindow::applyTheme(const Theme &theme)
             background-color: rgba(%26, %27, %28, 0.85);
             border-top: 1px solid rgba(%17, %18, %19, 0.10);
         }
+        QWidget#bottomPanelButtons {
+            background-color: transparent;
+            border-bottom: none;
+            padding: 0px;
+        }
+        QWidget#bottomPanelButtons QToolButton {
+            background-color: transparent;
+            border: none;
+            border-radius: 4px;
+            padding: 2px;
+            margin: 1px 0px;
+            min-width: 24px;
+            min-height: 24px;
+        }
+        QWidget#bottomPanelButtons QToolButton:hover {
+            background-color: rgba(%11, %12, %13, 0.10);
+        }
+        QWidget#bottomPanelButtons QToolButton:checked {
+            background-color: rgba(%14, %15, %16, 0.15);
+            border-bottom: 2px solid %6;
+        }
+        QWidget#bottomPanelButtons QToolButton:pressed {
+            background-color: rgba(%11, %12, %13, 0.18);
+        }
         QWidget#sidebarDrawer {
             background-color: rgba(%29, %30, %31, 0.85);
             border-right: 1px solid rgba(%17, %18, %19, 0.10);
