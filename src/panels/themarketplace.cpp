@@ -3,6 +3,7 @@
 #include "themedefs.h"
 #include <QMessageBox>
 #include <QColorDialog>
+#include <QJsonDocument>
 
 ThemeMarketplaceWidget::ThemeMarketplaceWidget(QWidget *parent)
     : QWidget(parent)

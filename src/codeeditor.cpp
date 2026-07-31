@@ -1138,12 +1138,12 @@ void CodeEditor::keyPressEvent(QKeyEvent *event)
         lineStart.movePosition(QTextCursor::StartOfBlock);
         QString lineText = lineStart.selectedText() + cursor.block().text().left(cursor.positionInBlock());
         // Look for Emmet-like pattern at end of line (word chars, >, +, *, ^, #, .)
-        QRegularExpression emmetRe("([a-zA-Z0-9\[\]()>+*^#._@\-]+)$");
+        QRegularExpression emmetRe("([a-zA-Z0-9\\[\\]()>+*^#._@\\-]+)$");
         QRegularExpressionMatch match = emmetRe.match(lineText);
         if (match.hasMatch() && !m_bracketColorEnabled) {
             QString abbreviation = match.captured(1);
             // Simple check: abbreviation should look like Emmet (contain special chars)
-            if (abbreviation.contains(QRegularExpression("[>+*^#\[\]()]")) && abbreviation.length() >= 2) {
+            if (abbreviation.contains(QRegularExpression("[>+*^#\\[\\]()]")) && abbreviation.length() >= 2) {
                 // Expand via Rust FFI
                 QByteArray abbrBytes = abbreviation.toUtf8();
                 char *expanded = rust_emmet_expand(abbrBytes.constData());
