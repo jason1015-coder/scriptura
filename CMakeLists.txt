@@ -177,8 +177,10 @@ target_link_libraries(scriptura_core PUBLIC
 if(WIN32)
     # DwmSetWindowAttribute (used by MainWindow::enableMicaEffect) lives in dwmapi.lib
     target_link_libraries(scriptura_core PRIVATE dwmapi)
-    # Windows needs these Rust runtime libraries
-    target_link_libraries(scriptura_core PRIVATE user32 advapi32 ws2_32 crypt32 userenv ntdll)
+    # Windows needs these Rust runtime libraries.
+    # bcrypt is required for BCryptGenRandom (getrandom crate) and is inherited
+    # by every consumer of this static lib (scriptura, scriptura_pluginhost, ...).
+    target_link_libraries(scriptura_core PRIVATE bcrypt user32 advapi32 ws2_32 crypt32 userenv ntdll)
 endif()
 
 if(APPLE)

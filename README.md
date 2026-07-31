@@ -24,17 +24,6 @@ The backend services are compiled into a static library (`libscriptura_backend.a
 - **File tree sidebar**: Navigate project structure with clickable folders
 - **Directory navigation**: "Go Up" button to navigate to parent directories
 - **Tabbed editing**: Multiple files open in tabs
-- **Status bar**: Shows cursor position (line/column)
-- **Edit operations**: Cut, Copy, Paste, Undo, Redo
-- **File management**: Create and delete files/directories within projects
-- **Save As**: Save files with a different name
-- **Theme support**: Multiple light/dark themes with Xcode-inspired design system
-- **Plugin Manager**: Install, remove, and manage plugins via the GUI (**Plugins → Manage Plugins...**)
-- **Plugin system**: Extensible architecture with event bus, service locator, and settings support
-- **Built-in Git plugin**: Version control integration for commits and pushes
-- **LSP support**: Code completion, diagnostics, go-to-definition (via Rust client)
-- **Debug support**: DAP-based debugging (via Rust client)
-- **Safe Rust backend**: Thread-safe event bus, memory-safe protocol handlers, no segmentation faults
 
 ## Requirements
 

@@ -204,7 +204,7 @@ void MainWindow::handleDockAppClicked(const QString &appId)
         m_activeDockAppId = appId;
         if (m_appDock) m_appDock->setActiveApp(appId);
         if (m_windowAnimator) {
-            m_windowAnimator->animatePanelSlide(ui->bottomPanelContainer, 200);
+            m_windowAnimator->animatePanelSlide(ui->bottomPanelContainer, true);
         }
     }
 }
