@@ -50,11 +50,6 @@ public:
     QIcon icon(const QString& path, Role role = Role::Normal) const;
 
     /**
-     * @brief 取回「原始」(不重新著色) 圖標，適用於品牌/多彩圖標
-     */
-    QIcon rawIcon(const QString& path) const;
-
-    /**
      * @brief 設定並追蹤按鈕圖標，主題切換時自動重新著色
      */
     void setIcon(QAbstractButton* button, const QString& path, Role role = Role::Normal);

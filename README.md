@@ -27,7 +27,7 @@ The backend services are compiled into a static library (`libscriptura_backend.a
 
 ## Requirements
 
-- **Qt 6** (with Widgets, Network, Sql, and LinguistTools modules) — Qt 5 also supported
+- **Qt 6** (with Widgets, Network, Sql, and LinguistTools modules)
 - **CMake 3.16+**
 - **C++17 compiler** (GCC, Clang, MSVC)
 - **Rust toolchain** (for building the backend) — Install via [rustup](https://rustup.rs/):

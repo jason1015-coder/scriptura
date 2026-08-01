@@ -232,6 +232,7 @@ private:
     RustDapClientAdapter *dapClient;
     std::unique_ptr<DebugConfigurationManager> debugConfigManager;
     bool m_isDebugging;
+    bool m_restartRequested = false; // Set when the user wipes settings and chooses to restart
     int m_currentFrameId = 0;
     QMap<QString, QString> m_breakpointConditions; // key: "file:line"
     QListWidget *m_completionPopup = nullptr;

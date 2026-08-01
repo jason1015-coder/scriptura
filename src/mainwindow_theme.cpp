@@ -336,6 +336,86 @@ QWidget* MainWindow::createUnifiedSettingsWidget()
             updater->checkForUpdates(QCoreApplication::applicationVersion(), QSettings().value("updates/url", "https://api.github.com/repos/jason1015-coder/scriptura/releases").toString());
     });
 
+    // ── Danger Zone Section ──────────────────────────────────────────────
+    QGroupBox *dangerGroup = new QGroupBox(tr("Danger Zone"), content);
+    QVBoxLayout *dangerLayout = new QVBoxLayout(dangerGroup);
+
+    QLabel *dangerLabel = new QLabel(tr(
+        "Reset Scriptura to its factory state. This permanently deletes all stored "
+        "preferences: theme, editor options, keyboard shortcuts, code snippets, "
+        "bookmarks, recent files, session data, and plugin settings."), dangerGroup);
+    dangerLabel->setWordWrap(true);
+    dangerLayout->addWidget(dangerLabel);
+
+    QPushButton *resetAllButton = new QPushButton(tr("Reset All Settings..."), dangerGroup);
+    resetAllButton->setObjectName("dangerButton");
+    resetAllButton->setCursor(Qt::PointingHandCursor);
+    resetAllButton->setToolTip(tr("Completely wipe all settings and restore defaults"));
+    resetAllButton->setStyleSheet(QStringLiteral(
+        "QPushButton { background-color: rgba(220, 38, 38, 0.14);"
+        " color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.45);"
+        " border-radius: 8px; padding: 8px 16px; font-weight: 600; }"
+        "QPushButton:hover { background-color: rgba(220, 38, 38, 0.26); }"
+        "QPushButton:pressed { background-color: rgba(220, 38, 38, 0.38); }"));
+    dangerLayout->addWidget(resetAllButton, 0, Qt::AlignLeft);
+    mainLayout->addWidget(dangerGroup);
+
+    connect(resetAllButton, &QPushButton::clicked, this, [this]() {
+        QMessageBox::StandardButton first = QMessageBox::warning(
+            this, tr("Reset All Settings"),
+            tr("This will permanently delete ALL of Scriptura's settings, including:\n\n"
+               "\u2022 Theme, fonts, and editor preferences\n"
+               "\u2022 Keyboard shortcuts and code snippets\n"
+               "\u2022 Bookmarks, recent files, and sessions\n"
+               "\u2022 Plugin registry URL and other stored data\n\n"
+               "This action cannot be undone.\n\n"
+               "Continue?"),
+            QMessageBox::Yes | QMessageBox::Cancel, QMessageBox::Cancel);
+        if (first != QMessageBox::Yes)
+            return;
+
+        QMessageBox::StandardButton second = QMessageBox::warning(
+            this, tr("Are You Absolutely Sure?"),
+            tr("There is no undo. Every stored setting will be wiped and Scriptura "
+               "will return to its default state.\n\n"
+               "Reset everything now?"),
+            QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
+        if (second != QMessageBox::Yes)
+            return;
+
+        // Wipe the entire settings store (default QSettings scope covers app + plugins)
+        QSettings s;
+        s.clear();
+        s.sync();
+
+        // Clear in-memory caches so stale data isn't re-persisted before a restart
+        recentProjects.clear();
+
+        // Restore the default theme immediately so the UI doesn't keep stale colours
+        selectedTheme = Theme(ThemeColorFamily::Default, ThemeMode::Light);
+        applyTheme(selectedTheme);
+
+        // Rebuild the settings page so every control reflects the defaults
+        if (QScrollArea *oldScroll = qobject_cast<QScrollArea*>(unifiedSettingsWidget)) {
+            editorStack->removeWidget(oldScroll);
+            oldScroll->deleteLater();
+        }
+        unifiedSettingsWidget = createUnifiedSettingsWidget();
+        editorStack->addWidget(unifiedSettingsWidget);
+        editorStack->setCurrentWidget(unifiedSettingsWidget);
+
+        QMessageBox::StandardButton restart = QMessageBox::question(
+            this, tr("Settings Reset"),
+            tr("All settings have been wiped and Scriptura has been restored to its "
+               "default state.\n\nRestart Scriptura now to fully reload every component "
+               "with default values?"),
+            QMessageBox::Yes | QMessageBox::No, QMessageBox::Yes);
+        if (restart == QMessageBox::Yes) {
+            m_restartRequested = true;
+            close(); // a fresh instance is spawned in closeEvent once the close is accepted
+        }
+    });
+
     mainLayout->addStretch();
 
     scrollArea->setWidget(content);

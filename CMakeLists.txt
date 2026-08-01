@@ -85,9 +85,7 @@ file(GLOB_RECURSE SCRIPTURA_CORE_SOURCES
 )
 
 # ── Exclude backend C++ files (replaced by Rust FFI modules) ─────────
-list(FILTER SCRIPTURA_CORE_SOURCES EXCLUDE REGEX "src/tests/")
 list(FILTER SCRIPTURA_CORE_SOURCES EXCLUDE REGEX "src/plugins/git/")
-list(FILTER SCRIPTURA_CORE_SOURCES EXCLUDE REGEX "src/pluginhost/")
 list(FILTER SCRIPTURA_CORE_SOURCES EXCLUDE REGEX "src/rust_backend/")
 
 # ── Rust Backend (old C++ backend files deleted) ──────────────────
@@ -101,7 +99,7 @@ list(FILTER SCRIPTURA_CORE_SOURCES EXCLUDE REGEX "src/rust_backend/")
 # ServiceLocator, CrashHandler, DependencyResolver.
 #
 # Old C++ backend files have been deleted. Remaining exclusions are for
-# files that were never migrated or belong to the plugin host.
+# the git plugin (built as a separate shared library) and the Rust backend.
 
 # The plugin SDK interface headers live outside src/ (in include/ and sdk/include/)
 # and contain Q_OBJECT classes (ScripturaPlugin, PluginContext). Their MOC-generated
@@ -179,7 +177,7 @@ if(WIN32)
     target_link_libraries(scriptura_core PRIVATE dwmapi)
     # Windows needs these Rust runtime libraries.
     # bcrypt is required for BCryptGenRandom (getrandom crate) and is inherited
-    # by every consumer of this static lib (scriptura, scriptura_pluginhost, ...).
+    # by every consumer of this static lib (scriptura, gitplugin, ...).
     target_link_libraries(scriptura_core PRIVATE bcrypt user32 advapi32 ws2_32 crypt32 userenv ntdll)
 endif()
 
@@ -240,23 +238,9 @@ set_target_properties(scriptura PROPERTIES
     QT_PLUGIN_PATH "${PLUGIN_OUTPUT_DIR}"
 )
 
-# Plugin host executable for sandboxed plugin isolation
-add_executable(scriptura_pluginhost
-    src/pluginhost/pluginhost.cpp
-    src/pluginhost/pluginhost.h
-    # removed: src/internals/lengthprefixedframer.cpp
-    # removed: src/internals/lengthprefixedframer.h
-)
-set_target_properties(scriptura_pluginhost PROPERTIES
-    FOLDER "Internal"
-    WIN32_EXECUTABLE FALSE
-)
-target_link_libraries(scriptura_pluginhost PRIVATE
-    scriptura_core
-    "${RUST_LIB_REL_PATH}"
-    Qt${QT_VERSION_MAJOR}::Core
-    Qt${QT_VERSION_MAJOR}::Widgets
-)
+# Plugin host executable removed: the sandboxed plugin host (src/pluginhost/,
+# src/plugins/pluginhost/) was unused at runtime — nothing in the codebase
+# ever launched it. Plugins are loaded in-process via scriptura_core.
 
 # Add plugin subdirectories (each has its own CMakeLists.txt)
 add_subdirectory(src/plugins/git)

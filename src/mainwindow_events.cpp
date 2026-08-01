@@ -15,6 +15,7 @@
 #include <QPropertyAnimation>
 #include <QEasingCurve>
 #include <QAbstractAnimation>
+#include <QProcess>
 
 #ifdef Q_OS_LINUX
 #include <QApplication>
@@ -179,7 +180,18 @@ void MainWindow::closeEvent(QCloseEvent *event)
         settings.setValue("ui/sidebarCollapsed", ui->sidebarDrawer->isHidden());
         
         event->accept();
+
+        // If the user wiped all settings and chose to restart, launch a fresh
+        // instance now that the close has been accepted (avoids spawning a
+        // duplicate if the close was cancelled above).
+        if (m_restartRequested) {
+            QProcess::startDetached(QCoreApplication::applicationFilePath(), QStringList());
+            m_restartRequested = false;
+        }
     } else {
+        // Close rejected (e.g. unsaved changes) — drop any pending restart so a
+        // later normal close doesn't unexpectedly spawn a fresh instance.
+        m_restartRequested = false;
         event->ignore();
     }
 }

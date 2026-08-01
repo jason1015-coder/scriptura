@@ -154,7 +154,7 @@ src/rust_backend/target/
 src/rust_backend/Cargo.lock
 rust_backend_target/
 
-# Python (used by tooling/helpers such as src/mainwindow.py)
+# Python (used by tooling/helpers)
 __pycache__/
 *.py[cod]
 *$py.class

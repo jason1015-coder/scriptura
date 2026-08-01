@@ -11,10 +11,14 @@
  * Scriptura now has two distinct extension types:
  *
  * 1. **Plugins** (ScripturaPlugin) — Full plugins that interact with the core UI,
- *    modify menus, toolbars, editors, themes, etc.
+ *    modify menus, toolbars, editors, themes, etc. These implement the full
+ *    ScripturaPlugin interface and have access to the complete PluginUIApi.
  *
  * 2. **Applications** (ScripturaApplication) — Self-contained UI panels that get
- *    an icon in the floating dock and a bottom-panel tab.
+ *    an icon in the floating dock and a bottom-panel tab. They are simpler,
+ *    only need an SVG icon, a name, and a content widget.
+ *
+ * The 'Application' feature type below is used for the new Application system.
  */
 
 enum class PluginFeature {

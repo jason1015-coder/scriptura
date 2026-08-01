@@ -122,11 +122,6 @@ QIcon ThemeIcons::icon(const QString& path, Role role) const
     return makeIcon(path, colorForRole(role));
 }
 
-QIcon ThemeIcons::rawIcon(const QString& path) const
-{
-    return QIcon(path);
-}
-
 void ThemeIcons::setIcon(QAbstractButton* button, const QString& path, Role role)
 {
     if (!button) return;
