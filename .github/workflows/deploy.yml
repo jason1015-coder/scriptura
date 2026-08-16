@@ -78,13 +78,13 @@ jobs:
 
   deploy-macos:
     runs-on: macos-latest
+    needs: build-macos
     steps:
       - uses: actions/checkout@v4
 
       - name: Download macOS app bundle
-        uses: dawidd6/action-download-artifact@v2
+        uses: actions/download-artifact@v4
         with:
-          workflow: build.yml
           name: scriptura-macos-app
           path: ./
 
@@ -99,6 +99,59 @@ jobs:
 
       - name: Bundle Qt dependencies
         run: macdeployqt build/scriptura.app -always-overwrite
+
+      - name: Generate app icon
+        run: |
+          mkdir -p scriptura.iconset
+          sips -z 16 16     src/icon.png --out scriptura.iconset/icon_16x16.png
+          sips -z 32 32     src/icon.png --out scriptura.iconset/icon_16x16@2x.png
+          sips -z 32 32     src/icon.png --out scriptura.iconset/icon_32x32.png
+          sips -z 64 64     src/icon.png --out scriptura.iconset/icon_32x32@2x.png
+          sips -z 128 128   src/icon.png --out scriptura.iconset/icon_128x128.png
+          sips -z 256 256   src/icon.png --out scriptura.iconset/icon_128x128@2x.png
+          sips -z 256 256   src/icon.png --out scriptura.iconset/icon_256x256.png
+          sips -z 512 512   src/icon.png --out scriptura.iconset/icon_256x256@2x.png
+          sips -z 512 512   src/icon.png --out scriptura.iconset/icon_512x512.png
+          sips -z 1024 1024 src/icon.png --out scriptura.iconset/icon_512x512@2x.png
+          iconutil -c icns scriptura.iconset
+          cp scriptura.icns build/scriptura.app/Contents/Resources/
+
+      - name: Code sign the app
+        env:
+          SIGNING_IDENTITY: ${{ secrets.APPLE_DEVELOPER_ID }}
+          CERTIFICATE_P12: ${{ secrets.APPLE_CERTIFICATE_P12 }}
+          CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+        run: |
+          echo "$CERTIFICATE_P12" | base64 --decode > certificate.p12
+          security create-keychain -p "" build.keychain
+          security import certificate.p12 -k build.keychain -P "$CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          security list-keychains -s build.keychain
+          security unlock-keychain -p "" build.keychain
+          security set-keychain-settings build.keychain
+          security find-identity -v build.keychain
+
+          codesign --force --deep --sign "$SIGNING_IDENTITY" \
+            --options runtime \
+            --entitlement src/entitlements.plist \
+            build/scriptura.app
+
+          codesign --verify --deep --strict --verbose=2 build/scriptura.app
+
+      - name: Notarize the app
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          ditto -c -k --keepParent build/scriptura.app scriptura.zip
+
+          xcrun notarytool submit scriptura.zip \
+            --apple-id "$APPLE_ID" \
+            --team-id "$APPLE_TEAM_ID" \
+            --password "$APPLE_APP_PASSWORD" \
+            --wait
+
+          xcrun stapler staple build/scriptura.app
 
       - name: Upload macOS app bundle
         uses: actions/upload-artifact@v4

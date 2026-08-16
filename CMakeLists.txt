@@ -16,6 +16,13 @@ configure_file(
     "${CMAKE_CURRENT_BINARY_DIR}/version.h"
 )
 
+# 產生 macOS Info.plist
+if(APPLE)
+    set(INFO_PLIST_IN "${CMAKE_CURRENT_SOURCE_DIR}/src/Info.plist.in")
+    set(INFO_PLIST_OUT "${CMAKE_CURRENT_BINARY_DIR}/Info.plist")
+    configure_file("${INFO_PLIST_IN}" "${INFO_PLIST_OUT}" @ONLY)
+endif()
+
 set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
@@ -256,6 +263,9 @@ endif()
 set_target_properties(scriptura PROPERTIES
     ${BUNDLE_ID_OPTION}
     MACOSX_BUNDLE TRUE
+    MACOSX_BUNDLE_INFO_PLIST "${INFO_PLIST_OUT}"
+    MACOSX_BUNDLE_ENTITLEMENTS "${CMAKE_CURRENT_SOURCE_DIR}/src/entitlements.plist"
+    MACOSX_BUNDLE_ICON_FILE "scriptura.icns"
     WIN32_EXECUTABLE TRUE
 )
 

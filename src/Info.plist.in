@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleIdentifier</key>
+    <string>com.scriptura.app</string>
+    <key>CFBundleName</key>
+    <string>Scriptura</string>
+    <key>CFBundleDisplayName</key>
+    <string>Scriptura</string>
+    <key>CFBundleVersion</key>
+    <string>@SCRIPTURA_VERSION@</string>
+    <key>CFBundleShortVersionString</key>
+    <string>@SCRIPTURA_VERSION@</string>
+    <key>CFBundleExecutable</key>
+    <string>scriptura</string>
+    <key>CFBundleIconFile</key>
+    <string>scriptura.icns</string>
+    <key>LSMinimumSystemVersion</key>
+    <string>10.15</string>
+    <key>NSHighResolutionCapable</key>
+    <true/>
+    <key>NSPrincipalClass</key>
+    <string>NSApplication</string>
+</dict>
+</plist>
