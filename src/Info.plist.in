@@ -15,9 +15,9 @@
     <key>CFBundleExecutable</key>
     <string>scriptura</string>
     <key>CFBundleIconFile</key>
-    <string>scriptura.icns</string>
+    <string>scriptura</string>
     <key>LSMinimumSystemVersion</key>
-    <string>10.15</string>
+    <string>11.0</string>
     <key>NSHighResolutionCapable</key>
     <true/>
     <key>NSPrincipalClass</key>

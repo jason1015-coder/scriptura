@@ -68,12 +68,13 @@ if(WIN32)
         COMMENT "Building Rust backend (cargo build --release) for MSVC"
         VERBATIM
     )
-else()
+    else()
     add_custom_command(
         OUTPUT "${RUST_LIB_REL_PATH}"
         COMMAND cargo build --release --target-dir "${RUST_TARGET_DIR}"
         WORKING_DIRECTORY "${RUST_BACKEND_DIR}"
         COMMENT "Building Rust backend (cargo build --release)"
+        VERBATIM
     )
 endif()
 add_custom_target(rust_backend

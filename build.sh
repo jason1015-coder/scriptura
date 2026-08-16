@@ -29,7 +29,11 @@ if [ ! -f "$BUILD_DIR/CMakeCache.txt" ]; then
 fi
 
 echo "Building C++ project..."
-cmake --build "$BUILD_DIR" -j$(nproc)
+if command -v nproc &>/dev/null; then
+    cmake --build "$BUILD_DIR" -j$(nproc)
+else
+    cmake --build "$BUILD_DIR" -j$(sysctl -n hw.ncpu)
+fi
 
 echo
 echo "Build complete. Run with: ./$BUILD_DIR/scriptura"

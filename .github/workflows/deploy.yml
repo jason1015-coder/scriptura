@@ -10,7 +10,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Download Linux executable
-        uses: dawidd6/action-download-artifact@v2
+        uses: actions/download-artifact@v4
         with:
           workflow: build.yml
           name: scriptura-linux-executable
@@ -78,13 +78,13 @@ jobs:
 
   deploy-macos:
     runs-on: macos-latest
-    needs: build-macos
     steps:
       - uses: actions/checkout@v4
 
       - name: Download macOS app bundle
         uses: actions/download-artifact@v4
         with:
+          workflow: build.yml
           name: scriptura-macos-app
           path: ./
 
@@ -122,6 +122,13 @@ jobs:
           CERTIFICATE_P12: ${{ secrets.APPLE_CERTIFICATE_P12 }}
           CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
         run: |
+          set -euo pipefail
+
+          if [ -z "$SIGNING_IDENTITY" ] || [ -z "$CERTIFICATE_P12" ] || [ -z "$CERTIFICATE_PASSWORD" ]; then
+            echo "::warning::Apple signing secrets not configured. Skipping code signing."
+            exit 0
+          fi
+
           echo "$CERTIFICATE_P12" | base64 --decode > certificate.p12
           security create-keychain -p "" build.keychain
           security import certificate.p12 -k build.keychain -P "$CERTIFICATE_PASSWORD" -T /usr/bin/codesign
@@ -130,12 +137,32 @@ jobs:
           security set-keychain-settings build.keychain
           security find-identity -v build.keychain
 
-          codesign --force --deep --sign "$SIGNING_IDENTITY" \
+          APP="build/scriptura.app"
+          FRAMEWORKS="$APP/Contents/Frameworks"
+          PLUGINS="$APP/Contents/PlugIns"
+          EXECUTABLE="$APP/Contents/MacOS/scriptura"
+
+          if [ -d "$FRAMEWORKS" ]; then
+            find "$FRAMEWORKS" -name "*.framework" -exec \
+              codesign --force --sign "$SIGNING_IDENTITY" --options runtime {} \;
+          fi
+
+          if [ -d "$PLUGINS" ]; then
+            find "$PLUGINS" -name "*.dylib" -exec \
+              codesign --force --sign "$SIGNING_IDENTITY" --options runtime {} \;
+          fi
+
+          codesign --force --sign "$SIGNING_IDENTITY" \
             --options runtime \
             --entitlement src/entitlements.plist \
-            build/scriptura.app
+            "$EXECUTABLE"
 
-          codesign --verify --deep --strict --verbose=2 build/scriptura.app
+          codesign --force --sign "$SIGNING_IDENTITY" \
+            --options runtime \
+            --entitlement src/entitlements.plist \
+            "$APP"
+
+          codesign --verify --deep --strict --verbose=2 "$APP"
 
       - name: Notarize the app
         env:
@@ -143,6 +170,13 @@ jobs:
           APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
+          set -euo pipefail
+
+          if [ -z "$APPLE_ID" ] || [ -z "$APPLE_APP_PASSWORD" ] || [ -z "$APPLE_TEAM_ID" ]; then
+            echo "::warning::Apple notarization secrets not configured. Skipping notarization."
+            exit 0
+          fi
+
           ditto -c -k --keepParent build/scriptura.app scriptura.zip
 
           xcrun notarytool submit scriptura.zip \
@@ -168,7 +202,7 @@ jobs:
           fetch-depth: 0
 
       - name: Download Windows executable
-        uses: dawidd6/action-download-artifact@v2
+        uses: actions/download-artifact@v4
         with:
           workflow: build.yml
           name: scriptura-windows-executable
