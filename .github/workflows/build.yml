@@ -211,10 +211,13 @@ jobs:
       - name: Bundle Qt dependencies
         run: macdeployqt build/scriptura.app -always-overwrite
 
-      - name: Upload macOS app bundle
+      # NOTE: this artifact is UNSIGNED and UNNOTARIZED - it is only a dev/preview
+      # bundle. macOS Gatekeeper will refuse to launch it on other Macs. The signed &
+      # notarized release bundle is produced by deploy.yml (scriptura-macos).
+      - name: Upload macOS app bundle (unsigned preview)
         uses: actions/upload-artifact@v4
         with:
-          name: scriptura-macos
+          name: scriptura-macos-unsigned
           path: build/scriptura.app
           retention-days: 14
 

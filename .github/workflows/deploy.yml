@@ -125,8 +125,9 @@ jobs:
           set -euo pipefail
 
           if [ -z "$SIGNING_IDENTITY" ] || [ -z "$CERTIFICATE_P12" ] || [ -z "$CERTIFICATE_PASSWORD" ]; then
-            echo "::warning::Apple signing secrets not configured. Skipping code signing."
-            exit 0
+            echo "::error::Apple signing secrets not configured (APPLE_DEVELOPER_ID, APPLE_CERTIFICATE_P12, APPLE_CERTIFICATE_PASSWORD)."
+            echo "::error::An unsigned macOS app is rejected by Gatekeeper on every Mac - refusing to publish one."
+            exit 1
           fi
 
           echo "$CERTIFICATE_P12" | base64 --decode > certificate.p12
@@ -142,22 +143,23 @@ jobs:
           PLUGINS="$APP/Contents/PlugIns"
           EXECUTABLE="$APP/Contents/MacOS/scriptura"
 
+          # --timestamp is REQUIRED: notarization rejects signatures without a secure timestamp.
           if [ -d "$FRAMEWORKS" ]; then
             find "$FRAMEWORKS" -name "*.framework" -exec \
-              codesign --force --sign "$SIGNING_IDENTITY" --options runtime {} \;
+              codesign --force --timestamp --sign "$SIGNING_IDENTITY" --options runtime {} \;
           fi
 
           if [ -d "$PLUGINS" ]; then
             find "$PLUGINS" -name "*.dylib" -exec \
-              codesign --force --sign "$SIGNING_IDENTITY" --options runtime {} \;
+              codesign --force --timestamp --sign "$SIGNING_IDENTITY" --options runtime {} \;
           fi
 
-          codesign --force --sign "$SIGNING_IDENTITY" \
+          codesign --force --timestamp --sign "$SIGNING_IDENTITY" \
             --options runtime \
             --entitlement src/entitlements.plist \
             "$EXECUTABLE"
 
-          codesign --force --sign "$SIGNING_IDENTITY" \
+          codesign --force --timestamp --sign "$SIGNING_IDENTITY" \
             --options runtime \
             --entitlement src/entitlements.plist \
             "$APP"
@@ -173,8 +175,9 @@ jobs:
           set -euo pipefail
 
           if [ -z "$APPLE_ID" ] || [ -z "$APPLE_APP_PASSWORD" ] || [ -z "$APPLE_TEAM_ID" ]; then
-            echo "::warning::Apple notarization secrets not configured. Skipping notarization."
-            exit 0
+            echo "::error::Apple notarization secrets not configured (APPLE_ID, APPLE_APP_PASSWORD, APPLE_TEAM_ID)."
+            echo "::error::An unnotarized app is rejected by Gatekeeper on every Mac - refusing to publish one."
+            exit 1
           fi
 
           ditto -c -k --keepParent build/scriptura.app scriptura.zip
