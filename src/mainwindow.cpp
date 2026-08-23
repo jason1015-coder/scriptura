@@ -487,6 +487,7 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
     iconLabel->setPixmap(QIcon(":/icons/app-icon.svg").pixmap(48, 48));
     iconLabel->setAlignment(Qt::AlignCenter);
 
+    // TODO: nanocoder assistant in here
     QLabel *aiLabel = new QLabel(tr("AI Assistant is in development"), inspectorContent);
     aiLabel->setObjectName("aiStatusLabel");
     aiLabel->setAlignment(Qt::AlignCenter);
@@ -884,20 +885,20 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
     // Updater connections
     connect(updater, &RustUpdaterAdapter::updateAvailable, this, &MainWindow::onUpdateAvailable);
 
-    // AI inline completion wiring
-    m_aiInline->setSettings(
-        QSettings().value("ai/provider", "ollama").toString(),
-        QSettings().value("ai/endpoint", "http://localhost:11434/api/chat").toString(),
-        QSettings().value("ai/model", "codellama").toString(),
-        QSettings().value("ai/enabled", false).toBool(),
-        QSettings().value("ai/debounceMs", 400).toInt(),
-        QSettings().value("ai/apiKey", {}).toString()
-    );
+    // TODO: replace with nanocoder- inline completion
+    // m_aiInline->setSettings(
+    //     QSettings().value("ai/provider", "ollama").toString(),
+    //     QSettings().value("ai/endpoint", "http://localhost:11434/api/chat").toString(),
+    //     QSettings().value("ai/model", "codellama").toString(),
+    //     QSettings().value("ai/enabled", false).toBool(),
+    //     QSettings().value("ai/debounceMs", 400).toInt(),
+    //     QSettings().value("ai/apiKey", {}).toString()
+    // );
 
     connect(ui->tabWidget, &QTabWidget::currentChanged, this, [this](int index) {
         if (index >= 0 && index < ui->tabWidget->count()) {
             if (CodeEditor *ce = qobject_cast<CodeEditor*>(ui->tabWidget->widget(index))) {
-                m_aiInline->setEditor(ce);
+                // m_aiInline->setEditor(ce);
                 m_codeActionCtrl->attach(ce, lspClient, QUrl::fromLocalFile(currentFile).toString());
                 if (m_codeActionCtrl->isVisible())
                     m_codeActionCtrl->showCurrent();

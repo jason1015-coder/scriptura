@@ -292,6 +292,7 @@ QWidget* MainWindow::createUnifiedSettingsWidget()
     });
 
     // ── Updates Section ───────────────────────────────────────────────────
+    // TODO: nanocoder settings UI (AI & Completions section goes here)
     QGroupBox *updateGroup = new QGroupBox(tr("Updates"), content);
     QVBoxLayout *updateLayout = new QVBoxLayout(updateGroup);
 

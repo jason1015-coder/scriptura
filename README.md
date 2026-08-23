@@ -1,4 +1,7 @@
+```
 # Scriptura
+
+> scriptura- a proposed AI powered IDE that actively developing toward v1
 
 A hybrid Qt/Rust text editor with project file browsing — **Qt for the UI, Rust for safe backend services**.
 
@@ -97,33 +100,3 @@ scriptura/
 └── CMakeLists.txt             # CMake build system
 ```
 
-## Documentation
-
-- [How to Develop a Plugin](docs/how-to-develop-a-plugin.md)
-- [How to Install a Plugin](docs/how-to-install-a-plugin.md)
-- [Windows Deployment Guide](docs/windows-deployment.md)
-- [Contributing Guidelines](CONTRIBUTING.md)
-
-## CI/CD
-
-Automated builds are available for Linux, macOS, and Windows via GitHub Actions.
-The CI pipeline:
-1. Installs Qt 6 and the Rust toolchain
-2. Builds the Rust backend library (`cargo build --release`)
-3. Builds the C++ project with CMake
-4. Runs unit tests
-5. Packages installers (AppImage, macOS DMG, Windows NSIS)
-
-## Windows Installer
-
-For Windows users, pre-built installers are available that bundle all Qt and Rust runtime dependencies,
-so no manual Qt or Rust installation is required. The installer:
-
-- Includes all necessary Qt DLLs and plugins
-- Installs to Program Files by default
-- Creates Start Menu shortcuts
-- Supports automatic updates and uninstallation
-
-## License
-
-MIT License — see [LICENSE](LICENSE) file
