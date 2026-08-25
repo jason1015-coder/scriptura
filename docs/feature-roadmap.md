@@ -636,9 +636,6 @@ All P0-P2 features are fully implemented. The remaining unimplemented features a
 3. **DevTools Integration** — High effort, requires QtWebEngine + CDP
 4. **Live Share / Collaborative Editing** — Very High effort, WebSocket + CRDT
 
-### TODO: Fix Apple System Rejection
-- **Fix Apple system rejection** by filling in Apple Developer details with **nano-collective**
-
 ---
 
 *Last updated: August 23, 2026*
