@@ -6,8 +6,7 @@
 A hybrid Qt/Rust text editor with project file browsing — **Qt for the UI, Rust for safe backend services**.
 
 > **Note:** This project is at an early development stage which expects bugs and occasional broken features.
-> The Rust backend migration aims to eliminate C++ segmentation faults by moving all protocol, infrastructure,
-> and service code into safe Rust.
+
 
 ## Architecture
 
