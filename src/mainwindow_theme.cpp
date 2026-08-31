@@ -1,6 +1,5 @@
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
-#include "applicationdock.h"
 #include "codeeditor.h"
 #include "version.h"
 #include "thememanager.h"

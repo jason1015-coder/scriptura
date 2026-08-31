@@ -582,10 +582,6 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
         }
     });
 
-    // handleDockAppClicked() in mainwindow_applicationdock.cpp routes dock clicks
-
-
-
     // Settings button
     connect(settingsButton, &QToolButton::clicked, this, &MainWindow::on_action_editor_settings_triggered);
 
@@ -1213,9 +1209,6 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
 
     // Init plugin developer API wiring
     setupPluginApis();
-
-    // Init application dock (apps floating at bottom center)
-    setupApplicationDock();
 
     // Config validator - validate settings on startup (Rust adapter handles this internally)
 

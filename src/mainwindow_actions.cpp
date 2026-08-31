@@ -8,7 +8,6 @@
 #include "themeicons.h"
 #include "rust_adapter.h"
 #include "windowanimator.h"
-#include "applicationdock.h"
 
 #include <QFileDialog>
 #include <QFile>

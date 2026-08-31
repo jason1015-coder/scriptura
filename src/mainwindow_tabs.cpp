@@ -24,7 +24,6 @@
 #include <QSignalBlocker>
 #include <QStringConverter>
 #include "encodingmanager.h"
-#include "applicationdock.h"
 #include "pluginmarketplace.h"
 #include "themarketplace.h"
 

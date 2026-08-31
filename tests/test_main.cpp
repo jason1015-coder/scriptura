@@ -4,7 +4,6 @@
 #include <QDir>
 #include <QStandardPaths>
 #include "test_aiinlinecompletion.h"
-#include "test_applicationdock.h"
 #include "test_bookmarkmanager.h"
 #include "test_bracketcolorizer.h"
 #include "test_breadcrumb.h"
@@ -64,7 +63,6 @@ int main(int argc, char *argv[])
 
     int status = 0;
     status |= QTest::qExec(new TestAiInlineCompletion, argc, argv);
-    status |= QTest::qExec(new TestApplicationDock, argc, argv);
     status |= QTest::qExec(new TestBookmarkManager, argc, argv);
     status |= QTest::qExec(new TestBracketColorizer, argc, argv);
     status |= QTest::qExec(new TestBreadcrumb, argc, argv);
