@@ -38,7 +38,7 @@ jobs:
           QT_QPA_PLATFORM=offscreen build/tests/scriptura_tests 2>&1 || echo "Exit code: $?"
       
       - name: Run C++ unit tests
-        run: cd build && ctest --output-on-failure
+        run: cd build && ctest --output-on-failure --timeout 300
 
       - name: Generate coverage report
         run: |
@@ -82,7 +82,7 @@ jobs:
           QT_QPA_PLATFORM=offscreen build/tests/scriptura_tests 2>&1 || echo "Exit code: $?"
       
       - name: Run C++ unit tests
-        run: cd build && ctest --output-on-failure
+        run: cd build && ctest --output-on-failure --timeout 300
 
   test-windows:
     runs-on: windows-latest
@@ -121,21 +121,25 @@ jobs:
         run: cmake --build build --config Debug --target scriptura_tests --verbose
 
       - name: Debug - run test binary directly
+        # Diagnostic only: the authoritative run is ctest below. Running the
+        # full suite a second time here doubles the wall time and lets a single
+        # hang (e.g. offscreen platform quirks on Windows) fail the job before
+        # ctest gets a chance, so never fail the job on this step's exit code.
         run: |
           $exe = "build/tests/Debug/scriptura_tests.exe"
           if (-not (Test-Path $exe)) { $exe = "build/tests/scriptura_tests.exe" }
-          if (-not (Test-Path $exe)) { throw "Test executable not found" }
+          if (-not (Test-Path $exe)) { echo "Test executable not found"; exit 0 }
           ls $exe 2>&1
           echo "=== Running test binary directly ==="
           $env:PATH = "${env:Qt6_DIR}\bin;$env:PATH"
           $env:QT_QPA_PLATFORM = "offscreen"
           & $exe 2>&1
-          if ($LASTEXITCODE -ne 0) { throw "Tests failed with exit code $LASTEXITCODE" }
+          echo "Direct run exited with code $LASTEXITCODE (diagnostic only)"
       
       - name: Run C++ unit tests
         run: |
           $env:PATH = "${env:Qt6_DIR}\bin;$env:PATH"
           $env:QT_QPA_PLATFORM = "offscreen"
           cd build
-          ctest --output-on-failure -C Debug
+          ctest --output-on-failure -C Debug --timeout 300
           if ($LASTEXITCODE -ne 0) { throw "Ctest failed with exit code $LASTEXITCODE" }
