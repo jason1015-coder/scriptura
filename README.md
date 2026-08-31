@@ -1,4 +1,4 @@
-```
+
 # Scriptura
 
 > scriptura- a proposed AI powered IDE that actively developing toward v1
