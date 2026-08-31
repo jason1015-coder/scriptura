@@ -70,6 +70,36 @@ Or directly:
 ./cmake-build-Debug/scriptura
 ```
 
+## Downloads
+
+Prebuilt binaries are produced by CI (`.github/workflows/build.yml` / `deploy.yml`).
+
+### macOS — App is NOT notarized/signed ⚠️
+
+The macOS build (`scriptura.app`) is **unsigned and not notarized** (no Apple Developer account is configured in CI). macOS Gatekeeper will therefore block the first launch with *"“Scriptura” can’t be opened because it is from an unidentified developer"* or *"damaged and can’t be opened"*.
+
+To bypass the check on macOS:
+
+**Option 1 — Right-click Open (easiest)**
+1. In **Finder**, locate `scriptura.app` (do NOT use Launchpad).
+2. **Control-click** (or right-click) the app and choose **Open**.
+3. In the dialog, click **Open** again. The app is now whitelisted for future launches.
+
+**Option 2 — Terminal (removes the quarantine flag)**
+```bash
+xattr -cr /path/to/scriptura.app
+```
+Run this once after downloading/extracting the app, then open it normally.
+
+**Option 3 — Allow apps from anywhere (macOS Sequoia+ may need this)**
+```bash
+sudo spctl --master-disable   # allows apps from "Anywhere" in System Settings > Privacy & Security
+# ... open the app, then optionally re-enable:
+sudo spctl --master-enable
+```
+
+> If macOS still reports the app as *damaged*, Option 2 (`xattr -cr`) is the reliable fix — it clears the `com.apple.quarantine` attribute added when the archive was downloaded.
+
 ## Project Structure
 
 ```
