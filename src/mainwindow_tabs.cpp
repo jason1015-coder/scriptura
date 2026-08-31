@@ -73,7 +73,8 @@ void MainWindow::loadProjectDirectory(const QString &dirName)
     // Disable goUpButton to restrict access to other directories when project is opened
     goUpButton->setEnabled(false);
 
-    autoSaveTimer->start(30000);
+    // Auto-save is armed via idle debounce (see constructor) — nothing to re-start
+    // here; opening a project changes no auto-save behavior.
 
     setWindowTitle(QFileInfo(projectDir).fileName() + " - Scriptura");
 
@@ -282,6 +283,10 @@ void MainWindow::openFileInTab(const QString &fileName)
     int tabIndex = openFiles.size();
     connect(editor, &QPlainTextEdit::modificationChanged, this,
             [this, tabIndex](bool m) { updateTabModified(tabIndex, m); });
+    // Re-arm the idle-debounce auto-save timer on every edit.
+    connect(editor, &QPlainTextEdit::textChanged, this, [this]() {
+        autoSaveTimer->start();
+    });
     // Only one cursorPositionChanged connection: updateStatusBar handles everything
     connect(editor, &QPlainTextEdit::cursorPositionChanged, this, &MainWindow::updateStatusBar);
     connect(editor, &QPlainTextEdit::cursorPositionChanged, this, [this]() {
@@ -371,6 +376,10 @@ void MainWindow::on_fileTreeView_clicked(const QModelIndex &index)
                 [this, tabIndex](bool m) { updateTabModified(tabIndex, m); });
         connect(editor, &QPlainTextEdit::textChanged, this, [this]() {
             lspDebounceTimer->start();
+        });
+        // Re-arm the idle-debounce auto-save timer on every edit.
+        connect(editor, &QPlainTextEdit::textChanged, this, [this]() {
+            autoSaveTimer->start();
         });
 
         OpenFile openFile;
