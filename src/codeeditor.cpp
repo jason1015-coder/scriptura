@@ -1063,11 +1063,11 @@ void CodeEditor::handleSmartIndent(QKeyEvent *event)
     }
 }
 
-void CodeEditor::handleBracketAutoClose(QKeyEvent *event)
+bool CodeEditor::handleBracketAutoClose(QKeyEvent *event)
 {
     QMap<QChar, QChar> pairs = {{'(', ')'}, {'[', ']'}, {'{', '}'}, {'"', '"'}, {'\'', '\''}};
     if (event->text().isEmpty() || !pairs.contains(event->text().at(0)))
-        return;
+        return false;
     
     QTextCursor cursor = textCursor();
     QChar open = event->text().at(0);
@@ -1079,20 +1079,19 @@ void CodeEditor::handleBracketAutoClose(QKeyEvent *event)
         if (nextChar == open) {
             cursor.movePosition(QTextCursor::Right);
             setTextCursor(cursor);
-            event->accept();
-            return;
+            return true;
         }
     }
     
     // Skip if next character is alphanumeric (don't auto-close before word chars)
     QChar nextChar = document()->characterAt(cursor.position());
     if (nextChar.isLetterOrNumber())
-        return;
+        return false;
     
     cursor.insertText(QString(open) + close);
     cursor.movePosition(QTextCursor::Left);
     setTextCursor(cursor);
-    event->accept();
+    return true;
 }
 
 void CodeEditor::keyPressEvent(QKeyEvent *event)
@@ -1125,10 +1124,15 @@ void CodeEditor::keyPressEvent(QKeyEvent *event)
         handleSmartIndent(event);
         return;
     }
-    // Bracket auto-close
+    // Bracket auto-close. The handler returns whether it consumed the key;
+    // relying on event->isAccepted() here is wrong because QKeyEvent arrives
+    // accepted by default, so an unhandled key would be silently dropped
+    // ("editor won't accept typed characters").
     if (!event->text().isEmpty() && !m_multiCursor->hasCursors() && m_bracketColorEnabled) {
-        handleBracketAutoClose(event);
-        if (event->isAccepted()) return;
+        if (handleBracketAutoClose(event)) {
+            event->accept();
+            return;
+        }
     }
     // Emmet expansion on Tab when cursor follows an abbreviation
     if (event->key() == Qt::Key_Tab && !event->modifiers().testFlag(Qt::ControlModifier)) {
@@ -1199,24 +1203,54 @@ void CodeEditor::keyPressEvent(QKeyEvent *event)
         m_multiCursor->clear();
         m_columnSelectionMode = false;
         updateAllSelections();
+        QPlainTextEdit::keyPressEvent(event);
         return;
     }
 
     QString text = event->text();
     if (text.isEmpty()) {
+        // Navigation / modifier keys are handled by the base editor; collapse
+        // the extra cursors so they never go stale or get typed over later.
         QPlainTextEdit::keyPressEvent(event);
         m_multiCursor->clear();
         return;
     }
 
-    QList<QTextCursor> allCursors;
-    allCursors.append(textCursor());
-    allCursors.append(m_multiCursor->cursors());
-
-    for (int i = allCursors.size() - 1; i >= 0; --i) {
-        QTextCursor c = allCursors[i];
-        c.insertText(text);
+    // Build the effective cursor set: the primary caret plus every distinct
+    // extra cursor. An extra cursor that sits exactly on the primary caret is
+    // dropped, otherwise the character would be inserted twice at that caret
+    // (which corrupts the buffer and reads as "the editor types garbage").
+    QTextCursor primary = textCursor();
+    QList<QTextCursor> extras;
+    for (const QTextCursor &extra : m_multiCursor->cursors()) {
+        if (extra.position() == primary.position()
+            && extra.anchor() == primary.anchor()) {
+            continue;
+        }
+        bool duplicate = false;
+        for (const QTextCursor &existing : extras) {
+            if (existing.position() == extra.position()
+                && existing.anchor() == extra.anchor()) {
+                duplicate = true;
+                break;
+            }
+        }
+        if (!duplicate)
+            extras.append(extra);
     }
+
+    // Edit the highest cursor first so lower edits are not shifted afterwards
+    // (independent QTextCursor objects keep their recorded positions).
+    std::sort(extras.begin(), extras.end(),
+              [](const QTextCursor &a, const QTextCursor &b) {
+                  return a.position() > b.position();
+              });
+    for (QTextCursor &extra : extras)
+        extra.insertText(text);
+
+    // Type once at the primary caret and land the editing caret right after.
+    primary.insertText(text);
+    setTextCursor(primary);
     m_multiCursor->clear();
 }
 

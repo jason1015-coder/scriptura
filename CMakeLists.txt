@@ -88,7 +88,7 @@ add_custom_target(rust_backend
 # All backend/infrastructure services have been rewritten in Rust (src/rust_backend/)
 # and are excluded from C++ compilation. Only Qt UI widgets, panels, and the
 # Rust bridge adapter are compiled as C++.
-file(GLOB_RECURSE SCRIPTURA_CORE_SOURCES
+file(GLOB_RECURSE SCRIPTURA_CORE_SOURCES CONFIGURE_DEPENDS
     "src/*.cpp" "src/*.h" "src/*.ui" "src/*.qrc" "src/*.h.in"
 )
 

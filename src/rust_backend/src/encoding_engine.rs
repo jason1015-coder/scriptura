@@ -1,5 +1,7 @@
 /// Encoding detection and conversion engine for files
 use std::fs;
+use std::fs::File;
+use std::io::Read;
 
 /// Detect BOM (Byte Order Mark) and return encoding name
 pub fn detect_bom(data: &[u8]) -> Option<&'static str> {
@@ -19,35 +21,46 @@ pub fn is_valid_utf8(data: &[u8]) -> bool {
     std::str::from_utf8(data).is_ok()
 }
 
-/// Detect encoding of file contents
+/// Read at most `max` bytes from the start of a file.
+///
+/// Detection never needs the whole file, and a full read of a huge file on
+/// the UI thread would freeze the editor while opening it. The C++ code this
+/// replaces peeked a small prefix for exactly this reason.
+fn read_prefix(file_path: &str, max: usize) -> Option<Vec<u8>> {
+    let file = File::open(file_path).ok()?;
+    let mut buf = Vec::with_capacity(max);
+    file.take(max as u64).read_to_end(&mut buf).ok()?;
+    Some(buf)
+}
+
+/// Detect encoding of file contents (BOM + UTF-8 validation of a 4 KiB peek).
 pub fn detect_encoding(file_path: &str) -> String {
-    let data = match fs::read(file_path) {
-        Ok(d) => d,
-        Err(_) => return "UTF-8".to_string(),
+    let data = match read_prefix(file_path, 4096) {
+        Some(d) => d,
+        None => return "UTF-8".to_string(),
     };
-    
+
     // Check BOM first
     if let Some(bom_enc) = detect_bom(&data) {
         return bom_enc.to_string();
     }
-    
-    // Peek at first 4096 bytes
-    let peek = &data[..std::cmp::min(data.len(), 4096)];
-    
-    // Try UTF-8
-    if is_valid_utf8(peek) {
+
+    // Try UTF-8 on the peek
+    if is_valid_utf8(&data) {
         return "UTF-8".to_string();
     }
-    
+
     // Default to Latin-1
     "ISO-8859-1".to_string()
 }
 
-/// Detect line ending style (CRLF, LF, CR)
+/// Detect line ending style (CRLF, LF, CR).
+/// Samples the first 64 KiB; line endings are consistent within a file in
+/// practice, and this avoids a full-file read when opening large files.
 pub fn detect_line_ending(file_path: &str) -> String {
-    let data = match fs::read(file_path) {
-        Ok(d) => d,
-        Err(_) => return "LF".to_string(),
+    let data = match read_prefix(file_path, 64 * 1024) {
+        Some(d) => d,
+        None => return "LF".to_string(),
     };
     
     let crlf_count = data.windows(2).filter(|w| w == b"\r\n").count();
@@ -63,11 +76,11 @@ pub fn detect_line_ending(file_path: &str) -> String {
     }
 }
 
-/// Check if file has BOM
+/// Check if file has BOM (only the first 3 bytes are read).
 pub fn has_bom(file_path: &str) -> bool {
-    let data = match fs::read(file_path) {
-        Ok(d) => d,
-        Err(_) => return false,
+    let data = match read_prefix(file_path, 3) {
+        Some(d) => d,
+        None => return false,
     };
     
     (data.len() >= 3 && data[0] == 0xEF && data[1] == 0xBB && data[2] == 0xBF) || 
@@ -77,12 +90,12 @@ pub fn has_bom(file_path: &str) -> bool {
 
 /// Convert line endings in content
 pub fn convert_line_endings(content: &str, from_style: &str, to_style: &str) -> String {
-    // Normalize to LF first
-    let normalized = match from_style {
-        "CRLF" => content.replace("\r\n", "\n"),
-        "CR" => content.replace('\r', "\n"),
-        _ => content.to_string(),
-    };
+    // Normalize to LF first: CRLF is always collapsed, then lone CR if the
+    // source style requests it (matches the C++ semantics this replaces).
+    let mut normalized = content.replace("\r\n", "\n");
+    if from_style == "CR" {
+        normalized = normalized.replace('\r', "\n");
+    }
     
     // Convert to target style
     match to_style {

@@ -9,9 +9,9 @@
 
 use std::ffi::c_void;
 use std::io::{BufRead, BufReader, Read, Write};
-use std::process::{Child, ChildStdin, Command, Stdio};
+use std::process::{Child, Command, Stdio};
 use std::sync::atomic::{AtomicI32, Ordering};
-use std::sync::mpsc::{self, Sender};
+use std::sync::mpsc::{self, Sender, SyncSender};
 use std::sync::{Arc, Mutex};
 use std::thread;
 
@@ -26,7 +26,8 @@ type CbLspResult = extern "C" fn(i32, *const std::os::raw::c_char, *mut c_void);
 
 pub struct LspClient {
     process: Option<Child>,
-    stdin: Option<ChildStdin>,
+    write_tx: Option<SyncSender<Vec<u8>>>,
+    writer_thread: Option<thread::JoinHandle<()>>,
     reader_thread: Option<thread::JoinHandle<()>>,
     shutdown_tx: Option<Sender<()>>,
     request_id: AtomicI32,
@@ -61,7 +62,8 @@ impl LspClient {
     pub fn new() -> Self {
         Self {
             process: None,
-            stdin: None,
+            write_tx: None,
+            writer_thread: None,
             reader_thread: None,
             shutdown_tx: None,
             request_id: AtomicI32::new(1),
@@ -108,7 +110,25 @@ impl LspClient {
         let stdout = child.stdout.take()
             .ok_or_else(|| "Failed to capture stdout".to_string())?;
 
-        self.stdin = Some(stdin);
+        // Writer thread: ALL writes to the server's stdin happen here, never
+        // on the caller (GUI) thread. A stuck server fills the pipe and a
+        // blocking write_all() on the main thread would freeze the whole app
+        // mid-keystroke. The channel is bounded so a dead server can't grow
+        // memory without bound; if it fills up, the newest message is dropped
+        // (the server is stuck anyway — the next delivered message carries
+        // fresher state once it drains).
+        let (write_tx, write_rx) = mpsc::sync_channel::<Vec<u8>>(32);
+        let writer_handle = thread::spawn(move || {
+            let mut stdin = stdin;
+            while let Ok(msg) = write_rx.recv() {
+                if stdin.write_all(msg.as_slice()).is_err() || stdin.flush().is_err() {
+                    break; // server is gone
+                }
+            }
+        });
+
+        self.write_tx = Some(write_tx);
+        self.writer_thread = Some(writer_handle);
         self.process = Some(child);
 
         let framer = self.framer.clone();
@@ -175,14 +195,20 @@ impl LspClient {
         if let Some(tx) = self.shutdown_tx.take() {
             let _ = tx.send(());
         }
-        if let Some(handle) = self.reader_thread.take() {
-            let _ = handle.join();
-        }
         if let Some(mut process) = self.process.take() {
+            // Kill the child FIRST: closing its stdin pipe unblocks the writer
+            // thread if it is mid-write_all() to a full pipe, and closing
+            // stdout unblocks the reader thread.
             let _ = process.kill();
             let _ = process.wait();
         }
-        self.stdin = None;
+        self.write_tx = None; // close the channel -> writer thread exits
+        if let Some(handle) = self.writer_thread.take() {
+            let _ = handle.join();
+        }
+        if let Some(handle) = self.reader_thread.take() {
+            let _ = handle.join();
+        }
         self.initialized = false;
     }
 
@@ -198,12 +224,15 @@ impl LspClient {
     }
 
     fn send_raw(&mut self, json: &Value) {
-        if let Some(ref mut stdin) = self.stdin {
-            let body = serde_json::to_string(json).unwrap_or_default();
-            let header = format!("Content-Length: {}\r\n\r\n", body.len());
-            let _ = stdin.write_all(header.as_bytes());
-            let _ = stdin.write_all(body.as_bytes());
-            let _ = stdin.flush();
+        let body = serde_json::to_string(json).unwrap_or_default();
+        let header = format!("Content-Length: {}\r\n\r\n", body.len());
+        let mut msg = Vec::with_capacity(header.len() + body.len());
+        msg.extend_from_slice(header.as_bytes());
+        msg.extend_from_slice(body.as_bytes());
+        if let Some(ref tx) = self.write_tx {
+            // try_send never blocks the caller (GUI thread). When the bounded
+            // queue is full the newest message is dropped rather than stalling.
+            let _ = tx.try_send(msg);
         }
     }
 

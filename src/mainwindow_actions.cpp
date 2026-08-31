@@ -368,7 +368,13 @@ void MainWindow::autoSave()
                 if (editor)
                     out << editor->toPlainText();
                 file.close();
-                openFiles[i].modified = false;
+                // Clear the dirty flag on the document AND force the tab title to
+                // update so the '*' disappears instantly (not waiting on the
+                // modificationChanged signal). updateTabModified() refreshes the
+                // openFiles[i].modified flag and both the bottom and top tab bars.
+                if (editor)
+                    editor->document()->setModified(false);
+                updateTabModified(i, false);
                 qDebug() << "Auto-saved:" << openFiles[i].filePath;
             }
         }

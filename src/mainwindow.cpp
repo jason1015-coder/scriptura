@@ -132,7 +132,10 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
     , m_fileWatcher(nullptr)
     , m_outlinePanel(nullptr)
     , m_sessionManager(nullptr)
-    , m_refactoringManager(nullptr)
+    // Note: created in the init list (not lazily below) because
+    // RefactoringManager is used as a connect() receiver earlier in the
+    // constructor — a null receiver silently discarded the LSP result route.
+    , m_refactoringManager(new RefactoringManager(this))
     , m_codeLensManager(nullptr)
     , m_gitBlame(nullptr)
     , m_statusBarWidget(nullptr)
@@ -392,6 +395,13 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
 
     findReplaceBar = new FindReplaceBar(this);
     findReplaceBar->setVisible(false);
+    // Anchor the find/replace bar into the editor's top layout (between the title
+    // bar and the tab bar). Without this it floated, unmanaged, at the window's
+    // top-left with no width, which made its buttons overlap/cramble together
+    // whenever a file was opened (showSearchBar() only toggles its visibility).
+    if (QVBoxLayout *edLayout = ui->editorContainerLayout) {
+        edLayout->insertWidget(1, findReplaceBar);
+    }
 
     commandPalette = new CommandPalette(this);
 
@@ -615,6 +625,12 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
     }
 
     connect(autoSaveTimer, &QTimer::timeout, this, &MainWindow::autoSave);
+    // Idle-debounce auto-save: a single-shot timer re-armed on every text change
+    // (wired in openFileInTab / on_fileTreeView_clicked / session hot-exit). It
+    // fires ~2s after the user stops typing in any saved file.
+    autoSaveTimer->setSingleShot(true);
+    autoSaveTimer->setInterval(2000);
+    autoSaveTimer->start();
 
     // LSP debounce timer for text changes
     lspDebounceTimer->setSingleShot(true);
@@ -910,7 +926,6 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
 
     // ── P0/P1/P2 Feature Modules ──────────────────────────────────────
     m_sessionManager = new SessionManager(this, ui->tabWidget, this);
-    m_refactoringManager = new RefactoringManager(this);
     m_codeLensManager = new CodeLensManager(this);
     // When Code Lens items arrive, feed them to the matching editor
     connect(m_codeLensManager, &CodeLensManager::codeLensUpdated, this, [this](const QString &uri) {
@@ -1091,6 +1106,10 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
         connect(editor, &QPlainTextEdit::textChanged, this, [this]() {
             lspDebounceTimer->start();
         });
+        // Re-arm the idle-debounce auto-save timer on every edit.
+        connect(editor, &QPlainTextEdit::textChanged, this, [this]() {
+            autoSaveTimer->start();
+        });
         openFiles.append({originalPath, displayName, true});
         showEditorInterface();
         ui->tabWidget->addTab(editor, "*" + displayName);
@@ -1148,6 +1167,7 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
     // ── Status Bar dynamic updates ────────────────────────────────────────
     connect(ui->tabWidget, &QTabWidget::currentChanged, this, [this](int index) {
         Q_UNUSED(index);
+        hideCompletion(); // don't let a stale completion popup follow across tabs
         updateStatusBar();
         CodeEditor *editor = getCurrentCodeEditor();
         if (editor && m_gitBlame && m_gitBlame->isEnabled() && !editor->filePath().isEmpty()) {

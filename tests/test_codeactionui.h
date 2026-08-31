@@ -9,6 +9,7 @@ class TestCodeActionUI : public QObject
 private slots:
     void testInitialState();
     void testCodeActionBar();
+    void testReattachAfterEditorDestroyed();
 };
 
 #endif

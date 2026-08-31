@@ -199,7 +199,11 @@ private:
     void updateHoverTooltip(const QPoint &pos);
     void updateAllSelections();
     void handleSmartIndent(QKeyEvent *event);
-    void handleBracketAutoClose(QKeyEvent *event);
+    // Returns true if the key was handled (auto-close performed). The caller
+    // must NOT rely on event->isAccepted() afterwards: QKeyEvent arrives
+    // accepted by default, so a void handler that silently does nothing would
+    // make the caller swallow the typed character ("editor won't accept input").
+    bool handleBracketAutoClose(QKeyEvent *event);
 
     QWidget *lineNumberArea;
     CodeHighlighter *syntaxHighlighter;

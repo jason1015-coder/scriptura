@@ -1,4 +1,6 @@
 
+use chrono::{Local, TimeZone};
+
 /// Blame info for a single line
 #[derive(Clone, Debug)]
 pub struct BlameLineInfo {
@@ -70,25 +72,13 @@ pub fn parse_blame_output(output: &str) -> Vec<BlameLineInfo> {
     result
 }
 
-/// Format Unix timestamp to human-readable date
+/// Format Unix timestamp as local time, matching Qt's
+/// QDateTime::fromSecsSinceEpoch(...).toString("yyyy-MM-dd hh:mm").
 fn format_timestamp(timestamp: i64) -> String {
-    // Simplified timestamp formatting
-    // In production, use chrono crate for proper timezone support
-    let days = timestamp / 86400;
-    let hours = (timestamp % 86400) / 3600;
-    let minutes = (timestamp % 3600) / 60;
-    
-    if days > 365 {
-        format!("{} years ago", days / 365)
-    } else if days > 30 {
-        format!("{} months ago", days / 30)
-    } else if days > 0 {
-        format!("{} days ago", days)
-    } else if hours > 0 {
-        format!("{} hours ago", hours)
-    } else {
-        format!("{} minutes ago", minutes)
-    }
+    let dt = Local.timestamp_opt(timestamp, 0)
+        .single()
+        .unwrap_or_else(|| Local.timestamp_opt(0, 0).single().unwrap());
+    dt.format("%Y-%m-%d %H:%M").to_string()
 }
 
 /// Parse blame output and return JSON string for FFI

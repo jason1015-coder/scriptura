@@ -1,6 +1,9 @@
 #include "encodingmanager.h"
 #include "rust_adapter.h"
 #include <QFile>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QTextStream>
 #include <QStringDecoder>
 
@@ -11,8 +14,27 @@ EncodingManager::EncodingManager(QObject *parent) : QObject(parent)
 
 void EncodingManager::initEncodings()
 {
-    // Delegate to Rust backend for supported encodings list
-    // Fallback to hardcoded list if FFI unavailable
+    // Delegate the supported-encoding list to the Rust backend.
+    char *json = rust_encoding_supported();
+    if (json) {
+        QJsonDocument doc = QJsonDocument::fromJson(QByteArray(json));
+        rust_free_string(json);
+        if (doc.isArray()) {
+            const QJsonArray arr = doc.array();
+            if (!arr.isEmpty()) {
+                for (const QJsonValue &v : arr) {
+                    QJsonObject o = v.toObject();
+                    QString name = o["name"].toString();
+                    QString display = o["display"].toString();
+                    if (name.isEmpty()) continue;
+                    m_encodings[name] = {name, display, name.startsWith("UTF")};
+                }
+                return;
+            }
+        }
+    }
+
+    // Fallback list if FFI is unavailable
     m_encodings["UTF-8"] = {"UTF-8", "Unicode (UTF-8)", true};
     m_encodings["UTF-16LE"] = {"UTF-16LE", "Unicode (UTF-16 LE)", true};
     m_encodings["UTF-16BE"] = {"UTF-16BE", "Unicode (UTF-16 BE)", true};
@@ -27,33 +49,13 @@ void EncodingManager::initEncodings()
 
 QString EncodingManager::detectEncoding(const QString &filePath) const
 {
-    // Delegate heavy logic to Rust backend via FFI
-    // The Rust engine handles BOM detection, UTF-8 validation, etc.
-    QFile file(filePath);
-    if (!file.open(QIODevice::ReadOnly))
-        return "UTF-8";
-
-    QByteArray data = file.peek(4096);
-    file.close();
-
-    // Check BOM (delegated to Rust engine logic)
-    if (data.size() >= 3 && (uchar)data[0] == 0xEF && (uchar)data[1] == 0xBB && (uchar)data[2] == 0xBF)
-        return "UTF-8";
-    if (data.size() >= 2 && (uchar)data[0] == 0xFF && (uchar)data[1] == 0xFE)
-        return "UTF-16LE";
-    if (data.size() >= 2 && (uchar)data[0] == 0xFE && (uchar)data[1] == 0xFF)
-        return "UTF-16BE";
-
-    // Validate UTF-8
-    auto decoder = QStringDecoder(QStringConverter::Utf8);
-    if (decoder.isValid()) {
-        QString text = decoder(data);
-        if (!text.contains(QChar::ReplacementCharacter)) {
-            return "UTF-8";
-        }
-    }
-
-    return "ISO-8859-1";
+    // Delegate BOM detection and UTF-8 validation to the Rust backend.
+    QByteArray pathBytes = filePath.toUtf8();
+    char *result = rust_encoding_detect(pathBytes.constData());
+    if (!result) return "UTF-8";
+    QString enc = QString::fromUtf8(result);
+    rust_free_string(result);
+    return enc;
 }
 
 QStringList EncodingManager::supportedEncodings() const
@@ -68,6 +70,8 @@ QString EncodingManager::encodingDisplayName(const QString &encoding) const
 
 QString EncodingManager::readFileWithEncoding(const QString &filePath, const QString &encoding) const
 {
+    // File I/O stays in C++: the Rust encoding engine's read/write are
+    // UTF-8-only, while Qt's QStringConverter handles all encodings.
     QFile file(filePath);
     if (!file.open(QIODevice::ReadOnly))
         return QString();
@@ -102,44 +106,31 @@ bool EncodingManager::convertEncoding(const QString &filePath, const QString &fr
 
 QString EncodingManager::detectLineEnding(const QString &filePath) const
 {
-    QFile file(filePath);
-    if (!file.open(QIODevice::ReadOnly))
-        return "LF";
-
-    QByteArray data = file.readAll();
-    file.close();
-
-    int crlfCount = data.count("\r\n");
-    int crCount = data.count("\r") - crlfCount;
-    int lfCount = data.count("\n") - crlfCount;
-
-    if (crlfCount > crCount && crlfCount > lfCount) return "CRLF";
-    if (crCount > 0 && crCount > lfCount) return "CR";
-    return "LF";
+    // Delegate CRLF/CR/LF counting to the Rust backend.
+    QByteArray pathBytes = filePath.toUtf8();
+    char *result = rust_encoding_detect_line_ending(pathBytes.constData());
+    if (!result) return "LF";
+    QString le = QString::fromUtf8(result);
+    rust_free_string(result);
+    return le;
 }
 
 QString EncodingManager::convertLineEndings(const QString &content, const QString &fromStyle, const QString &toStyle)
 {
-    // Normalize to LF first
-    QString normalized = content;
-    normalized.replace("\r\n", "\n");
-    if (fromStyle == "CR") normalized.replace("\r", "\n");
-
-    // Convert to target style
-    if (toStyle == "CRLF") normalized.replace("\n", "\r\n");
-    else if (toStyle == "CR") normalized.replace("\n", "\r");
-
-    return normalized;
+    QByteArray contentBytes = content.toUtf8();
+    QByteArray fromBytes = fromStyle.toUtf8();
+    QByteArray toBytes = toStyle.toUtf8();
+    char *result = rust_encoding_convert_line_endings(contentBytes.constData(),
+                                                      fromBytes.constData(),
+                                                      toBytes.constData());
+    if (!result) return content;
+    QString out = QString::fromUtf8(result);
+    rust_free_string(result);
+    return out;
 }
 
 bool EncodingManager::hasBOM(const QString &filePath) const
 {
-    QFile file(filePath);
-    if (!file.open(QIODevice::ReadOnly))
-        return false;
-
-    QByteArray bom = file.peek(3);
-    file.close();
-
-    return bom.startsWith("\xEF\xBB\xBF") || bom.startsWith("\xFF\xFE") || bom.startsWith("\xFE\xFF");
+    QByteArray pathBytes = filePath.toUtf8();
+    return rust_encoding_has_bom(pathBytes.constData());
 }

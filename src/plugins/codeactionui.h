@@ -9,6 +9,7 @@
 #include <QString>
 #include <QLabel>
 #include <QJsonArray>
+#include <QPointer>
 #include "codeeditor.h"
 
 class RustLspClientAdapter;
@@ -72,7 +73,10 @@ private:
 
     CodeEditor *m_editor;
     RustLspClientAdapter *m_client;
-    CodeActionBar *m_bar;
+    // QPointer so the bar auto-nulls when its owning editor/tab is destroyed;
+    // a raw pointer here dangles -> m_bar->hide() in attach()/~Controller
+    // dereferences freed memory and segfaults when switching files.
+    QPointer<CodeActionBar> m_bar;
     QWidget *m_parent;
     QString m_currentUri;
     int m_pendingRequestId;

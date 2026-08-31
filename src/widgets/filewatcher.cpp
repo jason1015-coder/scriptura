@@ -1,6 +1,10 @@
 #include "filewatcher.h"
+#include "rust_adapter.h"
 #include <QFile>
 #include <QFileInfo>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QTextStream>
 #include <QDir>
 
@@ -236,28 +240,38 @@ void FileWatcher::processPendingChanges()
 
 QString FileWatcher::computeDiff(const QString &oldContent, const QString &newContent) const
 {
-    // Simple line-by-line diff
-    QStringList oldLines = oldContent.split('\n');
-    QStringList newLines = newContent.split('\n');
-    
+    // Delegate LCS diff computation to the Rust backend.
+    QByteArray leftBytes = oldContent.toUtf8();
+    QByteArray rightBytes = newContent.toUtf8();
+    char *json = rust_diff_compute(leftBytes.constData(), rightBytes.constData());
+    if (!json) return QString();
+
+    QJsonDocument doc = QJsonDocument::fromJson(QByteArray(json));
+    rust_free_string(json);
+    if (!doc.isArray()) return QString();
+
     QString diff;
-    int maxLines = qMax(oldLines.size(), newLines.size());
-    
-    for (int i = 0; i < maxLines; ++i) {
-        QString oldLine = (i < oldLines.size()) ? oldLines[i] : QString();
-        QString newLine = (i < newLines.size()) ? newLines[i] : QString();
-        
-        if (oldLine != newLine) {
-            diff += QString("@@ Line %1 @@\n").arg(i + 1);
-            if (!oldLine.isEmpty()) {
-                diff += "- " + oldLine + "\n";
+    for (const QJsonValue &v : doc.array()) {
+        QJsonObject hunk = v.toObject();
+        int leftStart = hunk["leftStart"].toInt();
+        int leftCount = hunk["leftCount"].toInt();
+        int rightStart = hunk["rightStart"].toInt();
+        int rightCount = hunk["rightCount"].toInt();
+        diff += QString("@@ -%1,%2 +%3,%4 @@\n")
+                    .arg(leftStart + 1).arg(leftCount)
+                    .arg(rightStart + 1).arg(rightCount);
+        const QJsonArray lines = hunk["lines"].toArray();
+        for (const QJsonValue &l : lines) {
+            QJsonObject line = l.toObject();
+            const QString type = line["type"].toString();
+            const QString text = line["text"].toString();
+            if (type == "removed" && !text.isEmpty()) {
+                diff += "- " + text + "\n";
+            } else if (type == "added" && !text.isEmpty()) {
+                diff += "+ " + text + "\n";
             }
-            if (!newLine.isEmpty()) {
-                diff += "+ " + newLine + "\n";
-            }
-            diff += "\n";
         }
+        diff += "\n";
     }
-    
     return diff;
 }

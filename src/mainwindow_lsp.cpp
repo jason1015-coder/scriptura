@@ -382,13 +382,48 @@ void MainWindow::onCompletionReceived(const QJsonArray &items, int requestId)
     if (!editor)
         return;
 
-    // Show completion popup
+    // Show completion popup.
+    //   - Parent to the editor and store in a QPointer so the pointer auto-nulls
+    //     when the editor/tab is destroyed (raw pointer here dangled and
+    //     segfaulted hideCompletion()/clear() when switching/closing files).
+    //   - Keep it a plain child widget of the editor (no Qt::Popup/Qt::Tool
+    //     window flags). A Qt::Popup grabs keyboard focus and silenced ALL
+    //     typing/arrow keys in the editor until Escape was pressed — which
+    //     presented as "the editor became read-only". As a child widget it
+    //     never steals focus; navigation is forwarded by eventFilter and it
+    //     auto-hides when the editor regains input.
     if (m_completionPopup) {
         m_completionPopup->clear();
     } else {
-        m_completionPopup = new QListWidget(editor);
-        m_completionPopup->setWindowFlags(Qt::Popup);
+        // Parent to the viewport (not the editor body) so local coordinates
+        // align with cursorRect(), which is offset by the line-number gutter.
+        m_completionPopup = new QListWidget(editor->viewport());
         m_completionPopup->setFocusPolicy(Qt::NoFocus);
+        m_completionPopup->setFrameShape(QFrame::StyledPanel);
+        m_completionPopup->hide();
+
+        // Accept the selection on Enter (routed here by MainWindow's event
+        // filter) and on mouse double-click. These are connected ONCE at
+        // creation — the old code connected on every completion response,
+        // which accumulated one handler per keystroke and left the Enter
+        // path (itemActivated) with no receiver at all, so Enter appeared
+        // dead while the popup was visible.
+        auto insertSelected = [this, editor](QListWidgetItem *item) {
+            if (!item) return;
+            QString insert = item->data(Qt::UserRole).toString();
+            QTextCursor cursor = editor->textCursor();
+            cursor.insertText(insert);
+            editor->setTextCursor(cursor);
+            hideCompletion();
+        };
+        connect(m_completionPopup, &QListWidget::itemActivated, this, insertSelected);
+        connect(m_completionPopup, &QListWidget::itemDoubleClicked, this, insertSelected);
+
+        // Dismiss the popup as soon as the user types (or the document is
+        // otherwise edited) so it can never sit on top of the caret and
+        // swallow arrows/Enter indefinitely. Completion is manual
+        // (Ctrl+Space), so typing means "I'm not accepting this list".
+        connect(editor, &QPlainTextEdit::textChanged, this, &MainWindow::hideCompletion);
     }
 
     for (const QJsonValue &v : items) {
@@ -412,26 +447,19 @@ void MainWindow::onCompletionReceived(const QJsonArray &items, int requestId)
         return;
     }
 
-    // Position popup near cursor
+    // Position popup near cursor in local coordinates (child of the editor).
     QRect rect = editor->cursorRect();
-    QPoint pos = editor->mapToGlobal(rect.bottomLeft());
-    m_completionPopup->setGeometry(pos.x(), pos.y(), 300, 200);
+    QPoint pos = rect.bottomLeft() + QPoint(2, 2);
+    QRect geo(pos, m_completionPopup->sizeHint());
+    geo.setHeight(qMin(200, m_completionPopup->sizeHint().height()));
+    m_completionPopup->setGeometry(geo);
+    m_completionPopup->raise();
     m_completionPopup->show();
     m_completionPopup->setCurrentRow(0);
-
-    // Connect selection
-    connect(m_completionPopup, &QListWidget::itemDoubleClicked, this, [this, editor](QListWidgetItem *item) {
-        QString insert = item->data(Qt::UserRole).toString();
-        QTextCursor cursor = editor->textCursor();
-        cursor.insertText(insert);
-        editor->setTextCursor(cursor);
-        hideCompletion();
-    });
 }
 
 void MainWindow::hideCompletion()
 {
-    if (m_completionPopup) {
+    if (m_completionPopup)
         m_completionPopup->hide();
-    }
 }

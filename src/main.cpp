@@ -14,6 +14,12 @@
 #include <QTimer>
 #include <QFileInfo>
 
+#ifdef Q_OS_LINUX
+#include <atomic>
+#include <thread>
+#include <cstdlib>
+#endif
+
 // Theme helper function to get window color based on theme
 QColor getThemeWindowColor(ThemeColorFamily family, ThemeMode mode) {
     bool isDark = (mode == ThemeMode::Dark);
@@ -818,6 +824,41 @@ QDialogButtonBox > QPushButton {
             welcome->show();
         });
     }
+
+#ifdef Q_OS_LINUX
+    // ── Freeze watchdog ──────────────────────────────────────────────────
+    // If the main (GUI) thread stops servicing the event loop for ~3 seconds
+    // (the heartbeat timer stops firing), dump its stack to
+    // /tmp/scriptura-freeze.log via gdb so a freeze is diagnosable from a
+    // stack trace instead of being a mystery. Complements CrashHandler,
+    // which only covers signals (crashes), not stalls.
+    static std::atomic<bool> freezeHeartbeat{true};
+    QTimer *freezeWatchdogTimer = new QTimer(&a);
+    freezeWatchdogTimer->setInterval(500);
+    QObject::connect(freezeWatchdogTimer, &QTimer::timeout, []() {
+        freezeHeartbeat = true;
+    });
+    freezeWatchdogTimer->start();
+
+    const QString freezeLog = QStringLiteral("/tmp/scriptura-freeze.log");
+    std::thread([freezeLog]() {
+        int missed = 0;
+        for (;;) {
+            std::this_thread::sleep_for(std::chrono::seconds(1));
+            if (freezeHeartbeat.exchange(false)) {
+                missed = 0;
+                continue;
+            }
+            if (++missed < 3)
+                continue; // ~3s of stall before dumping
+            missed = 0;
+            const QString cmd =
+                QStringLiteral("gdb -p %1 -batch -ex \"thread apply all bt\" > %2 2>&1")
+                    .arg(QString::number(QCoreApplication::applicationPid()), freezeLog);
+            std::system(cmd.toUtf8().constData());
+        }
+    }).detach();
+#endif
 
     return a.exec();
 }

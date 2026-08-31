@@ -134,16 +134,43 @@ pub struct FfiDiffHunk {
     pub right_count: i32,
 }
 
-/// Compute diff and return JSON string for FFI
+/// Escape string for JSON output
+fn escape_json(s: &str) -> String {
+    s.replace('\\', "\\\\")
+     .replace('"', "\\\"")
+     .replace('\n', "\\n")
+     .replace('\r', "\\r")
+     .replace('\t', "\\t")
+}
+
+/// Compute diff and return JSON string for FFI.
+/// Each hunk carries its positions plus the changed lines
+/// (type "removed" / "added" with their text) so C++ can render them.
 pub fn compute_diff_json(left: &str, right: &str) -> String {
     let hunks = compute_diff(left, right);
     let mut result = String::from("[");
     for (i, hunk) in hunks.iter().enumerate() {
         if i > 0 { result.push(','); }
         result.push_str(&format!(
-            r#"{{"leftStart":{},"leftCount":{},"rightStart":{},"rightCount":{}}}"#,
+            r#"{{"leftStart":{},"leftCount":{},"rightStart":{},"rightCount":{},"lines":["#,
             hunk.left_start, hunk.left_count, hunk.right_start, hunk.right_count
         ));
+        let mut first = true;
+        for line in hunk.left_lines.iter().chain(hunk.right_lines.iter()) {
+            if !first { result.push(','); }
+            first = false;
+            let (t, text) = match &line.line_type {
+                LineType::Removed => ("removed", &line.text),
+                LineType::Added => ("added", &line.text),
+                LineType::Unchanged => ("unchanged", &line.text),
+                LineType::Modified => ("modified", &line.text),
+            };
+            result.push_str(&format!(
+                r#"{{"type":"{}","text":"{}"}}"#,
+                t, escape_json(text)
+            ));
+        }
+        result.push_str("]}");
     }
     result.push(']');
     result

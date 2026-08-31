@@ -27,6 +27,7 @@
 #include <QGridLayout>
 #include <QTabBar>
 #include <QScrollArea>
+#include <QPointer>
 #include <memory>
 #include "codeeditor.h"
 #include "findreplace.h"
@@ -231,7 +232,11 @@ private:
     bool m_restartRequested = false; // Set when the user wipes settings and chooses to restart
     int m_currentFrameId = 0;
     QMap<QString, QString> m_breakpointConditions; // key: "file:line"
-    QListWidget *m_completionPopup = nullptr;
+    // QPointer so the popup auto-nulls when its owning editor/tab is destroyed.
+    // A raw pointer here dangles -> m_completionPopup->hide()/clear() in
+    // hideCompletion()/onCompletionReceived() dereference freed memory and
+    // segfault whenever the file tab is closed or a new completion arrives.
+    QPointer<QListWidget> m_completionPopup = nullptr;
     QMap<QString, QString> m_fileEncodings;  // filePath -> encoding name
     QMap<QString, QString> m_fileLineEndings; // filePath -> line ending style
 

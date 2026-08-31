@@ -11,11 +11,11 @@
 #include "test_codelensmanager.h"
 #include "test_commandpalette.h"
 #include "test_crashhandler.h"
+#include "test_codeeditor_multicursor.h"
 #include "test_dataformatter.h"
 #include "test_debugconfiguration.h"
 #include "test_debuggergutter.h"
 #include "test_dependencyresolver.h"
-#include "test_emmetparser.h"
 #include "test_encodingmanager.h"
 #include "test_filewatcher.h"
 #include "test_findreplace.h"
@@ -26,6 +26,7 @@
 #include "test_gitmergewidget.h"
 #include "test_httpclientpanel.h"
 #include "test_largefilehandler.h"
+#include "test_mainwindow_editing.h"
 #include "test_minimap.h"
 #include "test_multicursor.h"
 #include "test_plugincontext.h"
@@ -74,7 +75,6 @@ int main(int argc, char *argv[])
     status |= QTest::qExec(new TestDebugConfiguration, argc, argv);
     status |= QTest::qExec(new TestDebuggerGutter, argc, argv);
     status |= QTest::qExec(new TestDependencyResolver, argc, argv);
-    status |= QTest::qExec(new TestEmmetParser, argc, argv);
     status |= QTest::qExec(new TestEncodingManager, argc, argv);
     status |= QTest::qExec(new TestFileWatcher, argc, argv);
     status |= QTest::qExec(new TestFindReplace, argc, argv);
@@ -85,8 +85,10 @@ int main(int argc, char *argv[])
     status |= QTest::qExec(new TestGitMergeWidget, argc, argv);
     status |= QTest::qExec(new TestHttpClientPanel, argc, argv);
     status |= QTest::qExec(new TestLargeFileHandler, argc, argv);
+    status |= QTest::qExec(new TestMainWindowEditing, argc, argv);
     status |= QTest::qExec(new TestMinimap, argc, argv);
     status |= QTest::qExec(new TestMultiCursor, argc, argv);
+    status |= QTest::qExec(new TestCodeEditorMultiCursor, argc, argv);
     status |= QTest::qExec(new TestPluginContext, argc, argv);
     status |= QTest::qExec(new TestPluginRegistry, argc, argv);
     status |= QTest::qExec(new TestProjectSearch, argc, argv);

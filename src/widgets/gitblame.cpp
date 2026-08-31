@@ -1,7 +1,11 @@
 #include "gitblame.h"
+#include "rust_adapter.h"
 #include <QFile>
 #include <QDir>
 #include <QStandardPaths>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
 
 GitBlame::GitBlame(QObject *parent)
     : QObject(parent)
@@ -54,39 +58,24 @@ void GitBlame::onProcessError(QProcess::ProcessError error)
 void GitBlame::parseBlameOutput(const QByteArray &output)
 {
     m_blameData.clear();
-    QString text = QString::fromUtf8(output);
-    QStringList lines = text.split('\n');
+    if (output.isEmpty()) return;
 
-    int currentLine = 0;
-    BlameLineInfo currentInfo;
+    // Delegate porcelain parsing to the Rust blame engine.
+    char *json = rust_blame_parse(output.constData());
+    if (!json) return;
+    QJsonDocument doc = QJsonDocument::fromJson(QByteArray(json));
+    rust_free_string(json);
 
-    for (const QString &line : lines) {
-        if (line.startsWith('\t')) {
-            // This is the actual line content - record the blame info
-            currentInfo.line = currentLine;
-            m_blameData[currentLine] = currentInfo;
-            currentLine++;
-            currentInfo = BlameLineInfo(); // Reset for next line
-            continue;
-        }
-
-        QStringList parts = line.split(' ');
-        if (parts.isEmpty()) continue;
-
-        // Header line: "<commit-hash> <original-line> <final-line> [<num-lines>]"
-        if (parts.size() >= 3 && parts[0].length() == 40) {
-            currentInfo.commitHash = parts[0];
-            continue;
-        }
-
-        if (parts[0] == "author") {
-            currentInfo.author = line.mid(7).trimmed();
-        } else if (parts[0] == "author-time") {
-            QDateTime dt = QDateTime::fromSecsSinceEpoch(parts[1].toLongLong());
-            currentInfo.date = dt.toString("yyyy-MM-dd hh:mm");
-        } else if (parts[0] == "summary") {
-            currentInfo.summary = line.mid(8).trimmed();
-        }
+    if (!doc.isArray()) return;
+    for (const QJsonValue &v : doc.array()) {
+        QJsonObject o = v.toObject();
+        BlameLineInfo info;
+        info.commitHash = o["commitHash"].toString();
+        info.author = o["author"].toString();
+        info.date = o["date"].toString();
+        info.summary = o["summary"].toString();
+        info.line = o["line"].toInt();
+        m_blameData[info.line] = info;
     }
 }
 
