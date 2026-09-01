@@ -30,6 +30,10 @@ Scriptura uses a **dual-language architecture**:
 
 The backend services are compiled into a static library (`libscriptura_backend.a`) via **Cargo** and linked into the C++ executable. Cross-language communication uses **C FFI** (`extern "C"`) with JSON strings for complex data. All state management and protocol handling runs in safe Rust.
 
+</div>
+
+<div align="center">
+
 ## Features
 
 - **Project-based workflow**: Open a project directory to browse files
@@ -37,29 +41,51 @@ The backend services are compiled into a static library (`libscriptura_backend.a
 - **Directory navigation**: "Go Up" button to navigate to parent directories
 - **Tabbed editing**: Multiple files open in tabs
 
+</div>
+
+<div align="center">
+
 ## Requirements
 
 - **Qt 6** (with Widgets, Network, Sql, and LinguistTools modules)
 - **CMake 3.16+**
 - **C++17 compiler** (GCC, Clang, MSVC)
 - **Rust toolchain** (for building the backend) — Install via [rustup](https://rustup.rs/):
-  ```bash
-  curl --proto =https --tlsv1.2 -sSf https://sh.rustup.rs | sh
-  ```
+
+</div>
+
+```bash
+curl --proto =https --tlsv1.2 -sSf https://sh.rustup.rs | sh
+```
+
+<div align="center">
 
 ## Building
 
 ### Quick Build (Debug)
+
+</div>
+
 ```bash
 ./build.sh
 ```
 
+<div align="center">
+
 ### Build (Release)
+
+</div>
+
 ```bash
 ./build.sh Release
 ```
 
+<div align="center">
+
 ### Manual Build
+
+</div>
+
 ```bash
 # Build Rust backend first
 cd src/rust_backend && cargo build --release && cd ../..
@@ -69,16 +95,27 @@ cmake -B build -S . -DCMAKE_BUILD_TYPE=Release
 cmake --build build --config Release -j$(nproc)
 ```
 
+<div align="center">
+
 ## Running
+
+</div>
 
 ```bash
 ./run.sh
 ```
 
+<div align="center">
+
 Or directly:
+
+</div>
+
 ```bash
 ./cmake-build-Debug/scriptura
 ```
+
+<div align="center">
 
 ## Downloads
 
@@ -96,17 +133,28 @@ To bypass the check on macOS:
 3. In the dialog, click **Open** again. The app is now whitelisted for future launches.
 
 **Option 2 — Terminal (removes the quarantine flag)**
+
+</div>
+
 ```bash
 xattr -cr /path/to/scriptura.app
 ```
+
+<div align="center">
+
 Run this once after downloading/extracting the app, then open it normally.
 
 **Option 3 — Allow apps from anywhere (macOS Sequoia+ may need this)**
+
+</div>
+
 ```bash
 sudo spctl --master-disable   # allows apps from "Anywhere" in System Settings > Privacy & Security
 # ... open the app, then optionally re-enable:
 sudo spctl --master-enable
 ```
+
+<div align="center">
 
 > If macOS still reports the app as *damaged*, Option 2 (`xattr -cr`) is the reliable fix — it clears the `com.apple.quarantine` attribute added when the archive was downloaded.
 
