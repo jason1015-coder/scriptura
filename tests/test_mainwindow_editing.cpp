@@ -40,6 +40,21 @@ void focusEditor(MainWindow &win, CodeEditor *editor)
     Q_UNUSED(win);
 }
 
+// Send a key press+release directly via QApplication::sendEvent so the event
+// still flows through MainWindow's event filter (installed on the editor in
+// openFileInTab) — the integration path these tests guard. We deliberately
+// avoid QTest::keyClick/keyClicks here: on the Windows offscreen platform they
+// spin inside qWaitForWindowActive for the complex MainWindow, keeping it alive
+// long enough for MainWindow's delayed plugin-registry check (5s) to fire
+// mid-test, which crashes the test process.
+void sendKey(CodeEditor *editor, Qt::Key key, const QString &text = QString())
+{
+    QKeyEvent press(QEvent::KeyPress, key, Qt::NoModifier, text);
+    QKeyEvent release(QEvent::KeyRelease, key, Qt::NoModifier, text);
+    QApplication::sendEvent(editor, &press);
+    QApplication::sendEvent(editor, &release);
+}
+
 } // namespace
 
 void TestMainWindowEditing::testEditorIsEditableAfterOpen()
@@ -83,7 +98,9 @@ void TestMainWindowEditing::testTypingInsertsText()
     c.movePosition(QTextCursor::End);
     editor->setTextCursor(c);
 
-    QTest::keyClicks(editor, "abc");
+    sendKey(editor, Qt::Key_A, QStringLiteral("a"));
+    sendKey(editor, Qt::Key_B, QStringLiteral("b"));
+    sendKey(editor, Qt::Key_C, QStringLiteral("c"));
     QTest::qWait(20);
     QCoreApplication::processEvents();
 
@@ -113,8 +130,8 @@ void TestMainWindowEditing::testEnterInsertsNewline()
     editor->setTextCursor(c);
 
     // Enter must insert a newline (or smart-indent) — it must not be swallowed.
-    QTest::keyClick(editor, Qt::Key_Return);
-    QTest::keyClicks(editor, "x");
+    sendKey(editor, Qt::Key_Return);
+    sendKey(editor, Qt::Key_X, QStringLiteral("x"));
     QTest::qWait(20);
     QCoreApplication::processEvents();
 
@@ -144,7 +161,7 @@ void TestMainWindowEditing::testArrowKeysMoveCaret()
     editor->setTextCursor(c);
     const int startPos = editor->textCursor().position();
 
-    QTest::keyClick(editor, Qt::Key_Right);
+    sendKey(editor, Qt::Key_Right);
     QTest::qWait(20);
     QCoreApplication::processEvents();
 
@@ -227,7 +244,7 @@ void TestMainWindowEditing::testCompletionPopupDoesNotBlockTyping()
     QCoreApplication::processEvents();
 
     // Typing with the popup visible must land in the document.
-    QTest::keyClicks(editor, "x");
+    sendKey(editor, Qt::Key_X, QStringLiteral("x"));
     QTest::qWait(20);
     QCoreApplication::processEvents();
 
@@ -236,7 +253,7 @@ void TestMainWindowEditing::testCompletionPopupDoesNotBlockTyping()
 
     // And after typing (which hides the popup), Enter must insert a newline —
     // not be swallowed by a still-visible popup.
-    QTest::keyClick(editor, Qt::Key_Return);
+    sendKey(editor, Qt::Key_Return);
     QTest::qWait(20);
     QCoreApplication::processEvents();
     QVERIFY2(editor->toPlainText().contains("x\n"),

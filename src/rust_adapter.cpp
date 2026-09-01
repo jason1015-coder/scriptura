@@ -9,6 +9,8 @@
 #include <QTextStream>
 #include <QStandardPaths>
 #include <QDateTime>
+#include <QtConcurrent/QtConcurrent>
+#include <QFutureWatcher>
 
 // ═══════════════════════════════════════════════════════════════════════
 //  RustLspClientAdapter
@@ -985,7 +987,17 @@ QString RustPluginRegistryAdapter::registryUrl() const
 
 void RustPluginRegistryAdapter::checkForUpdates()
 {
-    rust_plugin_registry_check_updates(m_registry);
+    // Run the fetch on a background thread: the Rust side does a blocking
+    // HTTP request (reqwest::blocking::get) which must never run on the GUI
+    // thread. Results come back through the registered callbacks, which
+    // marshal onto this thread via queued connections.
+    auto *watcher = new QFutureWatcher<void>(this);
+    connect(watcher, &QFutureWatcher<void>::finished, this, [this, watcher]() {
+        watcher->deleteLater();
+    });
+    watcher->setFuture(QtConcurrent::run([this]() {
+        rust_plugin_registry_check_updates(m_registry);
+    }));
 }
 
 bool RustPluginRegistryAdapter::upgradeAvailable(const QString &pluginId, const QString &currentVersion) const

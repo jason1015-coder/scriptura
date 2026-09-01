@@ -30,6 +30,17 @@ set(CMAKE_AUTORCC ON)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+if(WIN32 AND MSVC)
+    # The Rust backend staticlib is always built with `cargo build --release`,
+    # which links the release MSVC CRT (/MD). A Debug C++ build uses the debug
+    # CRT (/MDd) by default; mixing the two runtimes in one process is undefined
+    # behavior and crashes at runtime on Windows (e.g. an access violation inside
+    # RustPluginRegistryAdapter::checkForUpdates -> reqwest::blocking::get during
+    # the C++ tests). Force the release runtime library for every configuration
+    # so C++ and Rust share a single CRT.
+    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreadedDLL")
+endif()
+
 find_package(QT NAMES Qt6 Qt5 REQUIRED COMPONENTS Widgets LinguistTools Network Sql Test)
 find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Widgets LinguistTools Network Sql Test)
 
