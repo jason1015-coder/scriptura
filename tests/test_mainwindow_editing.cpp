@@ -2,6 +2,7 @@
 #include <QApplication>
 #include <QJsonArray>
 #include <QJsonObject>
+#include <QKeyEvent>
 #include <QTemporaryDir>
 #include <QFile>
 #include <QTextStream>
@@ -172,7 +173,17 @@ void TestMainWindowEditing::testTabInsertsIndent()
     editor->setTextCursor(c);
     const int startPos = editor->textCursor().position();
 
-    QTest::keyClick(editor, Qt::Key_Tab);
+    // Send the Tab key directly via QApplication::sendEvent so the event
+    // still flows through MainWindow's event filter (installed on the editor
+    // in openFileInTab) — that's the integration path this test guards
+    // (input must not be swallowed by the filter). We deliberately avoid
+    // QTest::keyClick here: on the Windows offscreen platform, keyClick's
+    // qWaitForWindowActive spins for the complex MainWindow and the test
+    // is then killed by ctest's --timeout, failing the job.
+    QKeyEvent tabPress(QEvent::KeyPress, Qt::Key_Tab, Qt::NoModifier);
+    QKeyEvent tabRelease(QEvent::KeyRelease, Qt::Key_Tab, Qt::NoModifier);
+    QApplication::sendEvent(editor, &tabPress);
+    QApplication::sendEvent(editor, &tabRelease);
     QTest::qWait(20);
     QCoreApplication::processEvents();
 

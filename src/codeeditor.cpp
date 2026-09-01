@@ -1195,6 +1195,17 @@ void CodeEditor::keyPressEvent(QKeyEvent *event)
     }
 
     if (!m_multiCursor->hasCursors()) {
+        // QPlainTextEdit::keyPressEvent ignores Tab by default (it neither
+        // inserts a character nor moves focus), so handle Tab here to keep
+        // the caret advancing. The earlier branches already consumed Tab
+        // when Emmet expanded an abbreviation or when ghost text was
+        // accepted, so this only fires for the plain "indent" case.
+        if (event->key() == Qt::Key_Tab) {
+            QTextCursor tabCursor = textCursor();
+            tabCursor.insertText(QStringLiteral("\t"));
+            event->accept();
+            return;
+        }
         QPlainTextEdit::keyPressEvent(event);
         return;
     }
