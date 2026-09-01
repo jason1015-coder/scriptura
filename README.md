@@ -1,5 +1,8 @@
+<div align="center">
 
 # Scriptura
+
+<img src=".github/assets/icon.jpg" alt="Scriptura Icon" width="128" />
 
 > scriptura- a proposed AI powered IDE that actively developing toward v1
 
@@ -7,6 +10,13 @@ A hybrid Qt/Rust text editor with project file browsing — **Qt for the UI, Rus
 
 > **Note:** This project is at an early development stage which expects bugs and occasional broken features.
 
+---
+
+## Preview
+
+<img src=".github/assets/preview.png" alt="Scriptura Preview" />
+
+---
 
 ## Architecture
 
@@ -100,6 +110,8 @@ sudo spctl --master-enable
 
 > If macOS still reports the app as *damaged*, Option 2 (`xattr -cr`) is the reliable fix — it clears the `com.apple.quarantine` attribute added when the archive was downloaded.
 
+</div>
+
 ## Project Structure
 
 ```
@@ -128,4 +140,3 @@ scriptura/
 ├── .github/workflows/         # CI/CD workflows
 └── CMakeLists.txt             # CMake build system
 ```
-
