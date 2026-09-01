@@ -114,16 +114,39 @@ jobs:
       - name: Run Rust tests
         run: cd src\rust_backend && cargo test && cd ..\..
       
+      # NOTE: Windows tests MUST build in Release (or RelWithDebInfo), not Debug.
+      # A Debug build selects Qt's pre-built debug libraries (Qt6Cored.lib, etc.)
+      # which are compiled with the debug CRT (/MDd), while this project's C++
+      # code and the Rust release staticlib use the release CRT (/MD). Mixing the
+      # two CRTs in one process gives each its own heap manager (ucrtbase.dll vs
+      # ucrtbased.dll); freeing memory across that boundary corrupts the heap,
+      # crashing the test binary with STATUS_HEAP_CORRUPTION (0xc0000374) shortly
+      # after startup on Windows. Release selects Qt's release libraries (/MD) so
+      # the whole process shares a single CRT.
       - name: Configure (MSVC)
-        run: cmake -B build -S . -A x64 -DCMAKE_BUILD_TYPE=Debug -DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake -DBUILD_TESTING=ON -DCMAKE_VERBOSE_MAKEFILE=ON
+        run: cmake -B build -S . -A x64 -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake -DBUILD_TESTING=ON -DCMAKE_VERBOSE_MAKEFILE=ON
       
       - name: Build C++ tests
-        run: cmake --build build --config Debug --target scriptura_tests --verbose
+        run: cmake --build build --config Release --target scriptura_tests --verbose
+
+      - name: Debug - run test binary directly
+        run: |
+          $env:PATH = "${env:Qt6_DIR}\bin;$env:PATH"
+          $env:QT_QPA_PLATFORM = "offscreen"
+          $bin = "build\tests\Release\scriptura_tests.exe"
+          if (Test-Path $bin) {
+            Write-Host "=== Running test binary directly ==="
+            & $bin 2>&1
+            Write-Host "Exit code: $LASTEXITCODE"
+          } else {
+            Write-Host "Binary not found at $bin"
+            Get-ChildItem -Recurse build -Filter "scriptura_tests.exe" | Format-List
+          }
 
       - name: Run C++ unit tests
         run: |
           $env:PATH = "${env:Qt6_DIR}\bin;$env:PATH"
           $env:QT_QPA_PLATFORM = "offscreen"
           cd build
-          ctest --output-on-failure -C Debug --timeout 300
+          ctest --output-on-failure -C Release --timeout 300
           if ($LASTEXITCODE -ne 0) { throw "Ctest failed with exit code $LASTEXITCODE" }
