@@ -1223,8 +1223,15 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
     });
     // Plugin registry (uses Rust adapter)
     m_pluginRegistry->setRegistryUrl(registryUrl);
-    QTimer::singleShot(5000, m_pluginRegistry, [this]() {
-        m_pluginRegistry->checkForUpdates();
+    // The timer context MUST be `this` (MainWindow), not m_pluginRegistry:
+    // m_pluginRegistry is owned by the RustBackend singleton and outlives this
+    // window, so a timer keyed to it would keep firing after MainWindow is
+    // destroyed and dereference a dangling `this` (heap corruption). Keying it
+    // to the window cancels the check when the window closes. The registry
+    // pointer itself is captured by value — it stays valid for the process
+    // lifetime via the singleton.
+    QTimer::singleShot(5000, this, [registry = m_pluginRegistry]() {
+        registry->checkForUpdates();
     });
 
     // Init plugin developer API wiring
