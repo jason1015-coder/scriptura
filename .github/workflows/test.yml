@@ -120,22 +120,6 @@ jobs:
       - name: Build C++ tests
         run: cmake --build build --config Debug --target scriptura_tests --verbose
 
-      - name: Debug - run test binary directly
-        # Diagnostic only: the authoritative run is ctest below. Running the
-        # full suite a second time here doubles the wall time and lets a single
-        # hang (e.g. offscreen platform quirks on Windows) fail the job before
-        # ctest gets a chance, so never fail the job on this step's exit code.
-        run: |
-          $exe = "build/tests/Debug/scriptura_tests.exe"
-          if (-not (Test-Path $exe)) { $exe = "build/tests/scriptura_tests.exe" }
-          if (-not (Test-Path $exe)) { echo "Test executable not found"; exit 0 }
-          ls $exe 2>&1
-          echo "=== Running test binary directly ==="
-          $env:PATH = "${env:Qt6_DIR}\bin;$env:PATH"
-          $env:QT_QPA_PLATFORM = "offscreen"
-          & $exe 2>&1
-          echo "Direct run exited with code $LASTEXITCODE (diagnostic only)"
-      
       - name: Run C++ unit tests
         run: |
           $env:PATH = "${env:Qt6_DIR}\bin;$env:PATH"
