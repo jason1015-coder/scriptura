@@ -62,13 +62,15 @@ curl --proto =https --tlsv1.2 -sSf https://sh.rustup.rs | sh
 
 ## Building
 
-### Quick Build (Debug)
+### Quick Build & Run (Debug)
 
 </div>
 
 ```bash
-./build.sh
+./run.sh
 ```
+
+> `./run.sh` builds the Rust backend and the Qt UI incrementally, then launches the app.
 
 <div align="center">
 
@@ -77,7 +79,8 @@ curl --proto =https --tlsv1.2 -sSf https://sh.rustup.rs | sh
 </div>
 
 ```bash
-./build.sh Release
+cmake -B cmake-build-Release -S . -DCMAKE_BUILD_TYPE=Release
+cmake --build cmake-build-Release -j$(nproc)
 ```
 
 <div align="center">

@@ -53,13 +53,12 @@ When submitting an enhancement suggestion, please:
 ### Building
 
 ```bash
-# Build the entire project (Rust backend + C++ UI)
-./build.sh Release
+# Quick build & run (Debug — Rust backend + C++ UI)
+./run.sh
 
-# Or build manually:
-cd src/rust_backend && cargo build --release && cd ../..
-cmake -B build -S . -DCMAKE_BUILD_TYPE=Release
-cmake --build build --config Release -j$(nproc)
+# Or build a Release build manually (CMake also builds the Rust backend):
+cmake -B cmake-build-Release -S . -DCMAKE_BUILD_TYPE=Release
+cmake --build cmake-build-Release -j$(nproc)
 ```
 
 ### Code Style
