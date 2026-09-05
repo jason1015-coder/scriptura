@@ -990,8 +990,9 @@ void MainWindow::on_action_license_triggered()
     settings.setValue("ui/sidebarCollapsed", collapsed);
 
     if (collapsed) {
-        if (sidebarToggleButton)
-            sidebarToggleButton->setChecked(false);
+        // Keep the title bar toggle in sync with the actual drawer state.
+        if (m_titleBar)
+            m_titleBar->sidebarToggleButton->setChecked(false);
         QPropertyAnimation *animation = new QPropertyAnimation(ui->sidebarDrawer, "maximumWidth");
         animation->setDuration(200);
         animation->setStartValue(ui->sidebarDrawer->width());
@@ -1003,8 +1004,8 @@ void MainWindow::on_action_license_triggered()
         });
         animation->start(QAbstractAnimation::DeleteWhenStopped);
     } else {
-        if (sidebarToggleButton)
-            sidebarToggleButton->setChecked(true);
+        if (m_titleBar)
+            m_titleBar->sidebarToggleButton->setChecked(true);
         QPropertyAnimation *animation = new QPropertyAnimation(ui->sidebarDrawer, "maximumWidth");
         animation->setDuration(200);
         animation->setStartValue(ui->sidebarDrawer->width());

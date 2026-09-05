@@ -38,7 +38,7 @@ The backend services are compiled into a static library (`libscriptura_backend.a
 
 - **Project-based workflow**: Open a project directory to browse files
 - **File tree sidebar**: Navigate project structure with clickable folders
-- **Directory navigation**: "Go Up" button to navigate to parent directories
+- **In-place browsing**: Expand and collapse folders in the sidebar to move around the project
 - **Tabbed editing**: Multiple files open in tabs
 
 </div>

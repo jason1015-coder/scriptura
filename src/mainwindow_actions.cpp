@@ -4,7 +4,6 @@
 #include "rust_adapter.h"
 #include "findreplace.h"
 #include "projectsearch.h"
-#include "commandpalette.h"
 #include "themeicons.h"
 #include "rust_adapter.h"
 #include "windowanimator.h"
@@ -140,25 +139,6 @@ void MainWindow::on_action_delete_file_directory_triggered()
             } else {
                 QMessageBox::warning(this, tr("Error"), tr("Failed to delete: %1").arg(file.errorString()));
             }
-        }
-    }
-}
-
-void MainWindow::toggleSidebar()
-{
-    if (sidebarToggleButton->isChecked()) {
-        if (m_windowAnimator) {
-            m_windowAnimator->animatePanelSlide(ui->sidebarDrawer, true, 200);
-        } else {
-            ui->sidebarDrawer->setMaximumWidth(240);
-            ui->sidebarDrawer->setMinimumWidth(48);
-        }
-    } else {
-        if (m_windowAnimator) {
-            m_windowAnimator->animatePanelSlide(ui->sidebarDrawer, false, 200);
-        } else {
-            ui->sidebarDrawer->setMaximumWidth(0);
-            ui->sidebarDrawer->setMinimumWidth(0);
         }
     }
 }
@@ -455,32 +435,8 @@ void MainWindow::on_action_project_search_triggered()
 
 void MainWindow::on_action_command_palette_triggered()
 {
-    if (!commandPalette) return;
-    commandPalette->registerCommand({"open-project", tr("Open Project..."), "Ctrl+Shift+O", [this]() { on_action_open_project_triggered(); }});
-    commandPalette->registerCommand({"open-file", tr("Open File..."), "Ctrl+O", [this]() { on_action_open_file_triggered(); }});
-    commandPalette->registerCommand({"save", tr("Save"), "Ctrl+S", [this]() { on_action_save_triggered(); }});
-    commandPalette->registerCommand({"save-as", tr("Save As..."), "Ctrl+Shift+S", [this]() { on_action_save_as_triggered(); }});
-    commandPalette->registerCommand({"new-file", tr("New File..."), "Ctrl+N", [this]() { on_action_add_file_directory_triggered(); }});
-    commandPalette->registerCommand({"undo", tr("Undo"), "Ctrl+Z", [this]() { on_action_Undo_triggered(); }});
-    commandPalette->registerCommand({"redo", tr("Redo"), "Ctrl+Y", [this]() { on_action_Redo_triggered(); }});
-    commandPalette->registerCommand({"cut", tr("Cut"), "Ctrl+X", [this]() { on_actionCu_t_triggered(); }});
-    commandPalette->registerCommand({"copy", tr("Copy"), "Ctrl+C", [this]() { on_action_copy_triggered(); }});
-    commandPalette->registerCommand({"paste", tr("Paste"), "Ctrl+V", [this]() { on_action_Paste_triggered(); }});
-    commandPalette->registerCommand({"find", tr("Find in File"), "Ctrl+F", [this]() { on_action_find_triggered(); }});
-    commandPalette->registerCommand({"replace", tr("Find and Replace"), "Ctrl+H", [this]() { on_action_replace_triggered(); }});
-    commandPalette->registerCommand({"project-search", tr("Project Search"), "Ctrl+Shift+F", [this]() { on_action_project_search_triggered(); }});
-    commandPalette->registerCommand({"git-commit", tr("Git Commit..."), "", [this]() { on_action_git_commit_triggered(); }});
-    commandPalette->registerCommand({"git-push", tr("Git Push..."), "", [this]() { on_action_git_push_triggered(); }});
-    commandPalette->registerCommand({"git-pull", tr("Git Pull..."), "", [this]() { on_action_git_pull_triggered(); }});
-    commandPalette->registerCommand({"git-fetch", tr("Git Fetch"), "", [this]() { on_action_git_fetch_triggered(); }});
-    commandPalette->registerCommand({"find-references", tr("Find References"), "", [this]() {
-        CodeEditor *editor = getCurrentCodeEditor();
-        if (!editor || currentFile.isEmpty() || !lspClient->isRunning())
-            return;
-        QTextCursor c = editor->textCursor();
-        lspClient->references(QUrl::fromLocalFile(currentFile).toString(),
-                              c.blockNumber(), c.positionInBlock());
-    }});
-    commandPalette->registerCommand({"theme", tr("Theme"), "Ctrl+T", [this]() { on_action_theme_triggered(); }});
-    commandPalette->registerCommand({"editor-settings", tr("Editor Settings"), "", [this]() { on_action_editor_settings_triggered(); }});
+    // The command palette was merged into the universal search popup so there
+    // is a single surface for commands, files, settings, and themes.
+    if (m_universalSearch)
+        m_universalSearch->openSearch();
 }

@@ -70,8 +70,6 @@ void MainWindow::loadProjectDirectory(const QString &dirName)
     }
     ui->fileTreeView->hideColumn(2);
     ui->fileTreeView->hideColumn(3);
-    // Disable goUpButton to restrict access to other directories when project is opened
-    goUpButton->setEnabled(false);
 
     // Auto-save is armed via idle debounce (see constructor) — nothing to re-start
     // here; opening a project changes no auto-save behavior.
@@ -550,27 +548,6 @@ void MainWindow::on_fileTreeView_contextMenu(const QPoint &pos)
     } else if (selected == deleteAction && index.isValid()) {
         // Reuse the existing delete slot to avoid duplicating logic
         on_action_delete_file_directory_triggered();
-    }
-}
-
-void MainWindow::goUpClicked()
-{
-    if (!rootIndex.isValid())
-        return;
-    
-    // When a project is opened, restrict navigation to project directory only
-    if (!projectDir.isEmpty()) {
-        // Already at project root, do not go up
-        return;
-    }
-    
-    QModelIndex parentIndex = rootIndex.parent();
-    if (parentIndex.isValid()) {
-        rootIndex = parentIndex;
-        ui->fileTreeView->setRootIndex(parentIndex);
-        goUpButton->setEnabled(parentIndex.parent().isValid());
-    } else {
-        goUpButton->setEnabled(false);
     }
 }
 

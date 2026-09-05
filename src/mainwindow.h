@@ -33,7 +33,6 @@
 #include "findreplace.h"
 #include "zenmode.h"
 #include "filewatcher.h"
-#include "outlinepanel.h"
 #include "snippetmanager.h"
 #include "sessionmanager.h"
 #include "refactoringmanager.h"
@@ -50,7 +49,6 @@
 #include "testrunner.h"
 #include "snippeteditordialog.h"
 #include "projectsearch.h"
-#include "commandpalette.h"
 #include "minimap.h"
 #include "splitmanager.h"
 #include "breadcrumb.h"
@@ -65,7 +63,6 @@
 
 class FindReplaceBar;
 class ProjectSearchPanel;
-class CommandPalette;
 class ApplicationManager;
 class PluginMarketplaceWidget;
 class ThemeMarketplaceWidget;
@@ -153,7 +150,6 @@ private slots:
     void on_fileTreeView_clicked(const QModelIndex &index);
     void on_fileTreeView_contextMenu(const QPoint &pos);
     void on_tabWidget_tabCloseRequested(int index);
-    void goUpClicked();
     void on_action_open_file_triggered();
     void showSearchBar(bool show);
     void on_action_find_triggered();
@@ -171,7 +167,6 @@ private slots:
     void on_action_continue_debug_triggered();
     void on_action_toggle_breakpoint_triggered();
 
-    void toggleSidebar();
     void onBottomTabChanged(int index);
     void onTopTabChanged(int index);
 
@@ -188,10 +183,7 @@ private:
     QList<OpenFile> openFiles;
     QFileSystemModel *fileModel = nullptr;
     ThemeFileIconProvider *m_fileIconProvider = nullptr;
-    QToolButton *goUpButton;
     QToolButton *fileTreeToggleButton;
-    QToolButton *sidebarToggleButton;
-    QToolButton *settingsButton;
     QTabBar *tabBar;
     QWidget *bottomPanelButtons;
     struct PanelButtonEntry {
@@ -203,7 +195,6 @@ private:
     QStackedWidget *bottomPanelStack;
     FindReplaceBar *findReplaceBar;
     ProjectSearchPanel *projectSearchPanel;
-    CommandPalette *commandPalette;
     QStackedWidget *editorStack;
 
     Theme selectedTheme;
@@ -274,7 +265,6 @@ private:
     // P0/P1/P2/P3 Feature Modules
     ZenMode *m_zenMode;
     FileWatcher *m_fileWatcher;
-    OutlinePanel *m_outlinePanel;
     SessionManager *m_sessionManager;
     RefactoringManager *m_refactoringManager;
     CodeLensManager *m_codeLensManager;

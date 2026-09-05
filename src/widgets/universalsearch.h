@@ -38,6 +38,10 @@ public:
     void showPopup();
     void hidePopup();
 
+    // Open the search popup from a shortcut (e.g. Ctrl+Shift+P) even when the
+    // field is empty — lists all registered commands/settings/themes.
+    void openSearch();
+
 signals:
     void fileOpenRequested(const QString &filePath);
     void dismissed();

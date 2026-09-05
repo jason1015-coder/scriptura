@@ -11,7 +11,6 @@
 #include "universalsearch.h"
 #include "findreplace.h"
 #include "projectsearch.h"
-#include "commandpalette.h"
 #include "minimap.h"
 #include "breadcrumb.h"
 #include "codeactionui.h"

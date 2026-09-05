@@ -9,7 +9,6 @@
 #include "test_breadcrumb.h"
 #include "test_codeactionui.h"
 #include "test_codelensmanager.h"
-#include "test_commandpalette.h"
 #include "test_crashhandler.h"
 #include "test_codeeditor_multicursor.h"
 #include "test_dataformatter.h"
@@ -69,7 +68,6 @@ int main(int argc, char *argv[])
     status |= QTest::qExec(new TestBreadcrumb, argc, argv);
     status |= QTest::qExec(new TestCodeActionUI, argc, argv);
     status |= QTest::qExec(new TestCodeLensManager, argc, argv);
-    status |= QTest::qExec(new TestCommandPalette, argc, argv);
     status |= QTest::qExec(new TestCrashHandler, argc, argv);
     status |= QTest::qExec(new TestDataFormatter, argc, argv);
     status |= QTest::qExec(new TestDebugConfiguration, argc, argv);

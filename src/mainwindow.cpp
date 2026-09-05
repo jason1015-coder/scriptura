@@ -7,7 +7,6 @@
 #include "version.h"
 #include "findreplace.h"
 #include "projectsearch.h"
-#include "commandpalette.h"
 #include "debugconfiguration.h"
 #include "rundialog.h"
 #include "minimap.h"
@@ -27,7 +26,6 @@
 #include "bookmarkmanager.h"
 #include "snippetmanager.h"
 #include "filewatcher.h"
-#include "outlinepanel.h"
 #include "rust_adapter.h"
 
 #include <QFileDialog>
@@ -130,7 +128,6 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
     , m_pluginRegistry(RustBackend::instance()->pluginRegistry())
     , m_zenMode(nullptr)
     , m_fileWatcher(nullptr)
-    , m_outlinePanel(nullptr)
     , m_sessionManager(nullptr)
     // Note: created in the init list (not lazily below) because
     // RefactoringManager is used as a connect() receiver earlier in the
@@ -252,6 +249,14 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
         regCmd(tr("Git Fetch"),               QString(),          [this]() { on_action_git_fetch_triggered(); });
         regCmd(tr("Format Document"),          tr("Ctrl+Shift+I"),[this]() { on_action_format_document_triggered(); });
         regCmd(tr("Go to Definition"),        tr("F12"),         [this]() { on_action_go_to_definition_triggered(); });
+        regCmd(tr("Find References"),         QString(),          [this]() {
+            CodeEditor *editor = getCurrentCodeEditor();
+            if (!editor || currentFile.isEmpty() || !lspClient->isRunning())
+                return;
+            QTextCursor c = editor->textCursor();
+            lspClient->references(QUrl::fromLocalFile(currentFile).toString(),
+                                  c.blockNumber(), c.positionInBlock());
+        });
         regCmd(tr("Toggle Breakpoint"),       tr("F9"),          [this]() { on_action_toggle_breakpoint_triggered(); });
         regCmd(tr("Run / Debug"),             tr("F5"),          [this]() { on_action_run_debug_triggered(); });
         regCmd(tr("Step Over"),               tr("F10"),         [this]() { on_action_step_over_triggered(); });
@@ -375,24 +380,6 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
     // Create panels that need to be added to bottom stack
     projectSearchPanel = new ProjectSearchPanel(this);
 
-    // Top toolbar setup — buttons now live in the unified title bar or editor area
-    sidebarToggleButton = new QToolButton(this);
-    ThemeIcons::instance()->setIcon(sidebarToggleButton, ":/icons/sidebar-toggle.svg");
-    sidebarToggleButton->setIconSize(QSize(20, 20));
-    sidebarToggleButton->setToolTip(tr("Toggle Sidebar"));
-    sidebarToggleButton->setCheckable(true);
-    sidebarToggleButton->setChecked(true);
-    sidebarToggleButton->setFixedSize(32, 32);
-    sidebarToggleButton->hide(); // Managed by unified title bar
-
-    goUpButton = new QToolButton(this);
-    ThemeIcons::instance()->setIcon(goUpButton, ":/icons/go-up.svg");
-    goUpButton->setIconSize(QSize(18, 18));
-    goUpButton->setToolTip(tr("Go Up"));
-    goUpButton->setEnabled(false);
-    goUpButton->setFixedSize(32, 32);
-    goUpButton->hide(); // Can be added to title bar later
-
     findReplaceBar = new FindReplaceBar(this);
     findReplaceBar->setVisible(false);
     // Anchor the find/replace bar into the editor's top layout (between the title
@@ -403,19 +390,9 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
         edLayout->insertWidget(1, findReplaceBar);
     }
 
-    commandPalette = new CommandPalette(this);
-
     // Add remaining panels to bottom stack
     bottomPanelStack->addWidget(projectSearchPanel);
     projectSearchPanel->hide();
-
-    // Right-side toolbar buttons (settings moved to title bar area)
-    settingsButton = new QToolButton(this);
-    ThemeIcons::instance()->setIcon(settingsButton, ":/icons/settings.svg");
-    settingsButton->setIconSize(QSize(20, 20));
-    settingsButton->setToolTip(tr("Editor Settings"));
-    settingsButton->setFixedSize(32, 32);
-    settingsButton->hide(); // Accessible via title bar menu
 
     // Sidebar icon buttons (bottom of drawer)
     fileTreeToggleButton = new QToolButton(ui->sidebarDrawer);
@@ -581,8 +558,6 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
     m_panelButtons[0].button->setChecked(true);
 
     // Sidebar connections
-    connect(sidebarToggleButton, &QToolButton::toggled, this, &MainWindow::toggleSidebar);
-    connect(goUpButton, &QToolButton::clicked, this, &MainWindow::goUpClicked);
     connect(fileTreeToggleButton, &QToolButton::toggled, this, [this](bool checked) {
         Q_UNUSED(checked);
         if (ui->fileTreeView->isHidden()) {
@@ -591,9 +566,6 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
             ui->fileTreeView->hide();
         }
     });
-
-    // Settings button
-    connect(settingsButton, &QToolButton::clicked, this, &MainWindow::on_action_editor_settings_triggered);
 
     // File tree
     connect(ui->fileTreeView, &QTreeView::clicked, this, &MainWindow::on_fileTreeView_clicked);
@@ -787,8 +759,8 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
         qDebug() << "Replace all complete:" << count;
     });
 
-    ui->menubar->show();
-
+    // Menu bar stays hidden: built-in menus were removed in favor of shortcuts
+    // and the universal search, so there is nothing to display in it.
     connect(projectSearchPanel, &ProjectSearchPanel::resultActivated, this, [this](const QString &filePath, int line, int column) {
         QModelIndex index = fileModel->index(filePath);
         if (index.isValid())

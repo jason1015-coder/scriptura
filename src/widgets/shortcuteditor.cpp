@@ -97,7 +97,7 @@ void ShortcutEditorWidget::loadShortcuts()
         {"Go to Definition", "Navigation", "F12"},
         {"Go to Declaration", "Navigation", "Ctrl+F12"},
         {"Find in Project", "Navigation", "Ctrl+Shift+F"},
-        {"Command Palette", "Navigation", "Ctrl+Shift+P"},
+        {"Command Search", "Navigation", "Ctrl+Shift+P"},
         {"Universal Search", "Navigation", "Ctrl+P"},
         {"Rename Symbol", "Refactoring", "F2"},
         {"Toggle Bookmark", "Bookmarks", "Ctrl+B"},

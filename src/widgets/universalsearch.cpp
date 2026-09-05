@@ -86,7 +86,9 @@ UniversalSearchPopup::UniversalSearchPopup(QLineEdit *searchField, QWidget *pare
 {
     setObjectName("universalSearchPopup");
     setWindowFlags(Qt::Popup | Qt::FramelessWindowHint);
-    setAttribute(Qt::WA_ShowWithoutActivating, false);
+    // Do NOT take activation/focus away from the search field when the popup
+    // opens — typing must keep flowing into the field so results filter live.
+    setAttribute(Qt::WA_ShowWithoutActivating, true);
 
     m_listWidget->setItemDelegate(new SearchResultDelegate(this));
     m_listWidget->setSelectionMode(QAbstractItemView::SingleSelection);
@@ -164,6 +166,15 @@ void UniversalSearchPopup::hidePopup()
 {
     QFrame::hide();
     emit dismissed();
+}
+
+void UniversalSearchPopup::openSearch()
+{
+    m_searchField->setFocus(Qt::ShortcutFocusReason);
+    // Rebuild the list for the current query (empty query => all commands).
+    filterResults(m_searchField->text().trimmed());
+    if (m_listWidget->count() > 0)
+        showPopup();
 }
 
 bool UniversalSearchPopup::eventFilter(QObject *obj, QEvent *event)
