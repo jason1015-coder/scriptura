@@ -31,6 +31,7 @@ typedef struct RustLanguageRegistry       RustLanguageRegistry;
 typedef struct RustLanguageServerManager  RustLanguageServerManager;
 typedef struct RustDebugConfigurationManager RustDebugConfigurationManager;
 typedef struct RustPluginCrashHandler     RustPluginCrashHandler;
+typedef struct RustUiActionHandler        RustUiActionHandler;
 
 /* ── C callback type aliases ───────────────────────────────────── */
 typedef void (*OnStringMessage)(const char* data, void* user_data);
@@ -489,6 +490,27 @@ char* rust_session_load_hot_exit(void);
 char* rust_test_detect_framework(const char* project_path);
 char* rust_test_build_command(const char* framework, const char* project_path, const char* filter);
 char* rust_test_parse_output(const char* framework, const char* output);
+
+/* ══════════════════════════════════════════════════════════════════════
+ *  UI Action Handler
+ * ══════════════════════════════════════════════════════════════════════
+ * Every user interaction is routed through Rust: it validates the action +
+ * payload, decides, and returns the minimal Qt commands for C++ to execute.
+ * Action/command names live in ui_actions.h (mirrors ui_actions.rs).
+ */
+RustUiActionHandler* rust_ui_actions_new(void);
+void                rust_ui_actions_free(RustUiActionHandler* h);
+
+/* Route a user action. Returns JSON:
+ *   { "commands": [ { "cmd": ... }, ... ], "error": null | "message" }
+ * Free the result with rust_free_string(). */
+char* rust_ui_actions_handle(RustUiActionHandler* h,
+                             const char* action,
+                             const char* json_payload);
+
+/* Audit trail of handled actions (most recent last).
+ * Free the array with rust_pm_free_strings(). */
+char** rust_ui_actions_log(RustUiActionHandler* h, size_t* out_len);
 
 #ifdef __cplusplus
 } /* extern "C" */

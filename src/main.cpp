@@ -4,6 +4,8 @@
 #include <QFileDialog>
 #include <QSettings>
 #include "welcomemenuscreen.h"
+#include "rust_adapter.h"
+#include "scriptura_actions.h"
 
 #include <QApplication>
 #include <QLocale>
@@ -759,22 +761,14 @@ QDialogButtonBox > QPushButton {
                 welcome->move(x, y);
             }
 
-            // When user requests to open a project, launch MainWindow
-            QObject::connect(welcome, &WelcomeMenuScreen::openProjectRequested, welcome, [welcome]() {
-                QString dirName = QFileDialog::getExistingDirectory(
-                    nullptr, WelcomeMenuScreen::tr("Open Project"), QString(),
-                    QFileDialog::DontUseNativeDialog);
-                if (dirName.isEmpty())
-                    return;
-                // Save recent project
-                QSettings settings;
-                QStringList recent = settings.value("recentProjects").toStringList();
-                if (!recent.contains(dirName)) {
-                    recent.prepend(dirName);
-                    while (recent.size() > 10)
-                        recent.removeLast();
-                    settings.setValue("recentProjects", recent);
-                }
+            // ── UI action routing ────────────────────────────────────────
+            // Every welcome-screen interaction is routed through the Rust
+            // UiActionHandler. Rust validates the action + payload and decides;
+            // these connections only execute the decided commands (Qt's
+            // "drawer" role). Settings storage (recentProjects) is unchanged.
+            UiActionBridge *uiActions = RustBackend::instance()->uiActions();
+
+            auto openMainWindow = [welcome](const QString &dirName) {
                 welcome->close();
                 welcome->deleteLater();
                 MainWindow *mainWindow = new MainWindow(dirName);
@@ -792,27 +786,55 @@ QDialogButtonBox > QPushButton {
                 HWND hwnd = reinterpret_cast<HWND>(mainWindow->winId());
                 mainWindow->enableMicaEffect(hwnd, mainWindow->isDarkModeEnabled());
 #endif
+            };
+
+            QObject::connect(welcome, &WelcomeMenuScreen::openProjectRequested, welcome, [uiActions]() {
+                uiActions->handle(UiActions::WelcomeOpenProject);
+            });
+            // Rust decided "prompt for a folder" — the native dialog is the
+            // drawer's job. Recent-project storage stays in QSettings for now.
+            QObject::connect(uiActions, &UiActionBridge::projectPromptOpenRequested, welcome, [uiActions]() {
+                QString dirName = QFileDialog::getExistingDirectory(
+                    nullptr, WelcomeMenuScreen::tr("Open Project"), QString(),
+                    QFileDialog::DontUseNativeDialog);
+                if (dirName.isEmpty())
+                    return;
+                // Save recent project
+                QSettings settings;
+                QStringList recent = settings.value("recentProjects").toStringList();
+                if (!recent.contains(dirName)) {
+                    recent.prepend(dirName);
+                    while (recent.size() > 10)
+                        recent.removeLast();
+                    settings.setValue("recentProjects", recent);
+                }
+                uiActions->handle(UiActions::ProjectChosen, {{QStringLiteral("path"), dirName}});
+            });
+            // Rust validated the path and decided to open it — Qt opens the window.
+            QObject::connect(uiActions, &UiActionBridge::projectOpenRequested, welcome, openMainWindow);
+
+            QObject::connect(welcome, &WelcomeMenuScreen::recentProjectSelected, welcome, [uiActions](const QString &path) {
+                uiActions->handle(UiActions::WelcomeRecentProject, {{QStringLiteral("path"), path}});
+            });
+            QObject::connect(welcome, &WelcomeMenuScreen::cloneRequested, welcome, [uiActions](const QString &gitUrl) {
+                uiActions->handle(UiActions::WelcomeCloneRepo, {{QStringLiteral("url"), gitUrl}});
+            });
+            QObject::connect(welcome, &WelcomeMenuScreen::newFileRequested, welcome, [uiActions]() {
+                uiActions->handle(UiActions::WelcomeNewFile);
             });
 
-            // When user selects a recent project, launch MainWindow directly
-            QObject::connect(welcome, &WelcomeMenuScreen::recentProjectSelected, welcome, [welcome](const QString &path) {
-                welcome->close();
-                welcome->deleteLater();
-                MainWindow *mainWindow = new MainWindow(path);
-                mainWindow->show();
-                QScreen *screen = QApplication::primaryScreen();
-                if (screen) {
-                    QRect available = screen->availableGeometry();
-                    mainWindow->resize(qMin(available.width() * 7 / 10, 900),
-                                       qMin(available.height() * 7 / 10, 800));
-                    int x = (available.width() - mainWindow->width()) / 2;
-                    int y = (available.height() - mainWindow->height()) / 2;
-                    mainWindow->move(x, y);
+            // Welcome window controls (routed through Rust in welcomemenuscreen.cpp):
+            QObject::connect(uiActions, &UiActionBridge::windowMinimizeRequested, welcome, &QWidget::showMinimized);
+            QObject::connect(uiActions, &UiActionBridge::windowToggleMaximizedRequested, welcome, [welcome]() {
+                if (welcome->isMaximized()) {
+                    welcome->showNormal();
+                } else {
+                    welcome->showMaximized();
                 }
-#ifdef Q_OS_WIN
-                HWND hwnd = reinterpret_cast<HWND>(mainWindow->winId());
-                mainWindow->enableMicaEffect(hwnd, mainWindow->isDarkModeEnabled());
-#endif
+            });
+            QObject::connect(uiActions, &UiActionBridge::windowCloseRequested, welcome, &QWidget::close);
+            QObject::connect(uiActions, &UiActionBridge::actionError, welcome, [](const QString &action, const QString &error) {
+                qWarning() << "[ui-action] rejected:" << action << "—" << error;
             });
 
             // No explicit quit handler needed — QApplication quits automatically

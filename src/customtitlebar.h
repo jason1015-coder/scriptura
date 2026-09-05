@@ -37,10 +37,13 @@ signals:
     void sidebarToggleClicked();
     void settingsClicked();
     void inspectorToggleClicked();
-    void searchRequested();
+    void searchRequested(const QString &query);
 
 protected:
     void paintEvent(QPaintEvent *event) override;
+    // Watches the (transparent) window control buttons so this bar can repaint
+    // their hover/pressed visuals, which are drawn here in paintEvent().
+    bool eventFilter(QObject *watched, QEvent *event) override;
 
 private:
     bool m_isDragging = false;
@@ -48,7 +51,10 @@ private:
 
     void styleButtons();
     void setupLayout();
-    void paintWindowControls(QPainter &p, const QRect &buttonRect, bool hovered, bool pressed, const QString &glyph);
+    void paintWindowControls(QPainter &p, QPushButton *button, const QString &glyph);
+    // Theme text colour when it contrasts with the title bar background,
+    // otherwise black/white — guarantees the glyphs are always visible.
+    QColor windowControlForeground() const;
 };
 
 #endif // CUSTOMTITLEBAR_H

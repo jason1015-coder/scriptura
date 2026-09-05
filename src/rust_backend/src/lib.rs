@@ -42,6 +42,7 @@ mod blame_engine;
 mod emmet_engine;
 mod session_engine;
 mod test_engine;
+mod ui_actions;
 
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;

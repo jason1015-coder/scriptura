@@ -15,6 +15,7 @@
 #include <QPointer>
 
 #include "rust_backend.h"
+#include "scriptura_actions.h"
 #include "permission.h"
 #include "plugincrashhandler.h"
 
@@ -504,6 +505,45 @@ private:
 };
 
 // ─────────────────────────────────────────────────────────────────────
+//  UiActionBridge — routes every user action through the Rust handler.
+//  Rust validates + decides; Qt only executes the returned commands.
+// ─────────────────────────────────────────────────────────────────────
+class UiActionBridge : public QObject
+{
+    Q_OBJECT
+public:
+    explicit UiActionBridge(QObject *parent = nullptr);
+    ~UiActionBridge() override;
+
+    /// Route a user action through Rust. The decided commands are emitted as
+    /// the signals below; C++ executes them (the "drawer" role only).
+    /// A rejected action emits actionError() and executes nothing.
+    void handle(const QString &action, const QJsonObject &payload = {});
+
+    /// Recent audit entries from the Rust handler (most recent last).
+    QStringList auditLog() const;
+
+signals:
+    void windowMinimizeRequested();
+    void windowToggleMaximizedRequested();
+    void windowCloseRequested();
+    void sidebarToggleRequested();
+    void inspectorToggleRequested();
+    void settingsOpenRequested();
+    void searchOpenRequested(const QString &query);
+    void projectPromptOpenRequested();
+    void projectOpenRequested(const QString &path);
+    void gitCloneRequested(const QString &url);
+    void fileNewRequested();
+    void actionError(const QString &action, const QString &error);
+
+private:
+    void dispatchCommand(const QJsonObject &cmd);
+
+    RustUiActionHandler *m_handler = nullptr;
+};
+
+// ─────────────────────────────────────────────────────────────────────
 //  RustBackend — singleton root that owns all Rust backend instances
 // ─────────────────────────────────────────────────────────────────────
 class RustBackend : public QObject
@@ -527,6 +567,7 @@ public:
     RustPluginCrashHandlerAdapter*     crashHandler() const { return m_crashHandler; }
     RustDependencyResolverAdapter*     dependencyResolver() const { return m_dependencyResolver; }
     RustArchiveExtractorAdapter*       archiveExtractor() const { return m_archiveExtractor; }
+    UiActionBridge*                    uiActions() const { return m_uiActions; }
 
 private:
     RustBackend(QObject *parent = nullptr);
@@ -548,6 +589,7 @@ private:
     RustPluginCrashHandlerAdapter*     m_crashHandler = nullptr;
     RustDependencyResolverAdapter*     m_dependencyResolver = nullptr;
     RustArchiveExtractorAdapter*       m_archiveExtractor = nullptr;
+    UiActionBridge*                    m_uiActions = nullptr;
 
     static RustBackend* s_instance;
 };

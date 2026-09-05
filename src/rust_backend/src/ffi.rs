@@ -51,6 +51,7 @@ use crate::permission::PermissionManager;
 use crate::framer::LengthPrefixedFramer;
 use crate::language_registry::LanguageRegistry;
 use crate::language_server_manager::LanguageServerManager;
+use crate::ui_actions::UiActionHandler;
 
 // ── Opaque handle types ─────────────────────────────────────────────
 // These are the types that C++ sees as pointers. Rust never dereferences
@@ -77,6 +78,7 @@ pub enum RustLanguageRegistry {}
 pub enum RustLanguageServerManager {}
 pub enum RustDebugConfigurationManager {}
 pub enum RustPluginCrashHandler {}
+pub enum RustUiActionHandler {}
 
 // ── Helper macros ────────────────────────────────────────────────────
 
@@ -1540,4 +1542,61 @@ pub extern "C" fn rust_test_parse_output(
     let suite = crate::test_engine::parse_output(fw, out);
     let json = serde_json::to_string(&suite).unwrap_or_default();
     crate::str_to_cstring(&json)
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  UI Action Handler
+// ═══════════════════════════════════════════════════════════════════════
+// Every user interaction is routed through this handler. Rust validates the
+// action + payload and decides; C++/Qt only draws the widgets and executes
+// the returned commands. See ui_actions.rs and include/scriptura/ui_actions.h.
+
+make_new!(rust_ui_actions_new, UiActionHandler, RustUiActionHandler);
+make_free!(rust_ui_actions_free, UiActionHandler, RustUiActionHandler);
+
+/// Route a user action through Rust. Returns a JSON document:
+/// `{ "commands": [ { "cmd": ... }, ... ], "error": null | "message" }`.
+/// On a rejected action the command list is empty and `error` is non-null;
+/// the caller must free the returned string with rust_free_string().
+#[no_mangle]
+pub extern "C" fn rust_ui_actions_handle(
+    h: *mut RustUiActionHandler,
+    action: *const c_char,
+    payload: *const c_char,
+) -> *mut c_char {
+    if h.is_null() || action.is_null() {
+        return crate::str_to_cstring(
+            &serde_json::json!({ "commands": [], "error": "null handler or action" }).to_string(),
+        );
+    }
+    let h = unsafe { &mut *(h as *mut UiActionHandler) };
+    let action_str = unsafe { ptr_to_str(action) };
+    let payload_str = if payload.is_null() { "{}" } else { unsafe { ptr_to_str(payload) } };
+    crate::str_to_cstring(&h.handle(action_str, payload_str))
+}
+
+/// Audit trail of handled actions (most recent last). Caller frees the
+/// array with rust_pm_free_strings().
+#[no_mangle]
+pub extern "C" fn rust_ui_actions_log(
+    h: *mut RustUiActionHandler,
+    out_len: *mut usize,
+) -> *mut *mut c_char {
+    if h.is_null() {
+        unsafe { *out_len = 0; }
+        return std::ptr::null_mut();
+    }
+    let entries = unsafe { (&*(h as *mut UiActionHandler)).audit_log() };
+    unsafe { *out_len = entries.len(); }
+    if entries.is_empty() {
+        return std::ptr::null_mut();
+    }
+    let mut arr: Vec<*mut c_char> = entries
+        .into_iter()
+        .map(|s| crate::str_to_cstring(&s))
+        .collect();
+    arr.shrink_to_fit();
+    let ptr = arr.as_mut_ptr();
+    mem::forget(arr);
+    ptr
 }

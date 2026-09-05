@@ -185,33 +185,70 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
         }
     )");
     
-    // Connect title bar signals
-    connect(m_titleBar, &CustomTitleBar::minimizeRequest, this, &MainWindow::showMinimized);
-    connect(m_titleBar, &CustomTitleBar::maximizeRequest, this, [this]() {
+    // ── UI action routing ───────────────────────────────────────────────
+    // Every title-bar interaction is routed through the Rust UiActionHandler.
+    // Rust validates the action and decides the command; the connections
+    // below only execute the decided commands (Qt's "drawer" role).
+    UiActionBridge *uiActions = RustBackend::instance()->uiActions();
+
+    connect(m_titleBar, &CustomTitleBar::minimizeRequest, this, [uiActions]() {
+        uiActions->handle(UiActions::TitlebarMinimize);
+    });
+    connect(m_titleBar, &CustomTitleBar::maximizeRequest, this, [uiActions]() {
+        uiActions->handle(UiActions::TitlebarMaximize);
+    });
+    connect(m_titleBar, &CustomTitleBar::closeRequest, this, [uiActions]() {
+        uiActions->handle(UiActions::TitlebarClose);
+    });
+
+    // Execute the commands Rust decided:
+    connect(uiActions, &UiActionBridge::windowMinimizeRequested, this, &MainWindow::showMinimized);
+    connect(uiActions, &UiActionBridge::windowToggleMaximizedRequested, this, [this]() {
         if (isMaximized()) {
             showNormal();
         } else {
             showMaximized();
         }
     });
-    connect(m_titleBar, &CustomTitleBar::closeRequest, this, &QWidget::close);
+    connect(uiActions, &UiActionBridge::windowCloseRequested, this, &QWidget::close);
 
     // Enable mouse tracking for resize edge detection
     setMouseTracking(true);
     if (centralWidget())
         centralWidget()->setMouseTracking(true);
 
-    // Connect unified title bar signals
-    connect(m_titleBar, &CustomTitleBar::sidebarToggleClicked, this, [this]() {
+    connect(m_titleBar, &CustomTitleBar::sidebarToggleClicked, this, [uiActions]() {
+        uiActions->handle(UiActions::TitlebarSidebarToggle);
+    });
+    connect(m_titleBar, &CustomTitleBar::inspectorToggleClicked, this, [uiActions]() {
+        uiActions->handle(UiActions::TitlebarInspectorToggle);
+    });
+    connect(m_titleBar, &CustomTitleBar::settingsClicked, this, [uiActions]() {
+        uiActions->handle(UiActions::TitlebarSettings);
+    });
+    connect(m_titleBar, &CustomTitleBar::searchRequested, this, [uiActions](const QString &query) {
+        uiActions->handle(UiActions::TitlebarSearch, {{QStringLiteral("query"), query}});
+    });
+
+    // Execute the commands Rust decided:
+    connect(uiActions, &UiActionBridge::sidebarToggleRequested, this, [this]() {
         // sidebarDrawer has zero width when collapsed (not hidden), so check width
         bool isCollapsed = ui->sidebarDrawer->maximumWidth() == 0 || ui->sidebarDrawer->width() < 10;
         setSidebarCollapsed(!isCollapsed);
     });
-    connect(m_titleBar, &CustomTitleBar::inspectorToggleClicked, this, [this]() {
+    connect(uiActions, &UiActionBridge::inspectorToggleRequested, this, [this]() {
         toggleInspector();
     });
-    connect(m_titleBar, &CustomTitleBar::settingsClicked, this, [this]() {
+    connect(uiActions, &UiActionBridge::settingsOpenRequested, this, [this]() {
         on_action_editor_settings_triggered();
+    });
+    connect(uiActions, &UiActionBridge::searchOpenRequested, this, [this](const QString &query) {
+        if (!query.isEmpty())
+            m_titleBar->searchField->setText(query);
+        m_universalSearch->openSearch();
+    });
+    connect(uiActions, &UiActionBridge::actionError, this, [](const QString &action, const QString &error) {
+        qWarning() << "[ui-action] rejected:" << action << "—" << error;
     });
     // ---- Universal Search ----
     m_universalSearch = new UniversalSearchPopup(m_titleBar->searchField, this);

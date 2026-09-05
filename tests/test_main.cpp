@@ -38,6 +38,7 @@
 #include "test_sqliteviewer.h"
 #include "test_themeicons.h"
 #include "test_thememanager.h"
+#include "test_ui_action_bridge.h"
 #include "test_windowanimator.h"
 
 int main(int argc, char *argv[])
@@ -97,6 +98,7 @@ int main(int argc, char *argv[])
     status |= QTest::qExec(new TestSqliteViewer, argc, argv);
     status |= QTest::qExec(new TestThemeIcons, argc, argv);
     status |= QTest::qExec(new TestThemeManager, argc, argv);
+    status |= QTest::qExec(new TestUiActionBridge, argc, argv);
     status |= QTest::qExec(new TestWindowAnimator, argc, argv);
 
     return status;

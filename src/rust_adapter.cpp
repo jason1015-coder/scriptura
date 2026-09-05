@@ -1364,6 +1364,95 @@ bool RustDependencyResolverAdapter::hasCircularDependency(const QList<QJsonObjec
 }
 
 // ═══════════════════════════════════════════════════════════════════════
+//  UiActionBridge
+// ═══════════════════════════════════════════════════════════════════════
+
+UiActionBridge::UiActionBridge(QObject *parent)
+    : QObject(parent)
+{
+    m_handler = rust_ui_actions_new();
+}
+
+UiActionBridge::~UiActionBridge()
+{
+    if (m_handler) {
+        rust_ui_actions_free(m_handler);
+        m_handler = nullptr;
+    }
+}
+
+void UiActionBridge::handle(const QString &action, const QJsonObject &payload)
+{
+    if (!m_handler) return;
+
+    QByteArray actionBytes = action.toUtf8();
+    QByteArray payloadBytes = QJsonDocument(payload).toJson(QJsonDocument::Compact);
+    char *result = rust_ui_actions_handle(m_handler, actionBytes.constData(),
+                                          payloadBytes.constData());
+    if (!result) return;
+
+    QJsonDocument doc = QJsonDocument::fromJson(QByteArray(result));
+    rust_free_string(result);
+
+    const QJsonObject obj = doc.object();
+    const QString error = obj["error"].toString();
+    if (!error.isEmpty()) {
+        emit actionError(action, error);
+        return;
+    }
+
+    const QJsonArray commands = obj["commands"].toArray();
+    for (const QJsonValue &v : commands) {
+        dispatchCommand(v.toObject());
+    }
+}
+
+void UiActionBridge::dispatchCommand(const QJsonObject &cmd)
+{
+    const QString name = cmd["cmd"].toString();
+    if (name == UiCommands::WindowMinimize) {
+        emit windowMinimizeRequested();
+    } else if (name == UiCommands::WindowToggleMaximized) {
+        emit windowToggleMaximizedRequested();
+    } else if (name == UiCommands::WindowClose) {
+        emit windowCloseRequested();
+    } else if (name == UiCommands::SidebarToggle) {
+        emit sidebarToggleRequested();
+    } else if (name == UiCommands::InspectorToggle) {
+        emit inspectorToggleRequested();
+    } else if (name == UiCommands::SettingsOpen) {
+        emit settingsOpenRequested();
+    } else if (name == UiCommands::SearchOpen) {
+        emit searchOpenRequested(cmd["query"].toString());
+    } else if (name == UiCommands::ProjectPromptOpen) {
+        emit projectPromptOpenRequested();
+    } else if (name == UiCommands::ProjectOpen) {
+        emit projectOpenRequested(cmd["path"].toString());
+    } else if (name == UiCommands::GitClone) {
+        emit gitCloneRequested(cmd["url"].toString());
+    } else if (name == UiCommands::FileNew) {
+        emit fileNewRequested();
+    } else {
+        qWarning() << "UiActionBridge: unknown command from Rust:" << name;
+    }
+}
+
+QStringList UiActionBridge::auditLog() const
+{
+    QStringList result;
+    if (!m_handler) return result;
+
+    size_t len = 0;
+    char **entries = rust_ui_actions_log(m_handler, &len);
+    if (!entries) return result;
+    for (size_t i = 0; i < len; ++i) {
+        result << QString::fromUtf8(entries[i]);
+    }
+    rust_pm_free_strings(entries, len);
+    return result;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
 //  RustBackend singleton
 // ═══════════════════════════════════════════════════════════════════════
 
@@ -1386,6 +1475,7 @@ RustBackend::RustBackend(QObject *parent)
     m_crashHandler = new RustPluginCrashHandlerAdapter(this);
     m_dependencyResolver = new RustDependencyResolverAdapter(this);
     m_archiveExtractor = new RustArchiveExtractorAdapter(this);
+    m_uiActions = new UiActionBridge(this);
 }
 
 RustBackend::~RustBackend()

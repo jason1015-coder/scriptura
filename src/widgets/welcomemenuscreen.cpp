@@ -1,4 +1,6 @@
 #include "welcomemenuscreen.h"
+#include "rust_adapter.h"
+#include "scriptura_actions.h"
 
 #include <QIcon>
 #include <QDir>
@@ -187,8 +189,9 @@ void WelcomeMenuScreen::setupUI()
             "  font-size: 14px;"
             "  font-weight: bold;"
             "}"
+            // Neutral hover overlay — visible on both light and dark themes.
             "QPushButton#windowControlButton:hover {"
-            "  background-color: rgba(255, 255, 255, 0.15);"
+            "  background-color: rgba(128, 128, 128, 0.18);"
             "}"
         );
         return btn;
@@ -198,7 +201,8 @@ void WelcomeMenuScreen::setupUI()
     m_maxBtn = makeWinBtn("\u25a1", tr("Maximize"));
     m_closeBtn = makeWinBtn("\u2715", tr("Close"));
 
-    // Close button hover turns red
+    // Close button hover turns solid red — the white glyph stays readable on
+    // both light and dark themes (a translucent red washes out on light ones).
     m_closeBtn->setStyleSheet(
         "QPushButton#windowControlButton {"
         "  border: none;"
@@ -208,25 +212,27 @@ void WelcomeMenuScreen::setupUI()
         "  font-weight: bold;"
         "}"
         "QPushButton#windowControlButton:hover {"
-        "  background-color: rgba(200, 50, 50, 0.6);"
+        "  background-color: #E81123;"
+        "  color: white;"
+        "}"
+        "QPushButton#windowControlButton:pressed {"
+        "  background-color: #B00E1E;"
         "  color: white;"
         "}"
     );
 
-    connect(m_minBtn, &QPushButton::clicked, this, &QWidget::showMinimized);
-    connect(m_maxBtn, &QPushButton::clicked, this, [this]() {
-        if (m_maximized) {
-            showNormal();
-            m_maxBtn->setText("\u25a1");
-            m_maxBtn->setToolTip(tr("Maximize"));
-        } else {
-            showMaximized();
-            m_maxBtn->setText("\u25a3");
-            m_maxBtn->setToolTip(tr("Restore"));
-        }
-        m_maximized = !m_maximized;
+    // Window controls route through the Rust UiActionHandler — Qt only draws
+    // the buttons and executes the commands Rust decides (see main.cpp). The
+    // maximize glyph/tooltip stay in sync via changeEvent() below.
+    connect(m_minBtn, &QPushButton::clicked, this, [this]() {
+        RustBackend::instance()->uiActions()->handle(UiActions::WelcomeMinimize);
     });
-    connect(m_closeBtn, &QPushButton::clicked, this, &QWidget::close);
+    connect(m_maxBtn, &QPushButton::clicked, this, [this]() {
+        RustBackend::instance()->uiActions()->handle(UiActions::WelcomeMaximize);
+    });
+    connect(m_closeBtn, &QPushButton::clicked, this, [this]() {
+        RustBackend::instance()->uiActions()->handle(UiActions::WelcomeClose);
+    });
 
     winCtrlLayout->addWidget(m_minBtn);
     winCtrlLayout->addWidget(m_maxBtn);
