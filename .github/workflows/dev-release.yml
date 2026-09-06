@@ -1,0 +1,124 @@
+name: Dev Release (update dev tag)
+
+# Rolling development release.
+#
+# Triggered whenever "Build & Deploy Scriptura" (build.yml) completes. A
+# workflow used as a trigger with `workflow_run` can only watch ONE upstream
+# workflow, so we additionally verify that "Run Unit Tests" (test.yml) also
+# succeeded for the same commit before publishing. If EITHER workflow failed,
+# no release is touched. When both pass, ALL artifacts from both workflows are
+# attached to the existing "dev" tag / "scriptura-dev" release — the tag is
+# force-moved to the newest commit instead of creating a new tag.
+
+on:
+  workflow_run:
+    workflows: ["Build & Deploy Scriptura"]
+    types: [completed]
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: dev-release-${{ github.event.workflow_run.head_sha }}
+  cancel-in-progress: false
+
+jobs:
+  update-dev-release:
+    name: Update scriptura-dev release
+    runs-on: ubuntu-latest
+    # Only act on pushed commits (main), and only when build+deploy passed.
+    if: >
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      # ── Gate 1: make sure the TEST workflow also passed for this commit ──
+      - name: Verify test workflow passed
+        id: check_test
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+        run: |
+          run_id="$(
+            gh run list \
+              --workflow "Run Unit Tests" \
+              --branch "$HEAD_BRANCH" \
+              --commit "$HEAD_SHA" \
+              --status completed \
+              --limit 1 \
+              --json databaseId \
+              --jq '.[0].databaseId'
+          )"
+          if [ -z "$run_id" ] || [ "$run_id" = "null" ]; then
+            echo "::error No 'Run Unit Tests' run found for commit $HEAD_SHA" >&2
+            exit 1
+          fi
+          conclusion="$(gh run view "$run_id" --json conclusion --jq '.conclusion')"
+          echo "Test workflow run $run_id conclusion = $conclusion"
+          if [ "$conclusion" != "success" ]; then
+            echo "::error Test workflow did not pass; skipping release update" >&2
+            exit 1
+          fi
+          echo "test_run_id=$run_id" >> "$GITHUB_OUTPUT"
+
+      # ── Download ALL artifacts produced by the build+deploy run ──
+      - name: Download build+deploy artifacts
+        uses: actions/download-artifact@v4
+        with:
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+          path: build-artifacts
+
+      # ── Download artifacts produced by the test run (e.g. coverage) ──
+      - name: Download test artifacts
+        uses: actions/download-artifact@v4
+        with:
+          run-id: ${{ steps.check_test.outputs.test_run_id }}
+          github-token: ${{ github.token }}
+          path: test-artifacts
+
+      # ── Package each artifact into exactly one release asset ──
+      - name: Stage release assets
+        run: |
+          set -e
+          mkdir -p release-assets
+
+          package_dir() {
+            local dir="$1" dest="$2"
+            [ -d "$dir" ] || return 0
+            local name; name="$(basename "$dir")"
+            ( cd "$dir" && zip -r -q "$OLDPWD/${dest}/${name}.zip" . )
+            echo "Staged ${dest}/${name}.zip"
+          }
+
+          for dir in build-artifacts/*/; do package_dir "$dir" release-assets; done
+          for dir in test-artifacts/*/; do  package_dir "$dir" release-assets; done
+
+          echo "=== Release assets ==="
+          ls -la release-assets/
+
+      # ── Create or UPDATE the dev tag / scriptura-dev release ──
+      # Uses a fixed tag name, so an existing release is updated and the git
+      # tag is force-moved to this commit — never a brand-new tag.
+      - name: Create/update dev release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: dev
+          name: scriptura-dev
+          body: |
+            Rolling development build (auto-generated).
+
+            - Updated when both **Build & Deploy Scriptura** and **Run Unit Tests**
+              succeed on the `main` branch.
+            - Assets always overwrite the previous `dev` build.
+            - Commit: ${{ github.event.workflow_run.head_sha }}
+          files: release-assets/*
+          fail_on_unmatched_files: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
