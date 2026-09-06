@@ -299,11 +299,12 @@ mod tests {
     fn recent_project_accepts_existing_dir() {
         let dir = temp_dir("recent");
         let mut h = UiActionHandler::new();
-        let payload = format!(r#"{{"path": "{}"}}"#, dir.display());
+        let path_str = dir.display().to_string();
+        let payload = serde_json::json!({"path": path_str}).to_string();
         let res = h.handle(WELCOME_RECENT_PROJECT, &payload);
         let cmds = commands_for(&res);
         assert_eq!(cmds[0]["cmd"], "project.open");
-        assert_eq!(cmds[0]["path"], dir.display().to_string());
+        assert_eq!(cmds[0]["path"], path_str);
         std::fs::remove_dir_all(&dir).ok();
     }
 
@@ -338,7 +339,8 @@ mod tests {
     fn project_chosen_validates_dir() {
         let dir = temp_dir("chosen");
         let mut h = UiActionHandler::new();
-        let payload = format!(r#"{{"path": "{}"}}"#, dir.display());
+        let path_str = dir.display().to_string();
+        let payload = serde_json::json!({"path": path_str}).to_string();
         let res = h.handle(PROJECT_CHOSEN, &payload);
         assert_eq!(commands_for(&res)[0]["cmd"], "project.open");
         std::fs::remove_dir_all(&dir).ok();
