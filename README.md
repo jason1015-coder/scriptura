@@ -16,6 +16,9 @@ A hybrid Qt/Rust text editor with project file browsing — **Qt for the UI, Rus
 
 <img src=".github/assets/preview.png" alt="Scriptura Preview" />
 
+[![Build & Deploy Scriptura](https://github.com/jason1015-coder/scriptura/actions/workflows/build.yml/badge.svg)](https://github.com/jason1015-coder/scriptura/actions/workflows/build.yml)
+[![Run Unit Tests](https://github.com/jason1015-coder/scriptura/actions/workflows/test.yml/badge.svg)](https://github.com/jason1015-coder/scriptura/actions/workflows/test.yml)
+
 ---
 
 ## Architecture
