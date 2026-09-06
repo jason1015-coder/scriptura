@@ -2,18 +2,14 @@ name: Dev Release (update dev tag)
 
 # Rolling development release.
 #
-# "build" and "deploy" live under the same workflow:
-#   - build.yml   = "Build & Deploy Scriptura"  (builds + packages installers,
-#                     AppImages, .deb, portable ZIPs for all OSes)
-#
 # This workflow is lazy: it does NOT start on every push. Instead it triggers
-# ONLY when "Build & Deploy Scriptura" (build + deploy) COMPLETES.
-# If build + deploy passed -> it immediately creates/updates the "dev" tag /
+# ONLY when "Deploy Scriptura (Manual)" workflow COMPLETES.
+# If deploy passed -> it immediately creates/updates the "dev" tag /
 # "scriptura-dev" release with every artifact. If it failed it does nothing.
 
 on:
   workflow_run:
-    workflows: ["Build & Deploy Scriptura"]
+    workflows: ["Deploy Scriptura (Manual)"]
     types: [completed]
 
 permissions:
@@ -35,24 +31,24 @@ jobs:
         with:
           fetch-depth: 0
 
-      # ── Gate: build + deploy must have passed ──
-      # This workflow is triggered by build+deploy completion; check conclusion.
-      - name: Check build/deploy passed
+      # ── Gate: deploy must have passed ──
+      # This workflow is triggered by deploy completion; check conclusion.
+      - name: Check deploy passed
         id: gate
         env:
-          BUILD_CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+          DEPLOY_CONCLUSION: ${{ github.event.workflow_run.conclusion }}
         run: |
           set -e
-          echo "Build+Deploy conclusion=$BUILD_CONCLUSION"
-          if [ "$BUILD_CONCLUSION" != "success" ]; then
-            echo "::warning Build & Deploy did not pass ($BUILD_CONCLUSION); skipping."
+          echo "Deploy conclusion=$DEPLOY_CONCLUSION"
+          if [ "$DEPLOY_CONCLUSION" != "success" ]; then
+            echo "::warning Deploy did not pass ($DEPLOY_CONCLUSION); skipping."
             echo "gated=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          echo "::notice Build & Deploy passed. Publishing dev release."
+          echo "::notice Deploy passed. Publishing dev release."
           echo "gated=true"  >> "$GITHUB_OUTPUT"
-      # ── Download ALL artifacts produced by the build+deploy run ──
-      - name: Download build+deploy artifacts
+      # ── Download ALL artifacts produced by the deploy run ──
+      - name: Download deploy artifacts
         if: steps.gate.outputs.gated == 'true'
         uses: actions/download-artifact@v4
         with:
@@ -92,7 +88,7 @@ jobs:
           body: |
             Rolling development build (auto-generated).
 
-            - Updated when **Build & Deploy Scriptura** (build + deploy) succeeds
+            - Updated when **Deploy Scriptura (Manual)** succeeds
               on the `main` branch.
             - Assets always overwrite the previous `dev` build.
             - Commit: ${{ github.event.workflow_run.head_sha }}
