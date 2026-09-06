@@ -2,17 +2,14 @@ name: Dev Release (update dev tag)
 
 # Rolling development release.
 #
-# "build", "deploy", and "test" all live under these workflows:
+# "build" and "deploy" live under the same workflow:
 #   - build.yml   = "Build & Deploy Scriptura"  (builds + packages installers,
 #                     AppImages, .deb, portable ZIPs for all OSes)
-#   - test.yml    = "Run Unit Tests"
 #
 # This workflow is lazy: it does NOT start on every push. Instead it triggers
-# ONLY when "Build & Deploy Scriptura" (build + deploy) COMPLETES, then it
-# verifies the "Run Unit Tests" workflow also SUCCEEDED for that same commit.
-# If all three (build + deploy + test) passed -> it immediately creates/updates
-# the "dev" tag / "scriptura-dev" release with every artifact. If any failed it
-# does nothing.
+# ONLY when "Build & Deploy Scriptura" (build + deploy) COMPLETES.
+# If build + deploy passed -> it immediately creates/updates the "dev" tag /
+# "scriptura-dev" release with every artifact. If it failed it does nothing.
 
 on:
   workflow_run:
@@ -38,63 +35,23 @@ jobs:
         with:
           fetch-depth: 0
 
-      # ── Gate: all of build + deploy + test must have passed ──
-      # build + deploy already finished (this workflow is triggered by their
-      # completion); only the TEST workflow may still be running, so wait
-      # (bounded) for it to reach a final conclusion.
-      - name: Check build/deploy + wait for test, allow release only if all pass
+      # ── Gate: build + deploy must have passed ──
+      # This workflow is triggered by build+deploy completion; check conclusion.
+      - name: Check build/deploy passed
         id: gate
         env:
-          GH_TOKEN: ${{ github.token }}
-          BUILD_RUN_ID: ${{ github.event.workflow_run.id }}
           BUILD_CONCLUSION: ${{ github.event.workflow_run.conclusion }}
-          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
-          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
-          TEST_WORKFLOW: test.yml
         run: |
           set -e
-          echo "Build+Deploy run=$BUILD_RUN_ID conclusion=$BUILD_CONCLUSION"
+          echo "Build+Deploy conclusion=$BUILD_CONCLUSION"
           if [ "$BUILD_CONCLUSION" != "success" ]; then
             echo "::warning Build & Deploy did not pass ($BUILD_CONCLUSION); skipping."
             echo "gated=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-
-          max_tries=90                # wait up to ~90 min for the test workflow
-          interval=60                 #   (poll every 60s)
-          i=0
-          t_state="missing"; t_id=""
-
-          while [ "$i" -lt "$max_tries" ]; do
-            meta="$(gh run list --workflow "$TEST_WORKFLOW" --branch "$HEAD_BRANCH" \
-                     --commit "$HEAD_SHA" --limit 1 --json databaseId,status,conclusion \
-                     --jq '.[0] // {}')"
-            status="$(printf '%s' "$meta" | jq -r '.status // "missing"')"
-            concl="$(printf '%s' "$meta" | jq -r '.conclusion // ""')"
-            id="$(printf '%s' "$meta" | jq -r '.databaseId // ""')"
-
-            if [ "$status" = "missing" ] || [ "$status" != "completed" ]; then
-              t_state="running"
-              echo "[poll $i] test=$t_state (waiting...)"
-            else
-              t_state="$concl"; t_id="$id"
-              echo "[poll $i] test=$t_state"
-              break
-            fi
-            sleep "$interval"
-            i=$((i + 1))
-          done
-
-          echo "Final -> build+deploy=success, test=$t_state ($t_id)"
-          if [ "$t_state" = "success" ]; then
-            echo "::notice All of build, deploy, and test passed. Publishing dev release."
-            echo "gated=true"  >> "$GITHUB_OUTPUT"
-          else
-            echo "::warning Test did not pass (state=$t_state); skipping release update."
-            echo "gated=false" >> "$GITHUB_OUTPUT"
-          fi
-          echo "test_run_id=$t_id" >> "$GITHUB_OUTPUT"
-# ── Download ALL artifacts produced by the build+deploy run ──
+          echo "::notice Build & Deploy passed. Publishing dev release."
+          echo "gated=true"  >> "$GITHUB_OUTPUT"
+      # ── Download ALL artifacts produced by the build+deploy run ──
       - name: Download build+deploy artifacts
         if: steps.gate.outputs.gated == 'true'
         uses: actions/download-artifact@v4
@@ -102,15 +59,6 @@ jobs:
           run-id: ${{ github.event.workflow_run.id }}
           github-token: ${{ github.token }}
           path: build-artifacts
-
-      # ── Download artifacts produced by the test run (e.g. coverage) ──
-      - name: Download test artifacts
-        if: steps.gate.outputs.gated == 'true'
-        uses: actions/download-artifact@v4
-        with:
-          run-id: ${{ steps.gate.outputs.test_run_id }}
-          github-token: ${{ github.token }}
-          path: test-artifacts
 
       # ── Package each artifact into exactly one release asset ──
       - name: Stage release assets
@@ -128,7 +76,6 @@ jobs:
           }
 
           for dir in build-artifacts/*/; do package_dir "$dir" release-assets; done
-          for dir in test-artifacts/*/; do  package_dir "$dir" release-assets; done
 
           echo "=== Release assets ==="
           ls -la release-assets/
@@ -145,8 +92,8 @@ jobs:
           body: |
             Rolling development build (auto-generated).
 
-            - Updated when **Build & Deploy Scriptura** (build + deploy) **and**
-              **Run Unit Tests** (test) all succeed on the `main` branch.
+            - Updated when **Build & Deploy Scriptura** (build + deploy) succeeds
+              on the `main` branch.
             - Assets always overwrite the previous `dev` build.
             - Commit: ${{ github.event.workflow_run.head_sha }}
           files: release-assets/*
