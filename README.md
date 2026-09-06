@@ -4,7 +4,7 @@
 
 <img src=".github/assets/icon.jpg" alt="Scriptura Icon" width="128" />
 
-> scriptura- a proposed AI powered IDE that actively developing toward v1
+> scriptura- a proposed AI powered IDE that is private, no tracker, no big companies, and no paid subscriptions, actively developing toward v1
 
 A hybrid Qt/Rust text editor with project file browsing — **Qt for the UI, Rust for safe backend services**.
 
