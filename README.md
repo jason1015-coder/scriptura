@@ -35,16 +35,67 @@ The backend services are compiled into a static library (`libscriptura_backend.a
 
 </div>
 
-<div align="center">
+
 
 ## Features
 
-- **Project-based workflow**: Open a project directory to browse files
-- **File tree sidebar**: Navigate project structure with clickable folders
-- **In-place browsing**: Expand and collapse folders in the sidebar to move around the project
-- **Tabbed editing**: Multiple files open in tabs
+### ✅ Working
 
-</div>
+**Editor core (`src/codeeditor.*`, `src/mainwindow_tabs.cpp`)**
+- Project workflow: open project / file-tree (`QFileSystemModel`) / expand-collapse / tabbed editing / save / save-as / recent projects-files / auto-save
+- Syntax highlighting (`CodeHighlighter` + `languageregistry.*`), line numbers, current-line, indent guides, `LargeFileHandler`, `EncodingManager` (detect / BOM / LF-CRLF), smart-indent + bracket auto-close
+- Per-tab `Minimap` + `Breadcrumb` + `BreadcrumbBarWidget` + `CssBreadcrumbParser` (html / css / scss / xml / svg)
+- `FoldManager`, `BracketColorizer`, `MultiCursorManager` (`Ctrl+D`, above / below), `ColumnSelection`, `SnippetManager` + editor dialog, `BookmarkManager` + `BookmarkPanelWidget`, inlay-hints, ghost-text infra, `CodeLensManager`, `RefactoringManager`, `CodeActionController`
+
+**Search / navigate**
+- `FindReplaceBar`, `ProjectSearchPanel` (bottom panel), `UniversalSearchPopup`, command palette, `ShortcutEditor`
+
+**LSP (`src/mainwindow_lsp.cpp`, `rust_backend/src/lsp/`)**
+- `start / stop / initialize / didOpen / didChange / didClose`, `completion / definition / declaration / implementation / typeDefinition / hover / references / rename / codeAction / documentSymbol / workspaceSymbol / formatting / signatureHelp`, diagnostics render + jump-to-error
+
+**DAP / Run (`src/mainwindow_debug.cpp`, `services/dap/`, `rust_backend/src/dap/`)**
+- `RunDialog`, `.vscode/launch.json` load / save, `startDebug / stopDebug`, breakpoint gutter, `continue / next / stepIn / stepOut / pause`, stack / scopes / variables / evaluate, run-without-debug via `QProcess`
+
+**Tasks / Git (basic)**
+- Rust `task_runner.rs` + `TaskRunnerUI` bottom panel + `Ctrl+Shift+B`, detects `package.json` / `Makefile` / `Cargo` tasks
+- Git commit / push / pull / fetch via `QProcess`, `GitPlugin` (`com.scriptura.git`), `GitRebaseWidget` bottom panel, `GitBlame` gutter + Rust `blame_engine` / `diff_engine`, status-bar branch
+
+**Rust backend (`src/rust_backend/src/ffi.rs` ~180 `pub extern "C"`)**
+- `eventbus`, `service_locator`, `workspace` (folders / settings / recent), `updater` + `version_fetcher` (Stable / Pre-release check), `config_validator`, `archive_extractor`, `permission`, `plugin/manager` + `crash_handler` + `dependency_resolver`, `registry`, `language_registry` + `language_server_manager`, `session_engine` (restore + hot-exit), `filewatcher`, `diff / encoding / blame / emmet / test / ui_actions`, `framer`
+
+**Plugins / themes / shell**
+- `ScripturaPlugin` SDK (`sdk/`, `include/scriptura/plugininterface.h`), `PluginManagerDialog`, `PluginContext` + Editor / Ui / Notification / Theme APIs, `ApplicationManager` + `FirstRunInstallDialog`
+- `PluginMarketplaceWidget` + `ThemeMarketplaceWidget` bottom panels, registry-URL setting, `ThemeManager` (8 families × Light / Dark) + `ThemeIcons`, `CustomTitleBar`, `WindowAnimator`, `WelcomeMenuScreen`, `StatusBarWidget`, `NotificationCenter`, `ZenMode`, `SplitManager`
+- Tests: `cargo test` + ~36 `tests/test_*.cpp` (`ctest`), CI `build.yml` / `test.yml` on Linux / macOS / Windows
+
+### 🚧 Partially implemented (code + tests exist, not wired)
+
+- `plugins/aiinlinecompletion.*`: OpenAI-compatible + Ollama `chat` / `generate` + debounce + `CodeEditor::setGhostText`, has `tests/test_aiinlinecompletion.*` — `setSettings / setEditor` commented out in `mainwindow.cpp:909-927`
+- `panels/testpanel.*` + `widgets/testrunner.*` + Rust `test_engine.rs`: pytest / jest / cargo / go / ctest detect + parse — `TestPanel` never added to `bottomPanelStack`
+- `panels/markdownpreview.*`, `dataformatter.*`, `regextester.*`, `globalreplacepreview.*`, `gitbranchwidget.*`, `gitdiffwidget.*`, `gitmergewidget.*`: complete classes, never `new`'d in `MainWindow` — dormant
+- `plugins/httpclientpanel.*`, `plugins/sqliteviewer.*`: complete + tested, only reachable as installable `ApplicationManager` Apps, not built-in panels
+- `rust_backend/src/plugin_updater.rs:30`: `check()` is `TODO: Query the plugin registry` no-op (callbacks wired, never fire)
+- `rust_backend/src/emmet_engine.rs` + `rust_emmet_expand`: FFI exists, no editor shortcut wired
+- `config_validator.rs`: only JSON well-formedness, no schema enforcement
+- `src/mainwindow_ui.cpp`: `Placeholder - setup methods will be extracted`
+
+### 🔜 Coming (explicit placeholders / TODOs)
+
+- Inspector drawer (`mainwindow.cpp:508-524`): sparkle placeholder + `AI Assistant is in development` + `Coming soon — intelligent code assistance, refactoring suggestions`
+- `TODO: nanocoder assistant in here`, `TODO: replace with nanocoder- inline completion`, `TODO: nanocoder settings UI (AI & Completions section goes here)` (`mainwindow.cpp:514,909`, `mainwindow_theme.cpp:294`)
+
+### 🗺️ Planned roadmap 
+
+1. `nanocoder` AI assistant (inspector) + inline completion + `AI & Completions` settings
+2. Wire up dormant panels: Test panel, Markdown preview, DataFormatter, RegexTester, Git Branch / Diff / Merge, GlobalReplacePreview
+3. Graduate `HTTP / SQLite` Apps vs built-ins decision
+4. Real plugin / theme registry (current default `https://example.com/plugin-registry.json`), implement `PluginUpdater::check()`
+5. Schema-aware `ConfigValidator`, Emmet keybinding, `TestPanel::jumpToTest` file / line extraction (`testpanel.cpp:208 TODO`)
+6. Prod hardening toward `v1`: macOS sign / notarize, `pluginhost` sandbox stays removed (`CMakeLists.txt:260`)
+
+
+
+
 
 <div align="center">
 
