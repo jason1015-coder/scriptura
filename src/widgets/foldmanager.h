@@ -58,6 +58,16 @@ public:
     int foldIndicatorWidth() const { return 20; }
     void paintFoldIndicator(QPainter &painter, int x, int y, int blockNumber, int blockHeight);
 
+    // File path tracking (used to detect document switches so regions are
+    // recomputed for the newly-active file rather than stale regions from a
+    // previous document).
+    void setEditorFilePath(const QString &path) { m_editorFilePath = path; }
+    QString editorFilePath() const { return m_editorFilePath; }
+
+    // Re-attach to the editor's current document. Safe to call repeatedly;
+    // reconnects only when the underlying QTextDocument pointer changes.
+    void reattachDocument();
+
 signals:
     void regionsChanged();
     void foldStateChanged(int line, bool collapsed);
@@ -66,11 +76,15 @@ private:
     void detectBraceFolds();
     void detectKeywordFolds();
     void updateHiddenLines();
+    void updateBlockVisibility();
+    void disconnectDocument();
     int findMatchingBrace(int line) const;
     int findMatchingBraceReverse(int line) const;
     int calculateIndent(const QString &line) const;
-    
+
     QPlainTextEdit *m_editor;
+    QTextDocument *m_document = nullptr;
+    QString m_editorFilePath;
     QList<FoldRegion> m_regions;
     QSet<int> m_hiddenLines;
     

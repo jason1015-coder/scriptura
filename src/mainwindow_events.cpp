@@ -39,8 +39,22 @@ bool MainWindow::eventFilter(QObject *watched, QEvent *event)
         QMouseEvent *me = static_cast<QMouseEvent*>(event);
         if (me->button() == Qt::MiddleButton) {
             int idx = tabBar->tabAt(me->pos());
-            if (idx >= 0 && idx < openFiles.size())
-                on_tabWidget_tabCloseRequested(idx);
+            if (idx >= 0) {
+                QVariant data = tabBar->tabData(idx);
+                if (data.typeId() == QMetaType::QString) {
+                    QString strData = data.toString();
+                    if (strData.startsWith("panel:")) {
+                        bool ok = false;
+                        int panelIndex = strData.mid(6).toInt(&ok);
+                        if (ok) {
+                            closePanelTab(panelIndex);
+                            return true;
+                        }
+                    } else if (idx < openFiles.size()) {
+                        on_tabWidget_tabCloseRequested(idx);
+                    }
+                }
+            }
         }
         return QMainWindow::eventFilter(watched, event);
     }

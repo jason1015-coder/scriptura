@@ -7,6 +7,8 @@
 #include <QFile>
 #include <QTextStream>
 #include <QTextCursor>
+#include <QFileInfo>
+#include <QTabWidget>
 
 #include "mainwindow.h"
 #include "codeeditor.h"
@@ -206,6 +208,32 @@ void TestMainWindowEditing::testTabInsertsIndent()
 
     QVERIFY2(editor->textCursor().position() > startPos,
              "Tab must move the caret (insert tab or indent), not be swallowed");
+}
+
+void TestMainWindowEditing::testSaveClearsDirtyState()
+{
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    const QString filePath = makeTempProject(dir);
+    QVERIFY(!filePath.isEmpty());
+
+    MainWindow win(dir.path(), QStringList{filePath});
+    CodeEditor *editor = activeEditor(win);
+    QVERIFY(editor);
+
+    editor->setPlainText(editor->toPlainText() + QStringLiteral("\nchanged"));
+    editor->document()->setModified(true);
+    QVERIFY(editor->document()->isModified());
+
+    QTabWidget *tabs = win.findChild<QTabWidget *>();
+    QVERIFY(tabs);
+    QVERIFY(tabs->tabText(0).startsWith(QStringLiteral("*")));
+
+    const bool invoked = QMetaObject::invokeMethod(
+        &win, "on_action_save_triggered", Qt::DirectConnection);
+    QVERIFY(invoked);
+    QVERIFY(!editor->document()->isModified());
+    QCOMPARE(tabs->tabText(0), QFileInfo(filePath).fileName());
 }
 
 void TestMainWindowEditing::testCompletionPopupDoesNotBlockTyping()

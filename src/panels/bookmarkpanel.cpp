@@ -1,10 +1,12 @@
 #include "bookmarkpanel.h"
 #include <QLabel>
 #include <QFileInfo>
+#include <QDesktopServices>
+#include <QUrl>
 
 BookmarkPanelWidget::BookmarkPanelWidget(BookmarkManager *manager, QWidget *parent)
     : QWidget(parent)
-    , m_manager(manager)
+    , m_manager(nullptr)
 {
     QVBoxLayout *layout = new QVBoxLayout(this);
     layout->setContentsMargins(8, 8, 8, 8);
@@ -37,10 +39,22 @@ BookmarkPanelWidget::BookmarkPanelWidget(BookmarkManager *manager, QWidget *pare
     connect(m_clearBtn, &QPushButton::clicked, this, &BookmarkPanelWidget::onClearAllClicked);
     connect(m_tree, &QTreeWidget::itemDoubleClicked, this, &BookmarkPanelWidget::onItemDoubleClicked);
 
-    if (m_manager) {
-        connect(m_manager, &BookmarkManager::bookmarksChanged, this, &BookmarkPanelWidget::onBookmarksChanged);
-    }
+    setManager(manager);
 
+    populateTree();
+}
+
+void BookmarkPanelWidget::setManager(BookmarkManager *manager)
+{
+    if (m_manager) {
+        disconnect(m_manager, &BookmarkManager::bookmarksChanged,
+                   this, &BookmarkPanelWidget::onBookmarksChanged);
+    }
+    m_manager = manager;
+    if (m_manager) {
+        connect(m_manager, &BookmarkManager::bookmarksChanged,
+                this, &BookmarkPanelWidget::onBookmarksChanged);
+    }
     populateTree();
 }
 
@@ -83,6 +97,7 @@ void BookmarkPanelWidget::onJumpClicked()
     if (m_manager) {
         m_manager->goToBookmark(id);
         emit bookmarkActivated(item->text(0), item->text(1).toInt() - 1);
+        emit navigateToBookmark(item->text(0), item->text(1).toInt() - 1);
     }
 }
 
@@ -95,7 +110,6 @@ void BookmarkPanelWidget::onRemoveClicked()
     if (m_manager) {
         m_manager->removeBookmark(id);
         emit bookmarkRemoved(id);
-        populateTree();
     }
 }
 

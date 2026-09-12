@@ -1,4 +1,5 @@
 #include "statusbarwidget.h"
+#include "thememanager.h"
 #include <QHBoxLayout>
 #include <QVBoxLayout>
 #include <QFrame>
@@ -63,6 +64,7 @@ StatusBarWidget::StatusBarWidget(QWidget *parent)
     QFrame *sep1 = new QFrame(this);
     sep1->setFrameShape(QFrame::VLine);
     sep1->setFrameShadow(QFrame::Sunken);
+    sep1->setObjectName("statusSeparator");
     mainLayout->addWidget(sep1);
 
     // Git branch
@@ -78,6 +80,7 @@ StatusBarWidget::StatusBarWidget(QWidget *parent)
     QFrame *sep2 = new QFrame(this);
     sep2->setFrameShape(QFrame::VLine);
     sep2->setFrameShadow(QFrame::Sunken);
+    sep2->setObjectName("statusSeparator");
     mainLayout->addWidget(sep2);
 
     // Error/warning count
@@ -93,6 +96,79 @@ StatusBarWidget::StatusBarWidget(QWidget *parent)
     m_lineCountLabel->setObjectName("statusPositionLabel");
     m_lineCountLabel->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
     mainLayout->addWidget(m_lineCountLabel);
+
+    applyStyle();
+}
+
+void StatusBarWidget::setThemeManager(ThemeManager *tm)
+{
+    m_themeManager = tm;
+    applyStyle();
+}
+
+void StatusBarWidget::applyStyle()
+{
+    if (!m_themeManager) return;
+
+    const int spacingXs = m_themeManager->spacingXs();
+    const int spacingSm = m_themeManager->spacingSm();
+    const int spacingMd = m_themeManager->spacingMd();
+    const int radiusSm = m_themeManager->radiusSm();
+    const int fontSizeXs = m_themeManager->fontSizeXs();
+    const int fontSizeSm = m_themeManager->fontSizeSm();
+    const ThemeDefinition &d = m_themeManager->currentDefinition();
+
+    QString style = QString(R"(
+        StatusBarWidget#statusBarWidget {
+            background-color: palette(window);
+            border-top: 1px solid palette(mid);
+        }
+        QLabel#statusFileLabel {
+            color: palette(text);
+            font-size: %1px;
+            font-weight: 500;
+            padding: 0 %2px;
+        }
+        QLabel#statusLanguageLabel,
+        QLabel#statusEncodingLabel,
+        QLabel#statusLineEndingLabel,
+        QLabel#statusIndentLabel,
+        QLabel#statusGitLabel,
+        QLabel#statusErrorLabel {
+            color: palette(text);
+            font-size: %1px;
+            font-family: %3;
+            padding: %2px %4px;
+            border-radius: %5px;
+        }
+        QLabel#statusLanguageLabel:hover,
+        QLabel#statusEncodingLabel:hover,
+        QLabel#statusLineEndingLabel:hover,
+        QLabel#statusIndentLabel:hover,
+        QLabel#statusGitLabel:hover,
+        QLabel#statusErrorLabel:hover {
+            background-color: palette(light);
+        }
+        QLabel#statusPositionLabel {
+            color: palette(mid);
+            font-size: %1px;
+            font-family: %3;
+            padding: 0 %2px;
+        }
+        QFrame#statusSeparator {
+            color: palette(mid);
+            margin: %6px 0;
+            max-width: 1px;
+        }
+    )")
+        .arg(fontSizeXs)
+        .arg(spacingSm)
+        .arg(m_themeManager->monoFontStack().join(", "))
+        .arg(spacingMd)
+        .arg(radiusSm)
+        .arg(spacingMd);
+
+    setStyleSheet(style);
 }
 
 void StatusBarWidget::setLanguage(const QString &language)

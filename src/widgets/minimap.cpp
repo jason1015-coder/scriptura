@@ -32,6 +32,7 @@ void Minimap::setDocument(QTextDocument *document)
     }
     
     update();
+    updateGeometry();
 }
 
 void Minimap::setVisible(bool visible)
@@ -65,19 +66,21 @@ void Minimap::paintEvent(QPaintEvent *event)
         block = block.next();
     }
     
-    // Draw visible region highlight
     if (m_editor) {
         QScrollBar *vbar = m_editor->verticalScrollBar();
         int viewportHeight = m_editor->viewport()->height();
-        int totalHeight = m_editor->document()->size().height();
+        int totalHeight = m_document->size().height();
         
         if (totalHeight > 0) {
             int visibleHeight = (viewportHeight * height()) / totalHeight;
             int visibleY = (vbar->value() * height()) / totalHeight;
+            m_visibleRegion = QRect(0, visibleY, width(), visibleHeight);
             
             painter.setBrush(QColor(100, 100, 100, 100));
             painter.setPen(Qt::NoPen);
-            painter.drawRect(0, visibleY, width(), visibleHeight);
+            painter.drawRect(m_visibleRegion);
+        } else {
+            m_visibleRegion = QRect();
         }
     }
 }
@@ -86,9 +89,10 @@ void Minimap::mousePressEvent(QMouseEvent *event)
 {
     if (!m_editor || !m_document) return;
     
-    int totalHeight = m_editor->document()->size().height();
+    int totalHeight = m_document->size().height();
     if (totalHeight > 0) {
-        int newPosition = static_cast<int>((event->position().y() * totalHeight) / height());
+        int newPosition = static_cast<int>((event->pos().y() * totalHeight) / height());
+        emit viewportRequested(newPosition);
         m_editor->verticalScrollBar()->setValue(newPosition);
     }
 }
@@ -109,7 +113,7 @@ void Minimap::resizeEvent(QResizeEvent *event)
 void Minimap::updateGeometry()
 {
     if (m_editor) {
-        int totalHeight = m_editor->document()->size().height();
+        int totalHeight = m_document ? m_document->size().height() : 0;
         setMinimumHeight(qMin(totalHeight / SCALE_FACTOR, 2000));
     }
     update();

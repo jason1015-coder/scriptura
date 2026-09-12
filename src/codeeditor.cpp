@@ -665,6 +665,22 @@ void CodeEditor::setLanguageForFile(const QString &filePath)
     m_filePath = filePath;
     syntaxHighlighter->setLanguage(
         LanguageRegistry::instance().languageForFile(filePath));
+
+    // Keep the bookmark manager's file scope in sync so navigation stays
+    // scoped to the current file.
+    if (m_bookmarkManager)
+        m_bookmarkManager->setEditorFilePath(filePath);
+    if (m_foldManager)
+        m_foldManager->setEditorFilePath(filePath);
+}
+
+void CodeEditor::setFilePath(const QString &path)
+{
+    m_filePath = path;
+    if (m_bookmarkManager)
+        m_bookmarkManager->setEditorFilePath(path);
+    if (m_foldManager)
+        m_foldManager->setEditorFilePath(path);
 }
 
 void CodeEditor::setDarkMode(bool dark)
@@ -900,8 +916,11 @@ int CodeEditor::lineNumberAreaWidth() const
         digits++;
     }
 
-    int space = 3 + fontMetrics().horizontalAdvance(QLatin1Char('9')) * digits;
-    return space;
+    int numberWidth = fontMetrics().horizontalAdvance(QLatin1Char('9')) * digits;
+    // Reserve a fixed icon gutter for fold/breakpoint/bookmark markers so
+    // they never collide with the line numbers or each other.
+    const int iconGutter = 32;
+    return iconGutter + 3 + numberWidth;
 }
 
 void CodeEditor::updateLineNumberAreaWidth(int)
@@ -1294,6 +1313,10 @@ void CodeEditor::lineNumberAreaPaintEvent(QPaintEvent *event)
 
     const int areaWidth = lineNumberArea->width();
     const int fontHeight = fontMetrics().height();
+    // Fixed icon gutter (breakpoint/fold/bookmark) kept left of the line
+    // numbers so the markers never collide with the numbers or each other.
+    const int iconGutter = 32;
+    const int numberX = iconGutter;  // Left edge of the right-aligned numbers
     const QPen numberPen(palette().color(QPalette::Midlight));
 
     painter.setPen(numberPen);
@@ -1302,10 +1325,11 @@ void CodeEditor::lineNumberAreaPaintEvent(QPaintEvent *event)
         if (block.isVisible() && bottom >= event->rect().top()) {
             int line = blockNumber + 1;
 
-            // Draw breakpoint icon if this line has a breakpoint
+            // --- Icon column (left of the line numbers) --------------------
+            // Breakpoint icon
             if (m_breakpointLines.contains(line)) {
                 QPainterPath path;
-                int cx = 9;
+                int cx = iconGutter / 2;
                 int cy = top + (bottom - top) / 2;
                 path.addEllipse(cx - 5, cy - 5, 10, 10);
                 painter.setPen(QPen(Qt::red, 2));
@@ -1314,19 +1338,21 @@ void CodeEditor::lineNumberAreaPaintEvent(QPaintEvent *event)
                 painter.setPen(numberPen);
             }
 
-            // Draw fold indicator if this line is a fold start
+            // Fold indicator
             if (m_foldManager && m_foldManager->isFoldStart(line - 1)) {
-                m_foldManager->paintFoldIndicator(painter, 0, top, line - 1, bottom - top);
+                m_foldManager->paintFoldIndicator(painter, 2, top, line - 1, bottom - top);
             }
 
-            // Draw bookmark indicator
-            if (m_bookmarkManager && !m_filePath.isEmpty() && m_bookmarkManager->isBookmarked(m_filePath, line - 1)) {
+            // Bookmark indicator
+            if (m_bookmarkManager && !m_filePath.isEmpty() &&
+                m_bookmarkManager->isBookmarked(m_filePath, line - 1)) {
                 painter.setPen(Qt::NoPen);
                 painter.setBrush(QColor(255, 215, 0));  // Gold bookmark dot
-                painter.drawEllipse(4, top + 3, 8, 8);
+                painter.drawEllipse(8, top + 3, 8, 8);
                 painter.setPen(numberPen);
             }
 
+            // --- Line number (right-aligned in the remaining space) -------
             // Draw blame annotation if enabled
             if (m_blameEnabled && m_blameData.contains(blockNumber)) {
                 const BlameLineInfo &info = m_blameData[blockNumber];
@@ -1337,9 +1363,8 @@ void CodeEditor::lineNumberAreaPaintEvent(QPaintEvent *event)
                 blameColor.setAlpha(160);
                 painter.setPen(blameColor);
                 QString blameText = info.author + " " + info.date;
-                int blameX = 20 + fontMetrics().horizontalAdvance(QString::number(blockCount() + 1)) + 12;
-                painter.drawText(blameX, top, areaWidth - blameX, fontHeight,
-                               Qt::AlignLeft | Qt::AlignVCenter, blameText);
+                painter.drawText(numberX + 4, top, areaWidth - numberX - 4, fontHeight,
+                                Qt::AlignLeft | Qt::AlignVCenter, blameText);
                 painter.setFont(font());
                 painter.setPen(numberPen);
             }
@@ -1354,9 +1379,7 @@ void CodeEditor::lineNumberAreaPaintEvent(QPaintEvent *event)
                         QColor lensColor = palette().color(QPalette::Midlight);
                         lensColor.setAlpha(200);
                         painter.setPen(lensColor);
-                        int lensX = 20 + fontMetrics().horizontalAdvance(QString::number(blockCount() + 1)) + 12;
-                        // Draw above the line number
-                        painter.drawText(lensX, top - 2, areaWidth - lensX, fontHeight,
+                        painter.drawText(numberX + 4, top - 2, areaWidth - numberX - 4, fontHeight,
                                        Qt::AlignLeft | Qt::AlignBottom, lens.title);
                         painter.setFont(font());
                         painter.setPen(numberPen);
@@ -1366,8 +1389,8 @@ void CodeEditor::lineNumberAreaPaintEvent(QPaintEvent *event)
 
             // Draw line number
             QString number = QString::number(line);
-            painter.drawText(20, top, areaWidth - 20, fontHeight,
-                           Qt::AlignRight, number);
+            painter.drawText(numberX, top, areaWidth - numberX, fontHeight,
+                            Qt::AlignRight, number);
         }
 
         block = block.next();

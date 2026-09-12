@@ -22,10 +22,13 @@ public:
 
     void detectTasks(const QString &projectPath);
     QList<DetectedTask> detectedTasks() const { return m_tasks; }
+    int taskCount() const { return m_tasks.size(); }
+    DetectedTask taskAt(int index) const;
 
 signals:
     void taskSelected(const DetectedTask &task);
     void taskRun(const QString &command);
+    void tasksDetected(int count);
 
 private slots:
     void onRunClicked();

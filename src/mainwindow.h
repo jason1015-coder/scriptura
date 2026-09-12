@@ -100,10 +100,13 @@ public:
     bool isDarkModeEnabled() const { return selectedTheme.mode == ThemeMode::Dark; }
 
     // Bottom panel button helpers (used by plugin API and dock)
-    int addBottomPanelButton(const QString &iconPath, const QString &tooltip, const QString &title);
+    int addBottomPanelButton(const QString &iconPath, const QString &tooltip, const QString &title, bool builtin = false);
     void showBottomPanelIndex(int index);
     int currentBottomPanelIndex() const;
     QString bottomPanelButtonTooltip(int index) const;
+    int findPanelTabIndex(int panelIndex) const;
+    void closePanelTab(int panelIndex);
+    void removePanelTab(int panelIndex);
 
 #ifdef Q_OS_WIN
     void enableMicaEffect(HWND hwnd, bool darkMode);
@@ -173,7 +176,8 @@ private slots:
 private:
     enum class TabType {
         File = 0,
-        Settings = 1
+        Settings = 1,
+        Panel = 2
     };
 
     Ui::MainWindow *ui;
@@ -190,6 +194,8 @@ private:
         QToolButton *button = nullptr;
         int panelIndex = -1;
         QString title;
+        bool builtin = false;
+        QWidget *panelWidget = nullptr;
     };
     QList<PanelButtonEntry> m_panelButtons;
     QStackedWidget *bottomPanelStack;

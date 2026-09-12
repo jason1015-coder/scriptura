@@ -48,6 +48,7 @@ void TaskRunnerUI::detectTasks(const QString &projectPath)
     detectMakefileTasks(projectPath);
     detectCargoTasks(projectPath);
     populateList();
+    emit tasksDetected(m_tasks.size());
 }
 
 void TaskRunnerUI::detectPackageJsonTasks(const QString &projectPath)
@@ -107,6 +108,14 @@ void TaskRunnerUI::populateList()
     for (const DetectedTask &task : m_tasks) {
         m_taskList->addItem(QString("[%1] %2").arg(task.source, task.name));
     }
+}
+
+DetectedTask TaskRunnerUI::taskAt(int index) const
+{
+    if (index >= 0 && index < m_tasks.size()) {
+        return m_tasks[index];
+    }
+    return DetectedTask{};
 }
 
 void TaskRunnerUI::onRunClicked()

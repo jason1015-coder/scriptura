@@ -124,6 +124,23 @@ public:
     QString generateDesignTokens() const;
     QString generateGlobalStylesheet() const;
 
+    // New: spacing/typography token accessors for consistent modernization
+    int spacingXs() const { return 4; }
+    int spacingSm() const { return 8; }
+    int spacingMd() const { return 12; }
+    int spacingLg() const { return 16; }
+    int spacingXl() const { return 24; }
+
+    int radiusSm() const { return 6; }
+    int radiusMd() const { return 8; }
+    int radiusLg() const { return 12; }
+    int radiusXl() const { return 16; }
+
+    int fontSizeBase() const { return 13; }
+    int fontSizeSm() const { return 12; }
+    int fontSizeXs() const { return 11; }
+    int fontSizeLg() const { return 14; }
+
 signals:
     void themeChanged(const Theme &theme);
 

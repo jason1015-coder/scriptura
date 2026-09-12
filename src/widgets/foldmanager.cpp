@@ -12,24 +12,47 @@ FoldManager::FoldManager(QPlainTextEdit *editor, QObject *parent)
     , m_editor(editor)
     , m_useBraceFolding(true)
 {
-    if (m_editor) {
-        connect(m_editor->document(), &QTextDocument::contentsChanged,
-                this, &FoldManager::detectRegions);
-    }
+    reattachDocument();
     detectRegions();
+}
+
+void FoldManager::reattachDocument()
+{
+    disconnectDocument();
+    if (!m_editor || !m_editor->document()) {
+        m_document = nullptr;
+        return;
+    }
+
+    m_document = m_editor->document();
+    connect(m_document, &QTextDocument::contentsChanged,
+            this, &FoldManager::detectRegions);
+}
+
+void FoldManager::disconnectDocument()
+{
+    if (!m_document)
+        return;
+
+    disconnect(m_document, &QTextDocument::contentsChanged,
+               this, &FoldManager::detectRegions);
+    disconnect(m_document, &QTextDocument::contentsChange,
+               this, &FoldManager::detectRegions);
+    m_document = nullptr;
 }
 
 void FoldManager::detectRegions()
 {
     m_regions.clear();
     m_hiddenLines.clear();
-    
+
     if (!m_editor || !m_editor->document()) return;
-    
+
     detectBraceFolds();
     detectKeywordFolds();
     updateHiddenLines();
-    
+    updateBlockVisibility();
+
     emit regionsChanged();
 }
 
@@ -211,6 +234,7 @@ void FoldManager::toggleFold(int line)
             (m_regions[i].startLine <= line && m_regions[i].endLine >= line)) {
             m_regions[i].collapsed = !m_regions[i].collapsed;
             updateHiddenLines();
+            updateBlockVisibility();
             emit foldStateChanged(line, m_regions[i].collapsed);
             emit regionsChanged();
             return;
@@ -224,6 +248,7 @@ void FoldManager::foldAll()
         m_regions[i].collapsed = true;
     }
     updateHiddenLines();
+    updateBlockVisibility();
     emit regionsChanged();
 }
 
@@ -233,6 +258,7 @@ void FoldManager::unfoldAll()
         m_regions[i].collapsed = false;
     }
     updateHiddenLines();
+    updateBlockVisibility();
     emit regionsChanged();
 }
 
@@ -244,6 +270,7 @@ void FoldManager::foldAtLevel(int level)
         }
     }
     updateHiddenLines();
+    updateBlockVisibility();
     emit regionsChanged();
 }
 
@@ -255,6 +282,7 @@ void FoldManager::unfoldAtLevel(int level)
         }
     }
     updateHiddenLines();
+    updateBlockVisibility();
     emit regionsChanged();
 }
 
@@ -320,7 +348,7 @@ bool FoldManager::isLineHidden(int blockNumber) const
 void FoldManager::updateHiddenLines()
 {
     m_hiddenLines.clear();
-    
+
     for (const FoldRegion &r : m_regions) {
         if (r.collapsed) {
             // Hide all lines between start and end (exclusive of start, inclusive of end)
@@ -328,6 +356,21 @@ void FoldManager::updateHiddenLines()
                 m_hiddenLines.insert(line);
             }
         }
+    }
+}
+
+void FoldManager::updateBlockVisibility()
+{
+    if (!m_editor || !m_editor->document())
+        return;
+
+    QTextDocument *doc = m_editor->document();
+    QTextBlock block = doc->begin();
+    while (block.isValid()) {
+        bool hidden = m_hiddenLines.contains(block.blockNumber());
+        if (block.isVisible() != hidden)
+            block.setVisible(!hidden);
+        block = block.next();
     }
 }
 

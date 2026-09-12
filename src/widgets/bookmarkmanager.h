@@ -38,21 +38,26 @@ public:
     void nextBookmark();
     void previousBookmark();
     void goToBookmark(int id);
-    
+    // Move the editor caret to the bookmark and emit bookmarkNavigated.
+    void navigateTo(int id);
+
     // Query
     bool isBookmarked(const QString &filePath, int line) const;
     int bookmarkAt(const QString &filePath, int line) const;
     const QList<Bookmark>& bookmarks() const { return m_bookmarks; }
     QList<Bookmark> bookmarksForFile(const QString &filePath) const;
     int bookmarkCount() const { return m_bookmarks.size(); }
-    
+
     // Persistence
     void saveToSettings();
     void loadFromSettings();
-    
+
     // Configuration
     void setEditor(QPlainTextEdit *editor) { m_editor = editor; }
-    
+    // Track the file path of the editor so navigation can scope by file.
+    void setEditorFilePath(const QString &path) { m_editorFilePath = path; }
+    QString editorFilePath() const { return m_editorFilePath; }
+
 signals:
     void bookmarkToggled(int id, const QString &filePath, int line, bool added);
     void bookmarkNavigated(int id, const QString &filePath, int line);
@@ -62,8 +67,9 @@ private:
     int generateId() const;
     int findNextBookmarkIndex(int currentLine, const QString &filePath) const;
     int findPreviousBookmarkIndex(int currentLine, const QString &filePath) const;
-    
+
     QPlainTextEdit *m_editor;
+    QString m_editorFilePath;
     QList<Bookmark> m_bookmarks;
     int m_nextId;
     int m_currentIndex;  // For navigation tracking

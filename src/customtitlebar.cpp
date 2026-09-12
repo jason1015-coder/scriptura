@@ -1,5 +1,6 @@
 #include "customtitlebar.h"
 #include "themeicons.h"
+#include "thememanager.h"
 #include <QMouseEvent>
 #include <QApplication>
 #include <QStyle>
@@ -42,23 +43,21 @@ CustomTitleBar::CustomTitleBar(QWidget *parent)
     setFixedHeight(52);
     setAttribute(Qt::WA_TranslucentBackground, false);
     setObjectName("unifiedTitleBar");
-    setStyleSheet(R"(
-        CustomTitleBar#unifiedTitleBar {
-            background-color: palette(window);
-            border-radius: 14px;
-            border-bottom-left-radius: 0;
-            border-bottom-right-radius: 0;
-        }
-    )");
     setupLayout();
     styleButtons();
 }
 
 void CustomTitleBar::setupLayout()
 {
+    auto tm = qobject_cast<ThemeManager*>(qApp->property("themeManager").value<QObject*>());
+    const int spacingSm = tm ? tm->spacingSm() : 8;
+    const int spacingMd = tm ? tm->spacingMd() : 12;
+    const int spacingXs = tm ? tm->spacingXs() : 4;
+    const int fontSizeSm = tm ? tm->fontSizeSm() : 12;
+
     QHBoxLayout *layout = new QHBoxLayout(this);
-    layout->setContentsMargins(8, 0, 8, 0);
-    layout->setSpacing(2);
+    layout->setContentsMargins(spacingMd, 0, spacingMd, 0);
+    layout->setSpacing(spacingXs);
 
     // -- Leading: sidebar toggle --
     sidebarToggleButton = new QPushButton(this);
@@ -73,12 +72,12 @@ void CustomTitleBar::setupLayout()
     layout->addWidget(sidebarToggleButton);
 
     // -- Spacer --
-    layout->addSpacing(4);
+    layout->addSpacing(spacingXs);
 
     // -- Center: title --
     titleLabel = new QLabel(tr("Scriptura"), this);
     QFont titleFont = titleLabel->font();
-    titleFont.setPointSize(11);
+    titleFont.setPointSize(fontSizeSm);
     titleFont.setWeight(QFont::DemiBold);
     titleLabel->setFont(titleFont);
     titleLabel->setStyleSheet("color: palette(text); background: transparent;");
@@ -98,7 +97,7 @@ void CustomTitleBar::setupLayout()
     });
     layout->addWidget(searchField, 0, Qt::AlignVCenter);
 
-    layout->addSpacing(4);
+    layout->addSpacing(spacingXs);
 
     // -- Trailing: inspector toggle + window controls --
     inspectorToggleButton = new QPushButton(this);
@@ -121,7 +120,7 @@ void CustomTitleBar::setupLayout()
     connect(settingsButton, &QPushButton::clicked, this, &CustomTitleBar::settingsClicked);
     layout->addWidget(settingsButton);
 
-    layout->addSpacing(8);
+    layout->addSpacing(spacingSm);
 
     // -- Window controls (traffic lights) --
     minimizeButton = new QPushButton(this);
@@ -157,40 +156,46 @@ void CustomTitleBar::setupLayout()
 
 void CustomTitleBar::styleButtons()
 {
-    const QString buttonStyle = R"(
+    auto tm = qobject_cast<ThemeManager*>(qApp->property("themeManager").value<QObject*>());
+    const int radius = tm ? tm->radiusMd() : 8;
+    const int spacingSm = tm ? tm->spacingSm() : 8;
+    const int spacingXs = tm ? tm->spacingXs() : 4;
+    const int spacingMd = tm ? tm->spacingMd() : 12;
+
+    const QString buttonStyle = QString(R"(
         QPushButton {
             border: none;
             background-color: transparent;
             color: palette(text);
-            border-radius: 14px;
+            border-radius: %1px;
             padding: 0px;
         }
         QPushButton:hover {
-            background-color: rgba(128, 128, 128, 0.15);
+            background-color: rgba(128, 128, 128, 0.10);
         }
         QPushButton:pressed {
-            background-color: rgba(128, 128, 128, 0.25);
+            background-color: rgba(128, 128, 128, 0.18);
         }
-    )";
+    )").arg(radius);
 
-    const QString checkableButtonStyle = R"(
+    const QString checkableButtonStyle = QString(R"(
         QPushButton {
             border: none;
             background-color: transparent;
             color: palette(text);
-            border-radius: 8px;
+            border-radius: %1px;
             padding: 0px;
         }
         QPushButton:hover {
-            background-color: rgba(128, 128, 128, 0.15);
+            background-color: rgba(128, 128, 128, 0.10);
         }
         QPushButton:checked {
-            background-color: rgba(128, 128, 128, 0.20);
+            background-color: rgba(128, 128, 128, 0.15);
         }
         QPushButton:pressed {
-            background-color: rgba(128, 128, 128, 0.25);
+            background-color: rgba(128, 128, 128, 0.18);
         }
-    )";
+    )").arg(radius);
 
     // Window control buttons must NOT paint their own hover/pressed background:
     // this title bar paints both the glyph and its hover state in paintEvent(),
@@ -210,25 +215,27 @@ void CustomTitleBar::styleButtons()
     settingsButton->setStyleSheet(buttonStyle);
     inspectorToggleButton->setStyleSheet(checkableButtonStyle);
 
-    // Search field styling
-    searchField->setStyleSheet(R"(
+    // Search field styling - use theme-aware colors
+    const QString searchStyle = QString(R"(
         QLineEdit#unifiedSearchField {
-            background-color: rgba(128, 128, 128, 0.08);
-            border: 1px solid rgba(128, 128, 128, 0.12);
-            border-radius: 8px;
-            padding: 4px 10px;
+            background-color: rgba(128, 128, 128, 0.06);
+            border: 1px solid rgba(128, 128, 128, 0.10);
+            border-radius: %1px;
+            padding: %2px %3px;
             color: palette(text);
-            font-size: 12px;
+            font-size: %4px;
             font-family: "Inter", "SF Pro Text", sans-serif;
         }
         QLineEdit#unifiedSearchField:focus {
-            background-color: rgba(128, 128, 128, 0.14);
-            border: 1px solid rgba(128, 128, 128, 0.25);
+            background-color: rgba(128, 128, 128, 0.12);
+            border: 1px solid rgba(128, 128, 128, 0.22);
         }
         QLineEdit#unifiedSearchField:hover {
-            background-color: rgba(128, 128, 128, 0.10);
+            background-color: rgba(128, 128, 128, 0.08);
         }
-    )");
+    )").arg(radius).arg(spacingXs).arg(spacingMd).arg(tm ? tm->fontSizeSm() : 12);
+
+    searchField->setStyleSheet(searchStyle);
 }
 
 void CustomTitleBar::paintEvent(QPaintEvent *event)
@@ -256,6 +263,9 @@ void CustomTitleBar::paintWindowControls(QPainter &p, QPushButton *button, const
 
     QColor glyphColor = windowControlForeground();
 
+    auto tm = qobject_cast<ThemeManager*>(qApp->property("themeManager").value<QObject*>());
+    const int radius = tm ? tm->radiusMd() : 8;
+
     if (button == closeButton && hoverActive) {
         // Close: red hover background + white glyph — readable on any theme.
         QColor red(0xE8, 0x11, 0x23);
@@ -263,16 +273,16 @@ void CustomTitleBar::paintWindowControls(QPainter &p, QPushButton *button, const
             red = red.darker(115);
         p.setPen(Qt::NoPen);
         p.setBrush(red);
-        p.drawRoundedRect(buttonRect.adjusted(2, 2, -2, -2), 12, 12);
+        p.drawRoundedRect(buttonRect.adjusted(2, 2, -2, -2), radius, radius);
         glyphColor = Qt::white;
     } else if (hoverActive) {
         // Minimize/Maximize: subtle overlay derived from the theme foreground,
         // so it reads on both light and dark themes.
         QColor overlay = glyphColor;
-        overlay.setAlphaF(pressed ? 0.25 : 0.14);
+        overlay.setAlphaF(pressed ? 0.22 : 0.12);
         p.setPen(Qt::NoPen);
         p.setBrush(overlay);
-        p.drawRoundedRect(buttonRect.adjusted(2, 2, -2, -2), 12, 12);
+        p.drawRoundedRect(buttonRect.adjusted(2, 2, -2, -2), radius, radius);
     }
 
     QFont font = p.font();

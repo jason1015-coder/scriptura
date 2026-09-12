@@ -13,6 +13,10 @@ public:
     void setDocument(QTextDocument *document);
     void setVisible(bool visible) override;
 
+    QTextDocument *document() const { return m_document; }
+    QRect visibleRegion() const { return m_visibleRegion; }
+    bool hasDocument() const { return m_document != nullptr; }
+
 signals:
     void viewportRequested(int position);
 

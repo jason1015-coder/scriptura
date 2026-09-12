@@ -92,17 +92,27 @@ void MainWindow::on_action_save_triggered()
     QPlainTextEdit *editor = getCurrentEditor();
     if (!editor)
         return;
-        
-    if (currentFile.isEmpty()) {
-        QString fileName = QFileDialog::getSaveFileName(this, tr("Save File"), 
+
+    CodeEditor *codeEditor = qobject_cast<CodeEditor *>(editor);
+    QString targetFile = codeEditor && !codeEditor->filePath().isEmpty()
+        ? codeEditor->filePath()
+        : currentFile;
+
+    if (targetFile.isEmpty()) {
+        QString fileName = QFileDialog::getSaveFileName(this, tr("Save File"),
             projectDir.isEmpty() ? QString() : projectDir,
             tr("C/C++ Files (*.c *.cpp *.h *.hpp *.hxx);;Python Files (*.py);;JavaScript Files (*.js *.ts);;HTML Files (*.html);;CSS Files (*.css);;Markdown Files (*.md);;JSON Files (*.json);;XML Files (*.xml);;All Files (*)"));
         if (fileName.isEmpty())
             return;
-        currentFile = fileName;
+        targetFile = fileName;
+        currentFile = targetFile;
+        if (codeEditor)
+            codeEditor->setFilePath(targetFile);
+    } else {
+        currentFile = targetFile;
     }
 
-    QFile file(currentFile);
+    QFile file(targetFile);
     if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
         QString errorMsg;
         QString errorStr = file.errorString();
@@ -110,7 +120,7 @@ void MainWindow::on_action_save_triggered()
             errorMsg = tr("Permission denied. Please check file permissions.");
         } else if (errorStr.contains("disk", Qt::CaseInsensitive) || errorStr.contains("space", Qt::CaseInsensitive)) {
             errorMsg = tr("Disk full. Cannot save file.");
-        } else if (currentFile.contains("://")) {
+        } else if (targetFile.contains("://")) {
             errorMsg = tr("Network path unavailable. Please check connection.");
         } else {
             errorMsg = tr("Cannot open file for writing: %1").arg(errorStr);
@@ -119,19 +129,17 @@ void MainWindow::on_action_save_triggered()
         return;
     }
 
-    // Check disk space before writing
-    QStorageInfo storage(QFileInfo(currentFile).absolutePath());
+    QStorageInfo storage(QFileInfo(targetFile).absolutePath());
     qint64 contentSize = editor->toPlainText().toUtf8().size();
     if (storage.bytesAvailable() < contentSize * 2) {
-        QMessageBox::warning(this, tr("Warning"), 
+        QMessageBox::warning(this, tr("Warning"),
             tr("Low disk space. Available: %1 MB").arg(storage.bytesAvailable() / (1024 * 1024)));
     }
 
     QTextStream out(&file);
     out.setEncoding(QStringConverter::Utf8);
     QString content = editor->toPlainText();
-    // Preserve original line endings
-    QString lineEnding = m_fileLineEndings.value(currentFile, "LF");
+    QString lineEnding = m_fileLineEndings.value(targetFile, "LF");
     if (lineEnding == "CRLF") {
         content.replace("\n", "\r\n");
     } else if (lineEnding == "CR") {
@@ -139,15 +147,19 @@ void MainWindow::on_action_save_triggered()
     }
     out << content;
     file.close();
-    
+
+    int editorIndex = ui->tabWidget->indexOf(editor);
+    editor->document()->setModified(false);
+    if (editorIndex >= 0)
+        updateTabModified(editorIndex, false);
     for (OpenFile &f : openFiles) {
-        if (f.filePath == currentFile) {
+        if (f.filePath == targetFile) {
             f.modified = false;
             break;
         }
     }
-    
-    setWindowTitle(QFileInfo(currentFile).fileName() + " - Scriptura");
+
+    setWindowTitle(QFileInfo(targetFile).fileName() + " - Scriptura");
 }
 
 void MainWindow::on_action_save_as_triggered()
@@ -155,13 +167,14 @@ void MainWindow::on_action_save_as_triggered()
     QPlainTextEdit *editor = getCurrentEditor();
     if (!editor)
         return;
-        
-    QString fileName = QFileDialog::getSaveFileName(this, tr("Save File As"), 
+
+    CodeEditor *codeEditor = qobject_cast<CodeEditor *>(editor);
+    QString fileName = QFileDialog::getSaveFileName(this, tr("Save File As"),
         currentFile.isEmpty() ? (projectDir.isEmpty() ? QString() : projectDir) : currentFile,
         tr("C/C++ Files (*.c *.cpp *.h *.hpp *.hxx);;Python Files (*.py);;JavaScript Files (*.js *.ts);;HTML Files (*.html);;CSS Files (*.css);;Markdown Files (*.md);;JSON Files (*.json);;XML Files (*.xml);;All Files (*)"));
     if (fileName.isEmpty())
         return;
-    
+
     QFile file(fileName);
     if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
         QMessageBox::warning(this, tr("Error"), tr("Cannot open file for writing: %1").arg(file.errorString()));
@@ -171,17 +184,30 @@ void MainWindow::on_action_save_as_triggered()
     QTextStream out(&file);
     out << editor->toPlainText();
     file.close();
-    
+
+    int editorIndex = ui->tabWidget->indexOf(editor);
     for (int i = 0; i < openFiles.size(); i++) {
-        if (openFiles[i].filePath == currentFile) {
+        if (editorIndex >= 0 && i != editorIndex)
+            continue;
+        if (openFiles[i].filePath == currentFile || (editorIndex >= 0 && i == editorIndex)) {
+            const QString oldPath = openFiles[i].filePath;
             openFiles[i].filePath = fileName;
             openFiles[i].fileName = QFileInfo(fileName).fileName();
             openFiles[i].modified = false;
-            ui->tabWidget->setTabText(i, openFiles[i].fileName);
+            if (!oldPath.isEmpty() && oldPath != fileName) {
+                m_fileLineEndings[fileName] = m_fileLineEndings.take(oldPath);
+                m_fileEncodings[fileName] = m_fileEncodings.take(oldPath);
+            }
+            if (codeEditor)
+                codeEditor->setFilePath(fileName);
+            if (editorIndex >= 0)
+                updateTabModified(editorIndex, false);
+            else
+                ui->tabWidget->setTabText(i, openFiles[i].fileName);
             break;
         }
     }
-    
+
     currentFile = fileName;
     setWindowTitle(QFileInfo(fileName).fileName() + " - Scriptura");
 }
@@ -582,13 +608,25 @@ void MainWindow::onTopTabChanged(int index)
             unifiedSettingsWidget->show();
         }
     } else if (data.typeId() == QMetaType::QString) {
-        // File tab - find by file path
-        QString filePath = data.toString();
-        for (int i = 0; i < openFiles.size(); ++i) {
-            if (openFiles[i].filePath == filePath) {
-                ui->tabWidget->setCurrentIndex(i);
-                editorStack->setCurrentWidget(ui->tabWidget);
-                break;
+        QString strData = data.toString();
+        if (strData.startsWith("panel:")) {
+            // Panel tab - extract panel index and show bottom panel
+            bool ok = false;
+            int panelIndex = strData.mid(6).toInt(&ok);
+            if (ok && panelIndex >= 0 && panelIndex < m_panelButtons.size()) {
+                showBottomPanelIndex(panelIndex);
+            }
+            // Keep editor stack showing the current file (don't switch editorStack)
+        } else {
+            // File tab - find by file path
+            QString filePath = strData;
+            for (int i = 0; i < openFiles.size(); ++i) {
+                if (openFiles[i].filePath == filePath) {
+                    currentFile = filePath;
+                    ui->tabWidget->setCurrentIndex(i);
+                    editorStack->setCurrentWidget(ui->tabWidget);
+                    break;
+                }
             }
         }
     }

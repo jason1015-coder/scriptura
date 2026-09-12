@@ -153,7 +153,7 @@ public:
     QList<CodeLensItem> codeLensItems() const { return m_codeLensItems; }
 
     // File path tracking (for bookmarks, file watcher, etc.)
-    void setFilePath(const QString &path) { m_filePath = path; }
+    void setFilePath(const QString &path);
     QString filePath() const { return m_filePath; }
 
     // Git blame display

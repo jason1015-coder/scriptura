@@ -21,6 +21,12 @@ private slots:
     void testIsLineHidden();
     void testNestedBraceFolds();
     void testKeywordFolds();
+    // Regression tests for the MANUAL_TEST_LOG fixes
+    void testFoldingHidesTextBlocks();
+    void testUnfoldingRestoresTextBlocks();
+    void testNestedFoldVisibleLineBehavior();
+    void testFoldIndicatorPaintDoesNotCrash();
+    void testReattachDocumentOnNewDocument();
 };
 
 #endif // TEST_FOLDMANAGER_H

@@ -32,8 +32,7 @@ void Breadcrumb::updateFromCursor()
     
     QTextCursor cursor = m_editor->textCursor();
     QTextBlock block = cursor.block();
-    
-    // Simple symbol path based on current line
+
     QString lineText = block.text().trimmed();
     if (!lineText.isEmpty()) {
         m_symbolPath = lineText.left(30);
@@ -56,7 +55,6 @@ void Breadcrumb::paintEvent(QPaintEvent *event)
     int x = 10;
     int y = height() / 2 + fontMetrics().height() / 4;
     
-    // Draw file path
     QStringList parts = parseFilePath(m_filePath);
     for (int i = 0; i < parts.size(); ++i) {
         QString part = parts[i];
@@ -73,12 +71,10 @@ void Breadcrumb::paintEvent(QPaintEvent *event)
         x += width;
     }
     
-    // Draw separator
     painter.setPen(palette().color(QPalette::Text));
     painter.drawText(x + 10, y, "|");
     x += fontMetrics().horizontalAdvance("|") + 20;
     
-    // Draw symbol path
     if (!m_symbolPath.isEmpty()) {
         painter.setPen(palette().color(QPalette::Text));
         painter.drawText(x, y, m_symbolPath);
@@ -96,6 +92,8 @@ void Breadcrumb::mousePressEvent(QMouseEvent *event)
                 path += "/" + parts[i];
             }
             emit breadcrumbClicked(path);
+        } else {
+            emit breadcrumbClicked(m_symbolPath);
         }
     }
 }
@@ -109,7 +107,6 @@ QStringList Breadcrumb::parseFilePath(const QString &path) const
     parts = info.absolutePath().split('/', Qt::SkipEmptyParts);
     parts.append(info.fileName());
     
-    // Limit to last 4 parts for display
     if (parts.size() > 4) {
         parts = parts.mid(parts.size() - 4);
     }
@@ -135,9 +132,20 @@ int Breadcrumb::hitTest(const QPoint &pos) const
         if (pos.x() >= x && pos.x() <= x + width) {
             return i;
         }
-        
+
         x += width;
     }
-    
+
+    x += fm.horizontalAdvance(" > ");
+
+    if (!m_symbolPath.isEmpty()) {
+        int symWidth = fm.horizontalAdvance(m_symbolPath);
+        int sepWidth = fm.horizontalAdvance("|");
+        x += sepWidth + 10;
+        if (pos.x() >= x && pos.x() <= x + symWidth) {
+            return parts.size();
+        }
+    }
+
     return -1;
 }

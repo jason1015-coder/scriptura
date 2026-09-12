@@ -1,5 +1,6 @@
 #include <QTest>
 #include <QSignalSpy>
+#include <QPlainTextEdit>
 #include <QSettings>
 #include "bookmarkmanager.h"
 #include "test_bookmarkmanager.h"
@@ -142,4 +143,69 @@ void TestBookmarkManager::testUniqueIds()
     QVERIFY(id1 != id2);
     QVERIFY(id2 != id3);
     QVERIFY(id1 != id3);
+}
+
+// ---------------------------------------------------------------------------
+// Regression tests added for the MANUAL_TEST_LOG fixes
+// ---------------------------------------------------------------------------
+
+void TestBookmarkManager::testNextBookmarkScopedToFile()
+{
+    BookmarkManager mgr;
+    mgr.setEditorFilePath("/tmp/a.cpp");
+
+    int idA = mgr.toggleBookmark("/tmp/a.cpp", 10, "a");
+    int idB = mgr.toggleBookmark("/tmp/b.cpp", 5, "b");
+
+    QSignalSpy nav(&mgr, &BookmarkManager::bookmarkNavigated);
+    mgr.nextBookmark();
+    // Navigation should scope to the current file (/tmp/a.cpp) and skip
+    // the bookmark in /tmp/b.cpp.
+    QVERIFY(nav.count() == 1);
+    QVERIFY(nav.at(0).at(2).toInt() == 10);
+}
+
+void TestBookmarkManager::testPreviousBookmarkScopedToFile()
+{
+    BookmarkManager mgr;
+    mgr.setEditorFilePath("/tmp/a.cpp");
+
+    mgr.toggleBookmark("/tmp/a.cpp", 10, "a");
+    mgr.toggleBookmark("/tmp/b.cpp", 5, "b");
+
+    QSignalSpy nav(&mgr, &BookmarkManager::bookmarkNavigated);
+    mgr.previousBookmark();
+    QVERIFY(nav.at(0).at(2).toInt() == 10);
+}
+
+void TestBookmarkManager::testNavigateToMovesCaret()
+{
+    BookmarkManager mgr;
+    QPlainTextEdit editor;
+    editor.setPlainText("line0\nline1\nline2\nline3\n");
+    mgr.setEditor(&editor);
+    mgr.setEditorFilePath("/tmp/a.cpp");
+
+    int id = mgr.toggleBookmark("/tmp/a.cpp", 2, "line2");
+
+    QSignalSpy nav(&mgr, &BookmarkManager::bookmarkNavigated);
+    mgr.navigateTo(id);
+    QVERIFY(nav.at(0).at(2).toInt() == 2);
+    // The caret should now sit on block 2.
+    QVERIFY(editor.textCursor().blockNumber() == 2);
+}
+
+void TestBookmarkManager::testNavigationWrapsWithinFile()
+{
+    BookmarkManager mgr;
+    mgr.setEditorFilePath("/tmp/a.cpp");
+
+    mgr.toggleBookmark("/tmp/a.cpp", 0, "first");
+    mgr.toggleBookmark("/tmp/a.cpp", 10, "second");
+    mgr.toggleBookmark("/tmp/b.cpp", 5, "other");
+
+    QSignalSpy nav(&mgr, &BookmarkManager::bookmarkNavigated);
+    // From line 10 (last bookmark in file) -> wrap to line 0.
+    mgr.nextBookmark();
+    QVERIFY(nav.at(0).at(2).toInt() == 0);
 }

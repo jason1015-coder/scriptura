@@ -18,6 +18,7 @@ private slots:
     void testEnterInsertsNewline();
     void testArrowKeysMoveCaret();
     void testTabInsertsIndent();
+    void testSaveClearsDirtyState();
     void testCompletionPopupDoesNotBlockTyping();
 };
 

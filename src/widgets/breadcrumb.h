@@ -15,6 +15,10 @@ public:
     void setSymbolPath(const QString &path);
     void updateFromCursor();
 
+    QString filePath() const { return m_filePath; }
+    QString symbolPath() const { return m_symbolPath; }
+    QStringList filePathParts() const { return parseFilePath(m_filePath); }
+
 signals:
     void breadcrumbClicked(const QString &path);
 

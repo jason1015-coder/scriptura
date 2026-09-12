@@ -5,8 +5,10 @@
 #include <QStandardPaths>
 #include "test_aiinlinecompletion.h"
 #include "test_bookmarkmanager.h"
+#include "test_bookmarkpanel.h"
 #include "test_bracketcolorizer.h"
 #include "test_breadcrumb.h"
+#include "test_taskrunnerui.h"
 #include "test_codeactionui.h"
 #include "test_codelensmanager.h"
 #include "test_crashhandler.h"
@@ -65,8 +67,10 @@ int main(int argc, char *argv[])
     int status = 0;
     status |= QTest::qExec(new TestAiInlineCompletion, argc, argv);
     status |= QTest::qExec(new TestBookmarkManager, argc, argv);
+    status |= QTest::qExec(new TestBookmarkPanel, argc, argv);
     status |= QTest::qExec(new TestBracketColorizer, argc, argv);
     status |= QTest::qExec(new TestBreadcrumb, argc, argv);
+    status |= QTest::qExec(new TestTaskRunnerUI, argc, argv);
     status |= QTest::qExec(new TestCodeActionUI, argc, argv);
     status |= QTest::qExec(new TestCodeLensManager, argc, argv);
     status |= QTest::qExec(new TestCrashHandler, argc, argv);

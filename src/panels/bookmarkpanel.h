@@ -13,11 +13,14 @@ class BookmarkPanelWidget : public QWidget
 public:
     explicit BookmarkPanelWidget(BookmarkManager *manager, QWidget *parent = nullptr);
 
+    void setManager(BookmarkManager *manager);
     void refresh();
+    int bookmarkCount() const { return m_manager ? m_manager->bookmarkCount() : 0; }
 
 signals:
     void bookmarkActivated(const QString &filePath, int line);
     void bookmarkRemoved(int id);
+    void navigateToBookmark(const QString &filePath, int line);
 
 private slots:
     void onJumpClicked();

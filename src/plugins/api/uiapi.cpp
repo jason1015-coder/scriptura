@@ -168,7 +168,7 @@ void PluginUIApi::registerPanel(const QString &id, const QString &title,
         QStackedWidget *stack = m_mainWindow->findChild<QStackedWidget*>(QStringLiteral("bottomPanelStack"));
 
         if (stack) {
-            entry.tabIndex = m_mainWindow->addBottomPanelButton(":/icons/settings.svg", title, title);
+            entry.tabIndex = m_mainWindow->addBottomPanelButton(":/icons/settings.svg", title, title, false);
             widget->setParent(stack);
             stack->addWidget(widget);
             widget->hide();
@@ -219,6 +219,10 @@ void PluginUIApi::unregisterPanel(const QString &id)
     if (entry.widget) {
         entry.widget->hide();
         entry.widget->deleteLater();
+    }
+    // Also remove the corresponding tab in the main window
+    if (entry.location == PanelLocation::BottomPanel && entry.tabIndex >= 0) {
+        m_mainWindow->removePanelTab(entry.tabIndex);
     }
 }
 

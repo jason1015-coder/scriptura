@@ -6,6 +6,7 @@
 #include <QPushButton>
 #include <QLabel>
 
+class ThemeManager;
 class CodeEditor;
 
 /**
@@ -24,6 +25,7 @@ class StatusBarWidget : public QWidget
     Q_OBJECT
 public:
     explicit StatusBarWidget(QWidget *parent = nullptr);
+    void setThemeManager(ThemeManager *tm);
 
     void setLanguage(const QString &language);
     void setEncoding(const QString &encoding);
@@ -45,6 +47,7 @@ signals:
     void errorCountClicked();
 
 private:
+    ThemeManager *m_themeManager = nullptr;
     QLabel *m_fileLabel;
     QLabel *m_languageLabel;
     QLabel *m_encodingLabel;
@@ -54,6 +57,8 @@ private:
     QLabel *m_gitBranchLabel;
     QLabel *m_errorLabel;
     QLabel *m_lineCountLabel;
+
+    void applyStyle();
 };
 
 #endif // STATUSBARWIDGET_H

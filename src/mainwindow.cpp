@@ -450,6 +450,9 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
     iconBarLayout->setAlignment(Qt::AlignCenter);
     ui->sidebarDrawerLayout->addWidget(iconBar);
 
+    // Hide the bottom panel buttons bar since panels are now tabs in the main tab bar
+    bottomPanelButtons->hide();
+
     // --- Right-side Inspector Drawer ---
     m_inspectorDrawer = new QWidget(this);
     m_inspectorDrawer->setObjectName("inspectorDrawer");
@@ -591,7 +594,7 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
     connect(ui->tabWidget, &QTabWidget::currentChanged, this, &MainWindow::updateStatusBar);
 
     // Bottom panel buttons (replacing QTabBar with SVG icon buttons)
-    addBottomPanelButton(":/icons/search.svg", tr("Search Results"), tr("Search Results") + tr(" (Ctrl+Shift+F)"));
+    addBottomPanelButton(":/icons/search.svg", tr("Search Results"), tr("Search Results") + tr(" (Ctrl+Shift+F)"), true);
     m_panelButtons[0].button->setChecked(true);
 
     // Sidebar connections
@@ -967,19 +970,59 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
     m_gitRebase = new GitRebaseWidget(this);
     bottomPanelStack->addWidget(m_gitRebase);
     m_gitRebase->hide();
-    addBottomPanelButton(":/icons/git.svg", tr("Git Rebase"), tr("Rebase"));
+    addBottomPanelButton(":/icons/git.svg", tr("Git Rebase"), tr("Rebase"), true);
 
     m_taskRunnerUI = new TaskRunnerUI(this);
     bottomPanelStack->addWidget(m_taskRunnerUI);
     m_taskRunnerUI->hide();
-    addBottomPanelButton(":/icons/check.svg", tr("Task Runner"), tr("Tasks"));
+    addBottomPanelButton(":/icons/check.svg", tr("Task Runner"), tr("Tasks"), true);
 
     CodeEditor *currentEditor = getCurrentCodeEditor();
     BookmarkManager *bm = currentEditor ? currentEditor->bookmarkManager() : nullptr;
     m_bookmarkPanel = new BookmarkPanelWidget(bm, this);
     bottomPanelStack->addWidget(m_bookmarkPanel);
     m_bookmarkPanel->hide();
-    addBottomPanelButton(":/icons/file.svg", tr("Bookmarks"), tr("Bookmarks"));
+    addBottomPanelButton(":/icons/file.svg", tr("Bookmarks"), tr("Bookmarks"), true);
+
+    // Connect bookmark panel to active editor (per-tab sync)
+    connect(ui->tabWidget, &QTabWidget::currentChanged, this, [this](int index) {
+        if (index >= 0 && index < ui->tabWidget->count()) {
+            CodeEditor *ce = qobject_cast<CodeEditor*>(ui->tabWidget->widget(index));
+            if (ce) {
+                m_bookmarkPanel->setManager(ce->bookmarkManager());
+            }
+        }
+    });
+
+    // Bookmark panel navigation: open file if needed and go to line
+    connect(m_bookmarkPanel, &BookmarkPanelWidget::bookmarkActivated, this, [this](const QString &filePath, int line) {
+        if (filePath != currentFile) {
+            openFileInTab(filePath);
+        }
+        CodeEditor *editor = getCurrentCodeEditor();
+        if (editor) {
+            QTextBlock block = editor->document()->findBlockByNumber(line);
+            if (block.isValid()) {
+                QTextCursor cursor(block);
+                editor->setTextCursor(cursor);
+                editor->centerCursor();
+            }
+        }
+    });
+    connect(m_bookmarkPanel, &BookmarkPanelWidget::navigateToBookmark, this, [this](const QString &filePath, int line) {
+        if (filePath != currentFile) {
+            openFileInTab(filePath);
+        }
+        CodeEditor *editor = getCurrentCodeEditor();
+        if (editor) {
+            QTextBlock block = editor->document()->findBlockByNumber(line);
+            if (block.isValid()) {
+                QTextCursor cursor(block);
+                editor->setTextCursor(cursor);
+                editor->centerCursor();
+            }
+        }
+    });
 
     // P2: CSS Breadcrumb parser
     m_cssBreadcrumbParser = new CssBreadcrumbParser(this);
@@ -992,14 +1035,14 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
     m_pluginMarketplace = new PluginMarketplaceWidget(m_pluginRegistry, this);
     bottomPanelStack->addWidget(m_pluginMarketplace);
     m_pluginMarketplace->hide();
-    addBottomPanelButton(":/icons/settings.svg", tr("Plugin Marketplace"), tr("Marketplace"));
+    addBottomPanelButton(":/icons/settings.svg", tr("Plugin Marketplace"), tr("Marketplace"), true);
 
     // P3: Theme Marketplace — kept as built-in (no app wrapper yet)
     m_themeMarketplace = new ThemeMarketplaceWidget(this);
     m_themeMarketplace->loadBuiltinThemes();
     bottomPanelStack->addWidget(m_themeMarketplace);
     m_themeMarketplace->hide();
-    addBottomPanelButton(":/icons/theme.svg", tr("Theme Marketplace"), tr("Themes"));
+    addBottomPanelButton(":/icons/theme.svg", tr("Theme Marketplace"), tr("Themes"), true);
 
     // Connect marketplace signals
     connect(m_themeMarketplace, &ThemeMarketplaceWidget::themeInstalled, this, [this](const QString &themeName) {
@@ -1037,6 +1080,12 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
             m_taskRunnerUI->detectTasks(projectPath);
             return;
         }
+        if (command.isEmpty()) return;
+        // Execute via QProcess (no shell, prevents injection)
+        const QStringList parts = command.split(' ', Qt::SkipEmptyParts);
+        if (parts.isEmpty()) return;
+        QProcess *taskProcess = new QProcess(this);
+        taskProcess->start(parts.first(), parts.mid(1));
     });
 
     // Connect notification center to status bar
@@ -1274,7 +1323,7 @@ CodeEditor* MainWindow::getCurrentCodeEditor()
     return qobject_cast<CodeEditor*>(ui->tabWidget->currentWidget());
 }
 
-int MainWindow::addBottomPanelButton(const QString &iconPath, const QString &tooltip, const QString &title)
+int MainWindow::addBottomPanelButton(const QString &iconPath, const QString &tooltip, const QString &title, bool builtin)
 {
     QToolButton *btn = new QToolButton(bottomPanelButtons);
     btn->setIconSize(QSize(18, 18));
@@ -1289,6 +1338,8 @@ int MainWindow::addBottomPanelButton(const QString &iconPath, const QString &too
     entry.button = btn;
     entry.panelIndex = index;
     entry.title = title;
+    entry.builtin = builtin;
+    entry.panelWidget = builtin ? bottomPanelStack->widget(index) : nullptr;
     m_panelButtons.append(entry);
 
     QHBoxLayout *layout = qobject_cast<QHBoxLayout*>(bottomPanelButtons->layout());
@@ -1300,6 +1351,11 @@ int MainWindow::addBottomPanelButton(const QString &iconPath, const QString &too
     connect(btn, &QToolButton::clicked, this, [this, index]() {
         showBottomPanelIndex(index);
     });
+
+    // Also add a tab to the main tab bar for this panel
+    int tabIndex = tabBar->addTab(title);
+    tabBar->setTabData(tabIndex, QString("panel:%1").arg(index));
+    tabBar->setTabButton(tabIndex, QTabBar::RightSide, createTabCloseButton(QString("panel:%1").arg(index)));
 
     return index;
 }
@@ -1314,8 +1370,28 @@ void MainWindow::showBottomPanelIndex(int index)
         m_panelButtons[i].button->setChecked(i == index);
     }
 
+    // If the panel widget was removed (closed tab), re-add it for built-in panels
+    if (m_panelButtons[index].builtin && m_panelButtons[index].panelWidget) {
+        QWidget *widget = m_panelButtons[index].panelWidget;
+        // Remove from current position if already in stack
+        bottomPanelStack->removeWidget(widget);
+        // Insert at the correct index
+        bottomPanelStack->insertWidget(index, widget);
+        m_panelButtons[index].panelWidget = nullptr;
+    }
+
     // QStackedWidget::setCurrentIndex shows the widget at index and hides all others
     bottomPanelStack->setCurrentIndex(index);
+
+    // Show the bottom panel container
+    ui->bottomPanelContainer->show();
+
+    // Also select the corresponding tab in the main tab bar
+    int tabIdx = findPanelTabIndex(index);
+    if (tabIdx >= 0) {
+        QSignalBlocker blocker(tabBar);
+        tabBar->setCurrentIndex(tabIdx);
+    }
 
     onBottomTabChanged(index);
 }
@@ -1336,6 +1412,62 @@ QString MainWindow::bottomPanelButtonTooltip(int index) const
     return QString();
 }
 
+int MainWindow::findPanelTabIndex(int panelIndex) const
+{
+    QString panelId = QString("panel:%1").arg(panelIndex);
+    for (int i = 0; i < tabBar->count(); ++i) {
+        QVariant data = tabBar->tabData(i);
+        if (data.typeId() == QMetaType::QString && data.toString() == panelId) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+void MainWindow::closePanelTab(int panelIndex)
+{
+    int tabIdx = findPanelTabIndex(panelIndex);
+    if (tabIdx >= 0) {
+        tabBar->removeTab(tabIdx);
+    }
+    // Also remove the button from bottom panel buttons
+    if (panelIndex >= 0 && panelIndex < m_panelButtons.size()) {
+        QToolButton *btn = m_panelButtons[panelIndex].button;
+        if (btn) {
+            btn->hide();
+            btn->deleteLater();
+        }
+        // For built-in panels, save the widget reference before removing from stack
+        QWidget *widget = nullptr;
+        if (m_panelButtons[panelIndex].builtin) {
+            widget = bottomPanelStack->widget(panelIndex);
+            if (widget) {
+                bottomPanelStack->removeWidget(widget);
+                widget->hide();
+            }
+        }
+        m_panelButtons[panelIndex].panelWidget = widget;
+        m_panelButtons.removeAt(panelIndex);
+        // Update panelIndex for remaining buttons
+        for (int i = panelIndex; i < m_panelButtons.size(); ++i) {
+            m_panelButtons[i].panelIndex = i;
+        }
+    }
+}
+
+void MainWindow::removePanelTab(int panelIndex)
+{
+    // Remove from bottomPanelStack as well (for plugin panels)
+    if (panelIndex >= 0 && panelIndex < bottomPanelStack->count()) {
+        QWidget *widget = bottomPanelStack->widget(panelIndex);
+        if (widget) {
+            bottomPanelStack->removeWidget(widget);
+            widget->deleteLater();
+        }
+    }
+    closePanelTab(panelIndex);
+}
+
 QPushButton* MainWindow::createTabCloseButton(const QString &filePath)
 {
     QPushButton *closeBtn = new QPushButton();
@@ -1344,6 +1476,15 @@ QPushButton* MainWindow::createTabCloseButton(const QString &filePath)
     closeBtn->setFlat(true);
     closeBtn->setCursor(Qt::ArrowCursor);
     connect(closeBtn, &QPushButton::clicked, this, [this, filePath]() {
+        // Check if it's a panel tab
+        if (filePath.startsWith("panel:")) {
+            bool ok = false;
+            int panelIndex = filePath.mid(6).toInt(&ok);
+            if (ok) {
+                closePanelTab(panelIndex);
+            }
+            return;
+        }
         // Look up the file's index in openFiles by path (not tabBar index)
         for (int i = 0; i < openFiles.size(); ++i) {
             if (openFiles[i].filePath == filePath) {

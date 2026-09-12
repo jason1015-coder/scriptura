@@ -20,6 +20,11 @@ private slots:
     void testGoToBookmark();
     void testNextPreviousBookmarkEmpty();
     void testUniqueIds();
+    // Regression tests for the MANUAL_TEST_LOG fixes
+    void testNextBookmarkScopedToFile();
+    void testPreviousBookmarkScopedToFile();
+    void testNavigateToMovesCaret();
+    void testNavigationWrapsWithinFile();
 };
 
 #endif // TEST_BOOKMARKMANAGER_H
