@@ -11,17 +11,42 @@
 //! Callbacks use C function pointers to notify the C++ side of async events.
 //! The C++ adapter layer translates these callbacks into Qt signals.
 
+//! # Scriptura Rust Backend Library
+//!
+//! Core API for third-party UI shells. All backend services live here
+//! and are exposed via C FFI in `ffi.rs`.
+//!
+//! ## Architecture
+//! - `app.rs`: `ScripturaApp` — owns all services, unified API surface
+//! - `ffi.rs`: C FFI exports (133+ functions)
+//! - Individual modules: standalone backend services
+//!
+//! Third-party UI shells (Qt/C++, web, terminal) link against this
+//! library and call the FFI functions in `rust_backend.h`.
+
 // Many types and functions in this crate are consumed by the C++ side
 // via FFI and appear "unused" to Rust's dead code analysis.
 #![allow(dead_code)]
 
+// Re-export FFI functions for binary target access
+pub use ffi::{rust_app_new, rust_app_free, rust_app_initialize, rust_app_shutdown};
+
+mod app;
 mod archive_extractor;
+mod app_crash;
+mod bookmark_engine;
+mod bracket_engine;
 mod config_validator;
 mod dap;
 mod debug_config;
 mod debug_session;
 mod dependency_resolver;
+mod diff_engine;
+mod edit_engine;
+mod encoding_engine;
+mod emmet_engine;
 mod eventbus;
+mod fold_engine;
 mod framer;
 mod language_registry;
 mod language_server_manager;
@@ -30,18 +55,18 @@ mod permission;
 mod plugin;
 mod plugin_updater;
 mod registry;
+mod search_engine;
+mod session_engine;
 mod service_locator;
+mod snippet_engine;
 mod task_runner;
+mod test_engine;
+mod text_buffer;
 mod updater;
 mod utils;
 mod version_fetcher;
 mod workspace;
-mod diff_engine;
-mod encoding_engine;
 mod blame_engine;
-mod emmet_engine;
-mod session_engine;
-mod test_engine;
 mod ui_actions;
 
 use std::ffi::{CStr, CString};
@@ -53,6 +78,15 @@ pub(crate) fn take_last_error() -> Option<String> {
         static LAST_ERROR: RefCell<Option<String>> = const { RefCell::new(None) };
     }
     LAST_ERROR.with(|e| e.borrow_mut().take())
+}
+
+/// Record an error for later retrieval by the C++ side via rust_last_error().
+pub(crate) fn set_last_error(msg: &str) {
+    use std::cell::RefCell;
+    thread_local! {
+        static LAST_ERROR: RefCell<Option<String>> = const { RefCell::new(None) };
+    }
+    LAST_ERROR.with(|e| *e.borrow_mut() = Some(msg.to_string()));
 }
 
 /// Get the last error message from any Rust backend (thread-local).

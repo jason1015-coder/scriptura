@@ -3,10 +3,15 @@ name = "scriptura-backend"
 version = "0.1.0"
 edition = "2021"
 description = "Rust backend library for Scriptura editor - replaces C++ backend services"
+build = "build.rs"
 
 [lib]
 name = "scriptura_backend"
-crate-type = ["staticlib"]
+crate-type = ["staticlib", "rlib"]
+
+[[bin]]
+name = "scriptura-backend"
+path = "src/main.rs"
 
 [dependencies]
 serde = { version = "1", features = ["derive"] }
@@ -23,3 +28,6 @@ zip = { version = "2", default-features = false, features = ["deflate"] }
 reqwest = { version = "0.12", default-features = false, features = ["blocking", "json", "stream", "rustls-tls"] }
 semver = "1"
 tempfile = "3"
+
+[build-dependencies]
+cc = "1"

@@ -1,22 +1,24 @@
 #include <QTest>
 #include <QFile>
 #include <QDir>
-#include "crashhandler.h"
+#include "rust_backend.h"
 #include "test_crashhandler.h"
 
 void TestCrashHandler::testInstall()
 {
-    // install() sets signal handlers and/or exception filters.
-    // We cannot easily test the platform-specific signal handling, but
-    // we can verify the function doesn't crash.
-    CrashHandler::install();
-    QVERIFY(true);  // reached without crash
+    RustAppCrashHandler *h = rust_app_crash_new();
+    rust_app_crash_install(h);
+    rust_app_crash_free(h);
+    QVERIFY(true);
 }
 
 void TestCrashHandler::testDumpPath()
 {
-    QString path = CrashHandler::dumpPath();
-    QVERIFY(!path.isEmpty());
-    // Must be an absolute path to a temp-like location
-    QVERIFY(QDir::isAbsolutePath(path));
+    RustAppCrashHandler *h = rust_app_crash_new();
+    char *path = rust_app_crash_dump_path(h);
+    QString pathStr = QString::fromUtf8(path);
+    rust_free_string(path);
+    rust_app_crash_free(h);
+    QVERIFY(!pathStr.isEmpty());
+    QVERIFY(QDir::isAbsolutePath(pathStr));
 }

@@ -1,8 +1,9 @@
 #include "bookmarkmanager.h"
+#include "rust_adapter.h"
 #include <QSettings>
+#include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
-#include <QJsonArray>
 #include <QPlainTextEdit>
 #include <QTextCursor>
 #include <QTextBlock>
@@ -10,107 +11,58 @@
 BookmarkManager::BookmarkManager(QObject *parent)
     : QObject(parent)
     , m_editor(nullptr)
-    , m_nextId(1)
-    , m_currentIndex(-1)
+    , m_store(new RustBookmarkStoreAdapter(this))
 {
     loadFromSettings();
 }
 
 int BookmarkManager::toggleBookmark(const QString &filePath, int line, const QString &text)
 {
-    // Check if already bookmarked
-    int existingId = bookmarkAt(filePath, line);
-    if (existingId >= 0) {
-        removeBookmark(existingId);
-        return -1;
-    }
-    
-    // Add new bookmark
-    Bookmark bm;
-    bm.filePath = filePath;
-    bm.line = line;
-    bm.text = text;
-    bm.id = m_nextId++;
-    m_bookmarks.append(bm);
-    
-    saveToSettings();
-    emit bookmarkToggled(bm.id, filePath, line, true);
+    // Rust decides toggle (add or remove) and the returned id.
+    const int id = m_store->toggle(filePath, static_cast<uint32_t>(line), text);
+    emit bookmarkToggled(id, filePath, line, id >= 0);
     emit bookmarksChanged();
-    
-    return bm.id;
+    return id;
 }
 
 void BookmarkManager::removeBookmark(int id)
 {
-    for (int i = 0; i < m_bookmarks.size(); ++i) {
-        if (m_bookmarks[i].id == id) {
-            Bookmark bm = m_bookmarks.takeAt(i);
-            saveToSettings();
-            emit bookmarkToggled(id, bm.filePath, bm.line, false);
-            emit bookmarksChanged();
-            return;
-        }
-    }
+    if (m_store->remove(id))
+        emit bookmarksChanged();
 }
 
 void BookmarkManager::removeAllBookmarks()
 {
-    if (m_bookmarks.isEmpty()) return;
-    
-    m_bookmarks.clear();
-    saveToSettings();
+    if (bookmarkCount() == 0) return;
+    m_store->clear();
     emit bookmarksChanged();
 }
 
 void BookmarkManager::removeAllBookmarksForFile(const QString &filePath)
 {
-    bool changed = false;
-    for (int i = m_bookmarks.size() - 1; i >= 0; --i) {
-        if (m_bookmarks[i].filePath == filePath) {
-            Bookmark bm = m_bookmarks.takeAt(i);
-            emit bookmarkToggled(bm.id, bm.filePath, bm.line, false);
-            changed = true;
-        }
-    }
-    
-    if (changed) {
-        saveToSettings();
-        emit bookmarksChanged();
-    }
+    if (bookmarksForFile(filePath).isEmpty()) return;
+    m_store->clearFile(filePath);
+    emit bookmarksChanged();
 }
 
 void BookmarkManager::nextBookmark()
 {
-    if (m_bookmarks.isEmpty()) return;
-
+    if (bookmarkCount() == 0) return;
     int currentLine = -1;
-    if (m_editor) {
-        currentLine = m_editor->textCursor().blockNumber();
-    }
-
-    int nextIdx = findNextBookmarkIndex(currentLine, m_editorFilePath);
-    if (nextIdx >= 0) {
-        m_currentIndex = nextIdx;
-        const Bookmark &bm = m_bookmarks[nextIdx];
-        emit bookmarkNavigated(bm.id, bm.filePath, bm.line);
-    }
+    if (m_editor) currentLine = m_editor->textCursor().blockNumber();
+    RustBookmarkStoreAdapter::Nav nav;
+    if (m_store->next(m_editorFilePath, currentLine, &nav))
+        navigateToBookmark(nav.id, nav.file, nav.line);
 }
 
 void BookmarkManager::previousBookmark()
 {
-    if (m_bookmarks.isEmpty()) return;
-
+    if (bookmarkCount() == 0) return;
     int currentLine = 0;
-    if (m_editor) {
-        currentLine = m_editor->textCursor().blockNumber();
-    }
-
-    int prevIdx = findPreviousBookmarkIndex(currentLine, m_editorFilePath);
-    if (prevIdx >= 0) {
-        m_currentIndex = prevIdx;
-        const Bookmark &bm = m_bookmarks[prevIdx];
-        emit bookmarkNavigated(bm.id, bm.filePath, bm.line);
-    }
+    if (m_editor) currentLine = m_editor->textCursor().blockNumber();
+    RustBookmarkStoreAdapter::Nav nav;
+    if (m_store->prev(m_editorFilePath, currentLine, &nav))
+        navigateToBookmark(nav.id, nav.file, nav.line);
 }
 
 void BookmarkManager::goToBookmark(int id)
@@ -120,149 +72,80 @@ void BookmarkManager::goToBookmark(int id)
 
 void BookmarkManager::navigateTo(int id)
 {
-    for (int i = 0; i < m_bookmarks.size(); ++i) {
-        if (m_bookmarks[i].id != id)
-            continue;
-
-        m_currentIndex = i;
-        const Bookmark &bm = m_bookmarks[i];
-
-        // Move the caret when the editor is available so the bookmark is
-        // actually visible to the user, not just signalled.
-        if (m_editor) {
-            QTextBlock block = m_editor->document()->findBlockByNumber(bm.line);
-            if (block.isValid()) {
-                QTextCursor cursor(block);
-                cursor.movePosition(QTextCursor::StartOfBlock);
-                m_editor->setTextCursor(cursor);
-            }
-        }
-
-        emit bookmarkNavigated(bm.id, bm.filePath, bm.line);
+    // Rust answers the lookup; Qt moves the caret and emits the signal.
+    const auto all = bookmarks();
+    for (const Bookmark &bm : all) {
+        if (bm.id != id) continue;
+        navigateToBookmark(bm.id, bm.filePath, bm.line);
         return;
     }
 }
 
+void BookmarkManager::navigateToBookmark(int id, const QString &filePath, int line)
+{
+    if (m_editor) {
+        QTextBlock block = m_editor->document()->findBlockByNumber(line);
+        if (block.isValid()) {
+            QTextCursor cursor(block);
+            cursor.movePosition(QTextCursor::StartOfBlock);
+            m_editor->setTextCursor(cursor);
+        }
+    }
+    emit bookmarkNavigated(id, filePath, line);
+}
+
 bool BookmarkManager::isBookmarked(const QString &filePath, int line) const
 {
-    return bookmarkAt(filePath, line) >= 0;
+    return m_store->isBookmarked(filePath, static_cast<uint32_t>(line));
 }
 
 int BookmarkManager::bookmarkAt(const QString &filePath, int line) const
 {
-    for (const Bookmark &bm : m_bookmarks) {
-        if (bm.filePath == filePath && bm.line == line) {
-            return bm.id;
-        }
+    return m_store->bookmarkAt(filePath, static_cast<uint32_t>(line));
+}
+
+QList<Bookmark> BookmarkManager::bookmarks() const
+{
+    QList<Bookmark> result;
+    const QJsonDocument doc = QJsonDocument::fromJson(m_store->toJson().toUtf8());
+    for (const QJsonValue &v : doc.array()) {
+        const QJsonObject o = v.toObject();
+        Bookmark bm;
+        bm.id = o.value("id").toInt(-1);
+        bm.filePath = o.value("file").toString();
+        bm.line = o.value("line").toInt(-1);
+        bm.text = o.value("text").toString();
+        if (bm.id >= 0) result.append(bm);
     }
-    return -1;
+    return result;
 }
 
 QList<Bookmark> BookmarkManager::bookmarksForFile(const QString &filePath) const
 {
     QList<Bookmark> result;
-    for (const Bookmark &bm : m_bookmarks) {
-        if (bm.filePath == filePath) {
-            result.append(bm);
-        }
-    }
+    for (const Bookmark &bm : bookmarks())
+        if (bm.filePath == filePath) result.append(bm);
     return result;
+}
+
+int BookmarkManager::bookmarkCount() const
+{
+    return bookmarks().size();
 }
 
 void BookmarkManager::saveToSettings()
 {
     QSettings settings;
-    QJsonArray arr;
-    
-    for (const Bookmark &bm : m_bookmarks) {
-        QJsonObject obj;
-        obj["filePath"] = bm.filePath;
-        obj["line"] = bm.line;
-        obj["text"] = bm.text;
-        obj["id"] = bm.id;
-        arr.append(obj);
-    }
-    
-    settings.setValue("bookmarks", QJsonDocument(arr).toJson());
+    settings.setValue("bookmarks", m_store->toQtJson().toUtf8());
 }
 
 void BookmarkManager::loadFromSettings()
 {
     QSettings settings;
-    QByteArray data = settings.value("bookmarks").toByteArray();
-    
-    if (data.isEmpty()) return;
-    
-    QJsonDocument doc = QJsonDocument::fromJson(data);
-    QJsonArray arr = doc.array();
-    
-    m_bookmarks.clear();
-    m_nextId = 1;
-    
-    for (const QJsonValue &v : arr) {
-        QJsonObject obj = v.toObject();
-        Bookmark bm;
-        bm.filePath = obj["filePath"].toString();
-        bm.line = obj["line"].toInt();
-        bm.text = obj["text"].toString();
-        bm.id = obj["id"].toInt();
-        m_bookmarks.append(bm);
-        
-        if (bm.id >= m_nextId) {
-            m_nextId = bm.id + 1;
-        }
+    const QByteArray data = settings.value("bookmarks").toByteArray();
+    if (data.isEmpty()) {
+        m_store->clear();
+        return;
     }
-}
-
-int BookmarkManager::generateId() const
-{
-    return m_nextId;
-}
-
-int BookmarkManager::findNextBookmarkIndex(int currentLine, const QString &filePath) const
-{
-    if (m_bookmarks.isEmpty()) return -1;
-
-    // First pass: prefer bookmarks in the same file, strictly after the
-    // current line. Return the first match.
-    for (int i = 0; i < m_bookmarks.size(); ++i) {
-        if (m_bookmarks[i].filePath == filePath && m_bookmarks[i].line > currentLine)
-            return i;
-    }
-
-    // Second pass: same file, wrap to the first bookmark of that file.
-    for (int i = 0; i < m_bookmarks.size(); ++i) {
-        if (m_bookmarks[i].filePath == filePath)
-            return i;
-    }
-
-    // Third pass: fall back to any bookmark (different file).
-    if (!m_bookmarks.isEmpty())
-        return 0;
-
-    return -1;
-}
-
-int BookmarkManager::findPreviousBookmarkIndex(int currentLine, const QString &filePath) const
-{
-    if (m_bookmarks.isEmpty()) return -1;
-
-    // First pass: prefer bookmarks in the same file, strictly before the
-    // current line. Return the last match.
-    int result = -1;
-    for (int i = 0; i < m_bookmarks.size(); ++i) {
-        if (m_bookmarks[i].filePath == filePath && m_bookmarks[i].line < currentLine)
-            result = i;
-    }
-    if (result >= 0)
-        return result;
-
-    // Second pass: same file, wrap to the last bookmark of that file.
-    for (int i = m_bookmarks.size() - 1; i >= 0; --i) {
-        if (m_bookmarks[i].filePath == filePath)
-            return i;
-    }
-
-    // Third pass: fall back to the last bookmark overall.
-    return m_bookmarks.size() - 1;
+    m_store->loadQtJson(QString::fromUtf8(data));
 }

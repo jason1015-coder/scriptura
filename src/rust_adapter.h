@@ -18,6 +18,7 @@
 #include "scriptura_actions.h"
 #include "permission.h"
 #include "plugincrashhandler.h"
+#include "snippetmanager.h"
 
 // ─────────────────────────────────────────────────────────────────────
 //  RustLspClientAdapter — bridges LSP protocol to Qt signals
@@ -541,6 +542,128 @@ private:
     void dispatchCommand(const QJsonObject &cmd);
 
     RustUiActionHandler *m_handler = nullptr;
+};
+
+// ─────────────────────────────────────────────────────────────────────
+//  RustTextBufferAdapter — wraps the Rust-owned editor text buffer and
+//  the pure edit/search engines. Static helpers are stateless calls into
+//  the engines; instance methods operate on the mirror TextBuffer.
+// ─────────────────────────────────────────────────────────────────────
+class RustTextBufferAdapter : public QObject
+{
+    Q_OBJECT
+public:
+    explicit RustTextBufferAdapter(QObject *parent = nullptr);
+    ~RustTextBufferAdapter() override;
+
+    // ── Mirror buffer (Rust-owned text; Qt is view-only) ──
+    void setText(const QString &utf8);
+    QString text() const;
+    quint64 version() const;
+    int lineCount() const;
+    QString line(uint32_t line) const;
+
+    // ── Edit decisions (ports of codeeditor.cpp key handling) ──
+    /// Indent string to insert after Enter for the given line.
+    static QString smartIndent(const QString &lineText, uint32_t tabWidth);
+    /// 0=insert-normal, 1=auto-close, 2=skip-over.
+    static int bracketDecision(const QString &typed, const QString &next, bool hasNext);
+    /// Closing bracket for the typed open bracket/quote (empty if none).
+    static QString bracketClose(const QString &typed);
+    /// Next occurrence of `needle` at/after `fromUtf16` (Qt position space).
+    /// Returns {start,end} and sets `found`.
+    static QPair<qint64, qint64> nextOccurrence(const QString &text, const QString &needle,
+                                                size_t fromUtf16, bool *found);
+    /// All occurrences as JSON [[start,end],...] in UTF-16 space.
+    static QString allOccurrencesJson(const QString &text, const QString &needle);
+
+    // ── Search / fold / bracket / snippet engines ──
+    /// Fuzzy score (>0 match, 0 = no match). Ported universalsearch semantics.
+    static int fuzzyScore(const QString &pattern, const QString &text);
+    /// Fold regions as JSON array [{startLine,endLine,indentLevel,collapsed}].
+    static QString foldRanges(const QString &flatText, bool indentBased);
+    /// Bracket pairs as JSON array [{open,close,depth}] in char offsets.
+    static QString bracketPairs(const QString &flatText);
+    /// Expand a snippet body: JSON {"text":..., "tabStops":[{offset,len}]}.
+    static QString expandSnippet(const QString &body, const QString &filename);
+
+private:
+    RustTextBuffer *m_buffer = nullptr;
+};
+
+// ─────────────────────────────────────────────────────────────────────
+//  RustBookmarkStoreAdapter — wraps the Rust bookmark store.
+//  Rust owns storage/navigation decisions; Qt renders gutter icons.
+// ─────────────────────────────────────────────────────────────────────
+class RustBookmarkStoreAdapter : public QObject
+{
+    Q_OBJECT
+public:
+    explicit RustBookmarkStoreAdapter(QObject *parent = nullptr);
+    ~RustBookmarkStoreAdapter() override;
+
+    struct Nav {
+        int id = -1;
+        QString file;
+        quint32 line = 0;
+        QString text;
+    };
+
+    /// Toggle. Returns the new bookmark id when added, -1 when removed.
+    int toggle(const QString &file, quint32 line, const QString &text);
+    bool remove(int id);
+    void clear();
+    void clearFile(const QString &file);
+    bool isBookmarked(const QString &file, quint32 line) const;
+    int bookmarkAt(const QString &file, quint32 line) const;
+
+    /// Next/prev navigation. Returns false when no target exists.
+    bool next(const QString &file, qint64 currentLine, Nav *out) const;
+    bool prev(const QString &file, qint64 currentLine, Nav *out) const;
+
+    /// All bookmarks as camelCase JSON [{file,line,text,id}].
+    QString toJson() const;
+    /// Legacy Qt QSettings shape [{filePath,line,text,id}].
+    QString toQtJson() const;
+    void loadQtJson(const QString &json);
+
+private:
+    static bool parseNav(const QString &json, Nav *out);
+    RustBookmarkStore *m_store = nullptr;
+};
+
+// ─────────────────────────────────────────────────────────────────────
+//  RustSnippetStoreAdapter — wraps the Rust snippet store.
+//  Rust owns storage/persistence/expansion; Qt keeps the dialog form.
+// ─────────────────────────────────────────────────────────────────────
+class RustSnippetStoreAdapter : public QObject
+{
+    Q_OBJECT
+public:
+    explicit RustSnippetStoreAdapter(QObject *parent = nullptr);
+    ~RustSnippetStoreAdapter() override;
+
+    bool add(const Snippet &snippet);
+    bool update(const Snippet &snippet);
+    bool remove(const QString &id);
+    Snippet get(const QString &id) const;
+    QList<Snippet> all() const;
+    QList<Snippet> forLanguage(const QString &language) const;
+    QStringList prefixes() const;
+    bool hasPrefix(const QString &prefix, const QString &language) const;
+    Snippet findForPrefix(const QString &prefix, const QString &language) const;
+
+    QString save() const;
+    void load(const QString &json);
+    size_t importSnippets(const QString &json);
+
+    /// Substitute $VARS in a snippet body (values supplied by Qt, e.g. dates).
+    static QString substituteVariables(const QString &body, const QVariantMap &vars);
+
+private:
+    static Snippet snippetFromJson(const QString &json);
+    static QString snippetToJson(const Snippet &snippet);
+    RustSnippetStore *m_store = nullptr;
 };
 
 // ─────────────────────────────────────────────────────────────────────

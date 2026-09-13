@@ -56,7 +56,6 @@ private slots:
 private:
     void filterResults(const QString &query);
     void activateItem(QListWidgetItem *item);
-    int fuzzyScore(const QString &pattern, const QString &text) const;
 
     QLineEdit *m_searchField;
     QListWidget *m_listWidget;

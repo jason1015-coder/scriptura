@@ -31,7 +31,11 @@ typedef struct RustLanguageRegistry       RustLanguageRegistry;
 typedef struct RustLanguageServerManager  RustLanguageServerManager;
 typedef struct RustDebugConfigurationManager RustDebugConfigurationManager;
 typedef struct RustPluginCrashHandler     RustPluginCrashHandler;
+typedef struct RustAppCrashHandler        RustAppCrashHandler;
 typedef struct RustUiActionHandler        RustUiActionHandler;
+typedef struct RustTextBuffer             RustTextBuffer;
+typedef struct RustBookmarkStore          RustBookmarkStore;
+typedef struct RustSnippetStore           RustSnippetStore;
 
 /* ── C callback type aliases ───────────────────────────────────── */
 typedef void (*OnStringMessage)(const char* data, void* user_data);
@@ -228,11 +232,19 @@ RustPluginCrashHandler* rust_crash_handler_new(void);
 void                    rust_crash_handler_free(RustPluginCrashHandler* h);
 
 void rust_crash_handler_on_crash(RustPluginCrashHandler* h,
-                                 OnPluginEvent cb, void* user_data);
+                                  OnPluginEvent cb, void* user_data);
 
 void rust_crash_handler_report_crash(RustPluginCrashHandler* h,
-                                     const char* plugin_id,
-                                     const char* error);
+                                      const char* plugin_id,
+                                      const char* error);
+
+/* ══════════════════════════════════════════════════════════════════
+ *  Application Crash Handler
+ * ══════════════════════════════════════════════════════════════════ */
+RustAppCrashHandler* rust_app_crash_new(void);
+void                  rust_app_crash_free(RustAppCrashHandler* h);
+void  rust_app_crash_install(RustAppCrashHandler* h);
+char* rust_app_crash_dump_path(RustAppCrashHandler* h);
 
 /* ══════════════════════════════════════════════════════════════════
  *  Plugin Registry
@@ -432,6 +444,21 @@ void  rust_language_registry_unregister(RustLanguageRegistry* lr,
 char* rust_language_registry_get(RustLanguageRegistry* lr, const char* lang_id);
 char* rust_language_registry_detect(RustLanguageRegistry* lr,
                                     const char* filename);
+char* rust_language_registry_names_json(RustLanguageRegistry* lr);
+/* Full definition of one language as JSON (null if unknown). */
+char* rust_language_registry_definition_json(RustLanguageRegistry* lr,
+                                             const char* lang_id);
+/* JSON array of ALL language definitions, in registration order.
+   Free with rust_free_string(). */
+char* rust_language_registry_all_definitions_json(RustLanguageRegistry* lr);
+/* Register/overwrite a language from a full definition JSON document.
+   Returns true on success; false on parse failure (rust_last_error()). */
+bool  rust_language_registry_register_definition_json(
+    RustLanguageRegistry* lr, const char* definition_json);
+/* Language id for a file path (falls back to "text").
+   Free with rust_free_string(). */
+char* rust_language_registry_language_for_file(RustLanguageRegistry* lr,
+                                               const char* path);
 
 /* ══════════════════════════════════════════════════════════════════
  *  Language Server Manager
@@ -511,6 +538,85 @@ char* rust_ui_actions_handle(RustUiActionHandler* h,
 /* Audit trail of handled actions (most recent last).
  * Free the array with rust_pm_free_strings(). */
 char** rust_ui_actions_log(RustUiActionHandler* h, size_t* out_len);
+
+/* ══════════════════════════════════════════════════════════════════
+ *  Text Buffer — Rust-owned editor text (Qt is view-only)
+ *  Coordinate contract: (line:uint32_t, col_utf16:uint32_t).
+ * ══════════════════════════════════════════════════════════════════ */
+RustTextBuffer* rust_text_buffer_new(void);
+void             rust_text_buffer_free(RustTextBuffer* b);
+void             rust_text_set(RustTextBuffer* b, const char* utf8);
+char*            rust_text_get(const RustTextBuffer* b);
+uint64_t         rust_text_version(const RustTextBuffer* b);
+size_t           rust_text_line_count(const RustTextBuffer* b);
+char*            rust_text_line(const RustTextBuffer* b, uint32_t line);
+void             rust_text_insert(RustTextBuffer* b, uint32_t line,
+                                  uint32_t col_utf16, const char* utf8,
+                                  uint32_t* out_line, uint32_t* out_col);
+char*            rust_text_delete(RustTextBuffer* b,
+                                  uint32_t start_line, uint32_t start_col,
+                                  uint32_t end_line, uint32_t end_col);
+bool             rust_text_undo(RustTextBuffer* b);
+bool             rust_text_redo(RustTextBuffer* b);
+
+/* Edit decisions (ports of codeeditor.cpp key handling). */
+char* rust_edit_smart_indent(const char* line_text, uint32_t tab_width);
+/* 0=insert-normal, 1=auto-close, 2=skip-over. has_next=false means EOL. */
+int32_t rust_edit_bracket_decision(const char* typed_utf8, const char* next_utf8, bool has_next);
+bool rust_edit_bracket_close(const char* typed_utf8, char* out_buf, size_t out_len);
+bool rust_edit_next_occurrence_utf16(const char* text, const char* needle, size_t from_utf16,
+                                     size_t* out_start, size_t* out_end);
+char* rust_edit_all_occurrences_utf16(const char* text, const char* needle);
+int32_t rust_search_fuzzy(const char* pattern, const char* text); /* 0 = no match */
+char* rust_fold_compute(const char* text, bool indent_based);
+char* rust_brackets_compute(const char* text);
+
+/* Bookmark store (Qt renders gutter icons only). */
+RustBookmarkStore* rust_bookmarks_new(void);
+void               rust_bookmarks_free(RustBookmarkStore* s);
+/* Returns id when added, -1 when removed, -2 on null store. */
+int32_t            rust_bookmarks_toggle(RustBookmarkStore* s, const char* file,
+                                         uint32_t line, const char* text);
+char*              rust_bookmarks_json(const RustBookmarkStore* s);
+/* camelCase/legacy-Qt JSON [{filePath,line,text,id}] for QSettings. */
+char*              rust_bookmarks_to_qt_json(const RustBookmarkStore* s);
+void               rust_bookmarks_load_qt_json(RustBookmarkStore* s, const char* json);
+bool               rust_bookmarks_remove(RustBookmarkStore* s, int32_t id);
+void               rust_bookmarks_clear(RustBookmarkStore* s);
+void               rust_bookmarks_clear_file(RustBookmarkStore* s, const char* file);
+bool               rust_bookmarks_is_bookmarked(const RustBookmarkStore* s,
+                                                const char* file, uint32_t line);
+int32_t            rust_bookmarks_at(const RustBookmarkStore* s,
+                                     const char* file, uint32_t line);
+/* Returns JSON bookmark or "null". current_line -1 = start. */
+char*              rust_bookmarks_next(const RustBookmarkStore* s,
+                                       const char* file, int64_t current_line);
+char*              rust_bookmarks_prev(const RustBookmarkStore* s,
+                                       const char* file, int64_t current_line);
+
+/* Snippet store (Qt keeps dialog form only). */
+RustSnippetStore* rust_snippets_new(void);
+void              rust_snippets_free(RustSnippetStore* s);
+/* Returns JSON {"text":..., "tabStops":[{"offset","len"}]} */
+char*             rust_snippet_expand(const char* body, const char* filename);
+
+/* Snippet store management */
+RustSnippetStore* rust_snippet_store_new(void);
+void              rust_snippet_store_free(RustSnippetStore* s);
+bool              rust_snippet_store_add(RustSnippetStore* s, const char* snippet_json);
+bool              rust_snippet_store_update(RustSnippetStore* s, const char* snippet_json);
+bool              rust_snippet_store_remove(RustSnippetStore* s, const char* id);
+char*             rust_snippet_store_get(RustSnippetStore* s, const char* id);
+char**            rust_snippet_store_all(RustSnippetStore* s, size_t* out_len);
+char**            rust_snippet_store_for_language(RustSnippetStore* s, const char* language, size_t* out_len);
+char**            rust_snippet_store_prefixes(RustSnippetStore* s, size_t* out_len);
+bool              rust_snippet_store_has_prefix(RustSnippetStore* s, const char* prefix, const char* language);
+char*             rust_snippet_store_find(RustSnippetStore* s, const char* prefix, const char* language);
+char*             rust_snippet_store_save(RustSnippetStore* s);
+size_t            rust_snippet_store_load(RustSnippetStore* s, const char* json);
+size_t            rust_snippet_store_import(RustSnippetStore* s, const char* json);
+char*             rust_snippet_store_export(RustSnippetStore* s);
+char*             rust_snippet_substitute_variables(const char* body, const char* vars_json);
 
 #ifdef __cplusplus
 } /* extern "C" */

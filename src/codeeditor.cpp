@@ -5,11 +5,14 @@
 #include "snippetmanager.h"
 #include "codelensmanager.h"
 #include "rust_backend.h"
+#include "rust_adapter.h"
 
 #include <cmath>
 #include <QColor>
 #include <QFileInfo>
 #include <QFont>
+#include <QJsonArray>
+#include <QJsonDocument>
 #include <QMouseEvent>
 #include <QKeyEvent>
 #include <QPainter>
@@ -43,15 +46,75 @@ inline QString numberPattern(const QString &suffix = "")
 } // anonymous namespace
 
 // -----------------------------------------------------------------------
-// CodeHighlighter - uses LanguageRegistry for data-driven definitions
+// CodeHighlighter - uses Rust LanguageRegistry for data-driven definitions
 // -----------------------------------------------------------------------
+
+static LanguageDefinition languageDefinitionFromJson(const QJsonObject &o)
+{
+    LanguageDefinition def;
+    auto strList = [](const QJsonValue &v) -> QStringList {
+        QStringList out;
+        for (const QJsonValue &item : v.toArray())
+            out.append(item.toString());
+        return out;
+    };
+    def.name = o.value("name").toString();
+    def.extensions = strList(o.value("extensions"));
+    def.keywords = strList(o.value("keywords"));
+    def.builtins = strList(o.value("builtins"));
+    def.blockCommentStart = o.value("blockCommentStart").toString();
+    def.blockCommentEnd = o.value("blockCommentEnd").toString();
+    def.lineComment = o.value("lineComment").toString();
+    def.hasCStyleComments = o.value("hasCStyleComments").toBool();
+    def.hasHtmlComments = o.value("hasHtmlComments").toBool();
+    def.hasPythonTripleStrings = o.value("hasPythonTripleStrings").toBool();
+    def.hasBracketMatching = o.value("hasBracketMatching").toBool(true);
+    def.stringDelimiters = strList(o.value("stringDelimiters"));
+    if (def.stringDelimiters.isEmpty())
+        def.stringDelimiters = {"\"", "'"};
+    def.multiLineStringDelimiters = strList(o.value("multiLineStringDelimiters"));
+    def.templateStringDelimiter = o.value("templateStringDelimiter").toString();
+    return def;
+}
+
+static RustLanguageRegistry *languageRegistryHandle()
+{
+    static RustLanguageRegistry *g_lr = rust_language_registry_new();
+    return g_lr;
+}
+
+static const LanguageDefinition* languageDefinitionFromRust(const QString &langId)
+{
+    static QMap<QString, LanguageDefinition> cache;
+    if (cache.contains(langId))
+        return &cache[langId];
+
+    RustLanguageRegistry *lr = languageRegistryHandle();
+    QByteArray json(rust_language_registry_definition_json(lr, langId.toUtf8().constData()));
+    if (json.isEmpty())
+        return nullptr;
+    QJsonDocument doc = QJsonDocument::fromJson(json);
+    rust_free_string(json.data());
+    if (!doc.isObject())
+        return nullptr;
+    cache[langId] = languageDefinitionFromJson(doc.object());
+    return &cache[langId];
+}
+
+static QString languageForFileFromRust(const QString &filePath)
+{
+    QByteArray result(rust_language_registry_language_for_file(languageRegistryHandle(), filePath.toUtf8().constData()));
+    if (result.isEmpty())
+        return "text";
+    QString lang = QString::fromUtf8(result);
+    rust_free_string(result.data());
+    return lang;
+}
 
 CodeHighlighter::CodeHighlighter(QTextDocument *parent)
     : QSyntaxHighlighter(parent)
     , m_formatCache(64)  // Cache up to 64 language format sets (covers 2 modes × ~30 languages)
 {
-    // Ensure the LanguageRegistry is populated
-    LanguageRegistry::instance();
     initializeFormats();
     setLanguage("text");
 }
@@ -63,10 +126,10 @@ void CodeHighlighter::setLanguage(const QString &newLanguage)
         return;
 
     m_language = lang;
-    m_langDef = LanguageRegistry::instance().findByName(lang);
+    m_langDef = languageDefinitionFromRust(lang);
 
     if (!m_langDef && lang != "text") {
-        m_langDef = LanguageRegistry::instance().findByName("text");
+        m_langDef = languageDefinitionFromRust("text");
     }
 
     rebuildRules();
@@ -635,6 +698,7 @@ CodeEditor::CodeEditor(QWidget *parent)
     , m_bracketColorizer(new BracketColorizer(this, this))
     , m_bookmarkManager(new BookmarkManager(this))
     , m_snippetManager(new SnippetManager(this))
+    , m_rustBuffer(new RustTextBufferAdapter(this))
 {
     connect(this, &CodeEditor::blockCountChanged, this, &CodeEditor::updateLineNumberAreaWidth);
     connect(this, &CodeEditor::updateRequest, this, &CodeEditor::updateLineNumberArea);
@@ -658,13 +722,40 @@ CodeEditor::CodeEditor(QWidget *parent)
     option.setFlags(option.flags() & ~QTextOption::ShowTabsAndSpaces);
     option.setTabStopDistance(fontMetrics().horizontalAdvance(QLatin1Char(' ')) * 4);
     document()->setDefaultTextOption(option);
+
+    // Rust mirror: keep Rust TextBuffer in sync so it can become the
+    // source of truth. Qt still renders via QTextDocument for now.
+    connect(this, &QPlainTextEdit::textChanged, this, [this]() {
+        syncRustMirror();
+    });
+    syncRustMirror();
+}
+
+CodeEditor::~CodeEditor() = default;
+
+// ── Rust backend mirror ──
+
+void CodeEditor::syncRustMirror()
+{
+    if (!m_rustBuffer || m_rustMirrorSuspended) return;
+    m_rustBuffer->setText(toPlainText());
+}
+
+quint64 CodeEditor::rustVersion() const
+{
+    return m_rustBuffer ? m_rustBuffer->version() : 0;
+}
+
+bool CodeEditor::verifyRustParity() const
+{
+    if (!m_rustBuffer) return false;
+    return m_rustBuffer->text() == toPlainText();
 }
 
 void CodeEditor::setLanguageForFile(const QString &filePath)
 {
     m_filePath = filePath;
-    syntaxHighlighter->setLanguage(
-        LanguageRegistry::instance().languageForFile(filePath));
+    syntaxHighlighter->setLanguage(languageForFileFromRust(filePath));
 
     // Keep the bookmark manager's file scope in sync so navigation stays
     // scoped to the current file.
@@ -1001,30 +1092,41 @@ void CodeEditor::mousePressEvent(QMouseEvent *event)
 void CodeEditor::selectNextOccurrence()
 {
     QTextCursor cursor = textCursor();
-    if (cursor.hasSelection()) {
-        QString selectedText = cursor.selectedText();
-        // Find next occurrence after current selection
-        QTextCursor next = document()->find(selectedText, cursor.selectionEnd());
-        if (!next.isNull()) {
-            m_multiCursor->addCursor(next);
-            setTextCursor(next);
-        }
-    }
+    if (!cursor.hasSelection()) return;
+    // Rust decides the match offsets (UTF-16 Qt position space);
+    // Qt only moves the cursors (drawer role).
+    const QString selectedText = cursor.selectedText().replace(QChar(0x2029), "\n");
+    if (selectedText.isEmpty()) return;
+    const QString flat = toPlainText().replace(QChar(0x2029), "\n");
+    bool found = false;
+    const auto se = RustTextBufferAdapter::nextOccurrence(
+        flat, selectedText, static_cast<size_t>(cursor.selectionEnd()), &found);
+    if (!found) return;
+    QTextCursor next(document());
+    next.setPosition(static_cast<int>(se.first));
+    next.setPosition(static_cast<int>(se.second), QTextCursor::KeepAnchor);
+    if (next.isNull()) return;
+    m_multiCursor->addCursor(next);
+    setTextCursor(next);
 }
 
 void CodeEditor::selectAllOccurrences()
 {
     QTextCursor cursor = textCursor();
     if (!cursor.hasSelection()) return;
-    QString selectedText = cursor.selectedText();
-    QTextCursor searchCursor(document());
-    searchCursor.movePosition(QTextCursor::Start);
-    while (true) {
-        QTextCursor found = document()->find(selectedText, searchCursor);
-        if (found.isNull()) break;
-        m_multiCursor->addCursor(found);
-        searchCursor = found;
-        searchCursor.movePosition(QTextCursor::Right);
+    const QString selectedText = cursor.selectedText().replace(QChar(0x2029), "\n");
+    if (selectedText.isEmpty()) return;
+    const QString flat = toPlainText().replace(QChar(0x2029), "\n");
+    // Rust returns all [[start,end]] in UTF-16 space; Qt only applies them.
+    const QString json = RustTextBufferAdapter::allOccurrencesJson(flat, selectedText);
+    const QJsonDocument doc = QJsonDocument::fromJson(json.toUtf8());
+    for (const QJsonValue &v : doc.array()) {
+        const QJsonArray pair = v.toArray();
+        if (pair.size() < 2) continue;
+        QTextCursor found(document());
+        found.setPosition(pair.at(0).toInt());
+        found.setPosition(pair.at(1).toInt(), QTextCursor::KeepAnchor);
+        if (!found.isNull()) m_multiCursor->addCursor(found);
     }
 }
 
@@ -1064,19 +1166,11 @@ void CodeEditor::handleSmartIndent(QKeyEvent *event)
     QTextCursor cursor = textCursor();
     QTextBlock block = cursor.block();
     QString lineText = block.text();
-    int indent = 0;
-    for (const QChar &c : lineText) {
-        if (c == ' ') indent++;
-        else if (c == '\t') indent += m_tabWidth;
-        else break;
-    }
     if (event->key() == Qt::Key_Return || event->key() == Qt::Key_Enter) {
-        // Check if line ends with { or (
-        QString trimmed = lineText.trimmed();
-        if (trimmed.endsWith('{') || trimmed.endsWith('(') || trimmed.endsWith('[')) {
-            indent += m_tabWidth;
-        }
-        cursor.insertText("\n" + QString(indent, ' '));
+        // Rust decides the indent; Qt only inserts the returned text.
+        const QString indent = RustTextBufferAdapter::smartIndent(
+            lineText, static_cast<uint32_t>(qMax(1, m_tabWidth)));
+        cursor.insertText(indent);
         setTextCursor(cursor);
         event->accept();
     }
@@ -1084,30 +1178,25 @@ void CodeEditor::handleSmartIndent(QKeyEvent *event)
 
 bool CodeEditor::handleBracketAutoClose(QKeyEvent *event)
 {
-    QMap<QChar, QChar> pairs = {{'(', ')'}, {'[', ']'}, {'{', '}'}, {'"', '"'}, {'\'', '\''}};
-    if (event->text().isEmpty() || !pairs.contains(event->text().at(0)))
-        return false;
-    
+    if (event->text().isEmpty()) return false;
+    const QString typed = event->text().at(0);
+
     QTextCursor cursor = textCursor();
-    QChar open = event->text().at(0);
-    QChar close = pairs[open];
-    
-    // For quotes, check if next char is the same quote — skip over it
-    if (open == close) {
-        QChar nextChar = document()->characterAt(cursor.position());
-        if (nextChar == open) {
-            cursor.movePosition(QTextCursor::Right);
-            setTextCursor(cursor);
-            return true;
-        }
+    // Char under caret: QTextDocument::characterAt returns QChar(0x2029)
+    // at block ends; treat that and null as EOL (no next char).
+    QChar qc = document()->characterAt(cursor.position());
+    bool hasNext = !qc.isNull() && qc.unicode() != 0x2029;
+    const int decision = RustTextBufferAdapter::bracketDecision(
+        typed, hasNext ? QString(qc) : QString(), hasNext);
+    if (decision == 2) { // skip-over: move past existing quote
+        cursor.movePosition(QTextCursor::Right);
+        setTextCursor(cursor);
+        return true;
     }
-    
-    // Skip if next character is alphanumeric (don't auto-close before word chars)
-    QChar nextChar = document()->characterAt(cursor.position());
-    if (nextChar.isLetterOrNumber())
-        return false;
-    
-    cursor.insertText(QString(open) + close);
+    if (decision != 1) return false; // Rust says: insert normally
+    // Rust says auto-close. Qt only performs the drawer ops.
+    const QString close = RustTextBufferAdapter::bracketClose(typed);
+    cursor.insertText(typed + close);
     cursor.movePosition(QTextCursor::Left);
     setTextCursor(cursor);
     return true;

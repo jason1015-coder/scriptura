@@ -16,7 +16,7 @@
 #include <QSet>
 #include <QCache>
 #include "multi-cursor.h"
-#include "languageregistry.h"
+#include "language_definition.h"
 #include "gitblame.h"
 #include "codelensmanager.h"
 
@@ -38,6 +38,8 @@ class BracketColorizer;
 class BookmarkManager;
 class SnippetManager;
 struct CodeLensItem;
+class RustTextBufferAdapter;
+class RustBookmarkStoreAdapter;
 
 class CodeHighlighter : public QSyntaxHighlighter
 {
@@ -108,6 +110,7 @@ class CodeEditor : public QPlainTextEdit
     friend class LineNumberArea;
 public:
     CodeEditor(QWidget *parent = nullptr);
+    ~CodeEditor() override;
     void setLanguageForFile(const QString &filePath);
     void setDarkMode(bool dark);
     void setThemeColors(const QColor &keyword, const QColor &string, const QColor &comment,
@@ -160,6 +163,14 @@ public:
     void setBlameData(const QMap<int, BlameLineInfo> &data) { m_blameData = data; lineNumberArea->update(); }
     bool blameEnabled() const { return m_blameEnabled; }
     void setBlameEnabled(bool enabled) { m_blameEnabled = enabled; lineNumberArea->update(); }
+
+    // ── Rust backend (Qt is view-only) ──
+    // Rust owns text/folds/brackets/bookmarks decisions; Qt renders.
+    // m_rustBuffer mirrors the document; m_rustVersion tracks parity.
+    RustTextBufferAdapter *rustBuffer() const { return m_rustBuffer; }
+    quint64 rustVersion() const;
+    // Verify Qt view == Rust source of truth (migration parity check).
+    bool verifyRustParity() const;
 
     // Smart indentation
     void setSmartIndent(bool enabled) { m_smartIndent = enabled; }
@@ -234,6 +245,11 @@ private:
     QMap<int, BlameLineInfo> m_blameData;
     QString m_filePath;
     QList<CodeLensItem> m_codeLensItems;
+
+    // Rust backend mirror (owned). Qt renders; Rust decides.
+    RustTextBufferAdapter *m_rustBuffer = nullptr;
+    bool m_rustMirrorSuspended = false;
+    void syncRustMirror();
 };
 
 class LineNumberArea : public QWidget

@@ -1,10 +1,15 @@
 #include "bracketcolorizer.h"
+#include "rust_adapter.h"
 #include <QPlainTextEdit>
 #include <QTextDocument>
 #include <QTextCursor>
 #include <QTextBlock>
 #include <QTextCharFormat>
 #include <QPainter>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QJsonValue>
 
 BracketColorizer::BracketColorizer(QPlainTextEdit *editor, QObject *parent)
     : QObject(parent)
@@ -25,16 +30,53 @@ void BracketColorizer::updateColors()
         applyExtraSelections();
         return;
     }
-    
+
+    // Rust owns bracket matching. Qt only applies ExtraSelection colors.
     m_pairs.clear();
-    findBracketPairs();
-    
+    {
+        QTextDocument *doc = m_editor->document();
+        QString flat;
+        QVector<int> charToPos;
+        QTextBlock b = doc->begin();
+        bool first = true;
+        while (b.isValid()) {
+            if (!first) {
+                flat += '\n';
+                charToPos.append(b.position() - 1);
+            }
+            first = false;
+            const QString t = b.text();
+            flat += t;
+            for (int i = 0; i < t.size(); ++i)
+                charToPos.append(b.position() + i);
+            b = b.next();
+        }
+        const QString json = RustTextBufferAdapter::bracketPairs(flat);
+        const QJsonDocument jdoc = QJsonDocument::fromJson(json.toUtf8());
+        const QJsonArray arr = jdoc.array();
+        for (const QJsonValue &v : arr) {
+            const QJsonObject o = v.toObject();
+            const int co = o.value("open").toInt(-1);
+            const int cc = o.value("close").toInt(-1);
+            const int depth = o.value("depth").toInt(0);
+            if (co < 0 || cc < 0 || co >= charToPos.size() || cc >= charToPos.size())
+                continue;
+            BracketPair pair;
+            pair.openPos = charToPos.at(co);
+            pair.closePos = charToPos.at(cc);
+            pair.depth = depth;
+            pair.openChar = flat.at(co);
+            pair.closeChar = flat.at(cc);
+            m_pairs.append(pair);
+        }
+    }
+
     // Build ExtraSelections for bracket coloring (avoids conflicts with syntax highlighter)
     m_extraSelections.clear();
-    
+
     for (const BracketPair &pair : m_pairs) {
         QColor color = colorForDepth(pair.depth);
-        
+
         // Color opening bracket
         QTextEdit::ExtraSelection openSel;
         QTextCursor openCursor(m_editor->document());
@@ -44,7 +86,7 @@ void BracketColorizer::updateColors()
         openSel.format.setForeground(color);
         openSel.format.setFontWeight(QFont::Bold);
         m_extraSelections.append(openSel);
-        
+
         // Color closing bracket
         QTextEdit::ExtraSelection closeSel;
         QTextCursor closeCursor(m_editor->document());
@@ -55,7 +97,7 @@ void BracketColorizer::updateColors()
         closeSel.format.setFontWeight(QFont::Bold);
         m_extraSelections.append(closeSel);
     }
-    
+
     applyExtraSelections();
     emit colorsChanged();
 }
@@ -118,132 +160,6 @@ BracketPair BracketColorizer::pairAt(int position) const
     invalid.closePos = -1;
     invalid.depth = -1;
     return invalid;
-}
-
-void BracketColorizer::findBracketPairs()
-{
-    QTextDocument *doc = m_editor->document();
-    if (!doc) return;
-    
-    // Stack-based bracket matching
-    struct BracketInfo {
-        QChar character;
-        int position;
-        int depth;
-    };
-    
-    QList<BracketInfo> stack;
-    int depth = 0;
-    
-    QTextBlock block = doc->begin();
-    while (block.isValid()) {
-        QString text = block.text();
-        int blockStart = block.position();
-        
-        // Simple state tracking for strings and comments
-        bool inString = false;
-        QChar stringChar;
-        bool inLineComment = false;
-        
-        for (int i = 0; i < text.length(); ++i) {
-            QChar c = text.at(i);
-            int pos = blockStart + i;
-            
-            // Skip if in comment or string
-            if (inLineComment) continue;
-            
-            if (c == '\'' || c == '"') {
-                if (!inString) {
-                    inString = true;
-                    stringChar = c;
-                } else if (c == stringChar) {
-                    inString = false;
-                }
-                continue;
-            }
-            
-            if (inString) continue;
-            
-            // Check for line comment
-            if (c == '/' && i + 1 < text.length() && text.at(i + 1) == '/') {
-                inLineComment = true;
-                continue;
-            }
-            
-            // Opening brackets
-            if (c == '(' || c == '[' || c == '{') {
-                BracketInfo info;
-                info.character = c;
-                info.position = pos;
-                info.depth = depth;
-                stack.append(info);
-                depth++;
-            }
-            // Closing brackets
-            else if (c == ')' || c == ']' || c == '}') {
-                if (!stack.isEmpty()) {
-                    BracketInfo last = stack.takeLast();
-                    depth--;
-                    
-                    // Check if brackets match
-                    bool matches = false;
-                    if (last.character == '(' && c == ')') matches = true;
-                    if (last.character == '[' && c == ']') matches = true;
-                    if (last.character == '{' && c == '}') matches = true;
-                    
-                    if (matches) {
-                        BracketPair pair;
-                        pair.openPos = last.position;
-                        pair.closePos = pos;
-                        pair.depth = last.depth;
-                        pair.openChar = last.character;
-                        pair.closeChar = c;
-                        m_pairs.append(pair);
-                    }
-                }
-            }
-        }
-        
-        block = block.next();
-    }
-}
-
-int BracketColorizer::findMatchingBracket(int position, QChar open, QChar close) const
-{
-    QTextDocument *doc = m_editor->document();
-    if (!doc) return -1;
-    
-    QTextCursor cursor(doc);
-    cursor.setPosition(position);
-    
-    // Determine direction based on bracket type
-    bool isClosing = (close != QChar());
-    int direction = isClosing ? -1 : 1;
-    QChar targetOpen = isClosing ? open : close;
-    QChar targetClose = isClosing ? close : open;
-    
-    int depth = 0;
-    
-    while (true) {
-        cursor.movePosition(QTextCursor::Right, QTextCursor::MoveAnchor, direction);
-        
-        if (cursor.atEnd() || cursor.atStart()) {
-            return -1;
-        }
-        
-        QChar c = doc->characterAt(cursor.position());
-        
-        if (c == targetOpen) {
-            depth++;
-        } else if (c == targetClose) {
-            depth--;
-            if (depth == 0) {
-                return cursor.position();
-            }
-        }
-    }
-    
-    return -1;
 }
 
 QColor BracketColorizer::colorForDepth(int depth) const

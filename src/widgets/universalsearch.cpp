@@ -1,4 +1,5 @@
 #include "universalsearch.h"
+#include "rust_adapter.h"
 
 #include <QVBoxLayout>
 #include <QKeyEvent>
@@ -259,9 +260,10 @@ void UniversalSearchPopup::filterResults(const QString &query)
     struct Scored { int index; int score; };
     QVector<Scored> scored;
 
-    // Score all permanent results
+    // Score all permanent results (Rust decides the fuzzy score)
     for (int i = 0; i < m_permanentResults.size(); ++i) {
-        int s = query.isEmpty() ? 1 : fuzzyScore(query.toLower(), m_permanentResults[i].label.toLower());
+        int s = query.isEmpty() ? 1 : RustTextBufferAdapter::fuzzyScore(
+            query.toLower(), m_permanentResults[i].label.toLower());
         if (s > 0)
             scored.append({i, s});
     }
@@ -276,7 +278,7 @@ void UniversalSearchPopup::filterResults(const QString &query)
             for (int r = 0; r < rootRows; ++r) {
                 QModelIndex child = m_fileModel->index(r, 0, rootIdx);
                 QString name = m_fileModel->fileName(child);
-                int s = fuzzyScore(query.toLower(), name.toLower());
+                int s = RustTextBufferAdapter::fuzzyScore(query.toLower(), name.toLower());
                 if (s > 0)
                     files.append({name, m_fileModel->filePath(child), s});
 
@@ -286,7 +288,7 @@ void UniversalSearchPopup::filterResults(const QString &query)
                     for (int s2 = 0; s2 < subRows && s2 < 10; ++s2) {
                         QModelIndex sub = m_fileModel->index(s2, 0, child);
                         QString sn = m_fileModel->fileName(sub);
-                        int ss = fuzzyScore(query.toLower(), sn.toLower());
+                        int ss = RustTextBufferAdapter::fuzzyScore(query.toLower(), sn.toLower());
                         if (ss > 0)
                             files.append({sn, m_fileModel->filePath(sub), ss});
                     }
@@ -348,17 +350,4 @@ void UniversalSearchPopup::activateItem(QListWidgetItem *item)
         if (r.action)
             r.action();
     }
-}
-
-int UniversalSearchPopup::fuzzyScore(const QString &pattern, const QString &text) const
-{
-    int pi = 0, score = 0, last = -1;
-    for (int ti = 0; ti < text.size() && pi < pattern.size(); ++ti) {
-        if (text[ti] == pattern[pi]) {
-            score += (last == ti - 1) ? 3 : 1;
-            last = ti;
-            ++pi;
-        }
-    }
-    return (pi == pattern.size()) ? score : 0;
 }

@@ -4,7 +4,6 @@
 #include <QObject>
 #include <QList>
 #include <QTextBlock>
-#include <QRegularExpression>
 #include <QSet>
 
 class QPlainTextEdit;
@@ -73,25 +72,15 @@ signals:
     void foldStateChanged(int line, bool collapsed);
 
 private:
-    void detectBraceFolds();
-    void detectKeywordFolds();
     void updateHiddenLines();
     void updateBlockVisibility();
     void disconnectDocument();
-    int findMatchingBrace(int line) const;
-    int findMatchingBraceReverse(int line) const;
-    int calculateIndent(const QString &line) const;
 
     QPlainTextEdit *m_editor;
     QTextDocument *m_document = nullptr;
     QString m_editorFilePath;
     QList<FoldRegion> m_regions;
     QSet<int> m_hiddenLines;
-    
-    // Language-specific fold keywords
-    QRegularExpression m_foldStartPattern;
-    QRegularExpression m_foldEndPattern;
-    bool m_useBraceFolding;
 };
 
 #endif // FOLDMANAGER_H

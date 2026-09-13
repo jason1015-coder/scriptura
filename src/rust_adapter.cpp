@@ -9,6 +9,7 @@
 #include <QTextStream>
 #include <QStandardPaths>
 #include <QDateTime>
+#include <QVariantMap>
 #include <QtConcurrent/QtConcurrent>
 #include <QFutureWatcher>
 
@@ -1495,4 +1496,422 @@ void RustBackend::destroyInstance()
 {
     delete s_instance;
     s_instance = nullptr;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  RustTextBufferAdapter
+// ═══════════════════════════════════════════════════════════════════════
+
+namespace {
+
+/// RAII guard for strings returned by the Rust FFI.
+struct RustStr
+{
+    explicit RustStr(char *s) : m_s(s) {}
+    ~RustStr() { if (m_s) rust_free_string(m_s); }
+    RustStr(const RustStr&) = delete;
+    RustStr& operator=(const RustStr&) = delete;
+    bool isNull() const { return m_s == nullptr; }
+    QString value() const { return m_s ? QString::fromUtf8(m_s) : QString(); }
+private:
+    char *m_s;
+};
+
+Snippet snippetFromJsonObj(const QJsonObject &o)
+{
+    Snippet s;
+    s.id = o.value("id").toString();
+    s.name = o.value("name").toString();
+    s.prefix = o.value("prefix").toString();
+    s.body = o.value("body").toString();
+    s.description = o.value("description").toString();
+    s.language = o.value("language").toString();
+    s.tabStops = o.value("tabStops").toInt(0);
+    return s;
+}
+
+QJsonObject snippetToJsonObj(const Snippet &s)
+{
+    QJsonObject o;
+    o.insert("id", s.id);
+    o.insert("name", s.name);
+    o.insert("prefix", s.prefix);
+    o.insert("body", s.body);
+    o.insert("description", s.description);
+    o.insert("language", s.language);
+    o.insert("tabStops", s.tabStops);
+    return o;
+}
+
+} // anonymous namespace
+
+RustTextBufferAdapter::RustTextBufferAdapter(QObject *parent)
+    : QObject(parent)
+    , m_buffer(rust_text_buffer_new())
+{
+}
+
+RustTextBufferAdapter::~RustTextBufferAdapter()
+{
+    if (m_buffer)
+        rust_text_buffer_free(m_buffer);
+}
+
+void RustTextBufferAdapter::setText(const QString &utf8)
+{
+    if (!m_buffer) return;
+    const QByteArray bytes = utf8.toUtf8();
+    rust_text_set(m_buffer, bytes.constData());
+}
+
+QString RustTextBufferAdapter::text() const
+{
+    if (!m_buffer) return QString();
+    RustStr s(rust_text_get(m_buffer));
+    return s.value();
+}
+
+quint64 RustTextBufferAdapter::version() const
+{
+    return m_buffer ? rust_text_version(m_buffer) : 0;
+}
+
+int RustTextBufferAdapter::lineCount() const
+{
+    return m_buffer ? static_cast<int>(rust_text_line_count(m_buffer)) : 0;
+}
+
+QString RustTextBufferAdapter::line(uint32_t line) const
+{
+    if (!m_buffer) return QString();
+    RustStr s(rust_text_line(m_buffer, line));
+    return s.value();
+}
+
+QString RustTextBufferAdapter::smartIndent(const QString &lineText, uint32_t tabWidth)
+{
+    const QByteArray bytes = lineText.toUtf8();
+    RustStr s(rust_edit_smart_indent(bytes.constData(), tabWidth));
+    return s.value();
+}
+
+int RustTextBufferAdapter::bracketDecision(const QString &typed, const QString &next, bool hasNext)
+{
+    const QByteArray typedBytes = typed.toUtf8();
+    const QByteArray nextBytes = next.toUtf8();
+    return rust_edit_bracket_decision(typedBytes.constData(),
+                                      nextBytes.constData(), hasNext);
+}
+
+QString RustTextBufferAdapter::bracketClose(const QString &typed)
+{
+    const QByteArray bytes = typed.toUtf8();
+    char out[8] = {0};
+    if (rust_edit_bracket_close(bytes.constData(), out, sizeof(out)))
+        return QString::fromUtf8(out);
+    return QString();
+}
+
+QPair<qint64, qint64> RustTextBufferAdapter::nextOccurrence(
+    const QString &text, const QString &needle, size_t fromUtf16, bool *found)
+{
+    if (found) *found = false;
+    const QByteArray textBytes = text.toUtf8();
+    const QByteArray needleBytes = needle.toUtf8();
+    size_t start = 0, end = 0;
+    if (!rust_edit_next_occurrence_utf16(textBytes.constData(), needleBytes.constData(),
+                                         fromUtf16, &start, &end))
+        return {-1, -1};
+    if (found) *found = true;
+    return {static_cast<qint64>(start), static_cast<qint64>(end)};
+}
+
+QString RustTextBufferAdapter::allOccurrencesJson(const QString &text, const QString &needle)
+{
+    const QByteArray textBytes = text.toUtf8();
+    const QByteArray needleBytes = needle.toUtf8();
+    RustStr s(rust_edit_all_occurrences_utf16(textBytes.constData(), needleBytes.constData()));
+    return s.isNull() ? QStringLiteral("[]") : s.value();
+}
+
+int RustTextBufferAdapter::fuzzyScore(const QString &pattern, const QString &text)
+{
+    const QByteArray pBytes = pattern.toUtf8();
+    const QByteArray tBytes = text.toUtf8();
+    return static_cast<int>(rust_search_fuzzy(pBytes.constData(), tBytes.constData()));
+}
+
+QString RustTextBufferAdapter::foldRanges(const QString &flatText, bool indentBased)
+{
+    const QByteArray bytes = flatText.toUtf8();
+    RustStr s(rust_fold_compute(bytes.constData(), indentBased ? 1 : 0));
+    return s.isNull() ? QStringLiteral("[]") : s.value();
+}
+
+QString RustTextBufferAdapter::bracketPairs(const QString &flatText)
+{
+    const QByteArray bytes = flatText.toUtf8();
+    RustStr s(rust_brackets_compute(bytes.constData()));
+    return s.isNull() ? QStringLiteral("[]") : s.value();
+}
+
+QString RustTextBufferAdapter::expandSnippet(const QString &body, const QString &filename)
+{
+    const QByteArray bodyBytes = body.toUtf8();
+    const QByteArray fileBytes = filename.toUtf8();
+    RustStr s(rust_snippet_expand(bodyBytes.constData(), fileBytes.constData()));
+    return s.isNull() ? QStringLiteral("{}") : s.value();
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  RustBookmarkStoreAdapter
+// ═══════════════════════════════════════════════════════════════════════
+
+RustBookmarkStoreAdapter::RustBookmarkStoreAdapter(QObject *parent)
+    : QObject(parent)
+    , m_store(rust_bookmarks_new())
+{
+}
+
+RustBookmarkStoreAdapter::~RustBookmarkStoreAdapter()
+{
+    if (m_store)
+        rust_bookmarks_free(m_store);
+}
+
+int RustBookmarkStoreAdapter::toggle(const QString &file, quint32 line, const QString &text)
+{
+    if (!m_store) return -2;
+    const QByteArray fileBytes = file.toUtf8();
+    const QByteArray textBytes = text.toUtf8();
+    return rust_bookmarks_toggle(m_store, fileBytes.constData(), line, textBytes.constData());
+}
+
+bool RustBookmarkStoreAdapter::remove(int id)
+{
+    return m_store && rust_bookmarks_remove(m_store, id);
+}
+
+void RustBookmarkStoreAdapter::clear()
+{
+    if (m_store) rust_bookmarks_clear(m_store);
+}
+
+void RustBookmarkStoreAdapter::clearFile(const QString &file)
+{
+    if (!m_store) return;
+    const QByteArray fileBytes = file.toUtf8();
+    rust_bookmarks_clear_file(m_store, fileBytes.constData());
+}
+
+bool RustBookmarkStoreAdapter::isBookmarked(const QString &file, quint32 line) const
+{
+    if (!m_store) return false;
+    const QByteArray fileBytes = file.toUtf8();
+    return rust_bookmarks_is_bookmarked(m_store, fileBytes.constData(), line);
+}
+
+int RustBookmarkStoreAdapter::bookmarkAt(const QString &file, quint32 line) const
+{
+    if (!m_store) return -1;
+    const QByteArray fileBytes = file.toUtf8();
+    return rust_bookmarks_at(m_store, fileBytes.constData(), line);
+}
+
+bool RustBookmarkStoreAdapter::parseNav(const QString &json, Nav *out)
+{
+    const QJsonDocument doc = QJsonDocument::fromJson(json.toUtf8());
+    if (!doc.isObject()) return false;
+    const QJsonObject o = doc.object();
+    if (o.isEmpty() || o.value("id").isNull()) return false;
+    if (out) {
+        out->id = o.value("id").toInt(-1);
+        out->file = o.value("file").toString();
+        out->line = static_cast<quint32>(o.value("line").toInt(0));
+        out->text = o.value("text").toString();
+    }
+    return true;
+}
+
+bool RustBookmarkStoreAdapter::next(const QString &file, qint64 currentLine, Nav *out) const
+{
+    if (!m_store) return false;
+    const QByteArray fileBytes = file.toUtf8();
+    RustStr s(rust_bookmarks_next(m_store, fileBytes.constData(), currentLine));
+    return parseNav(s.value(), out);
+}
+
+bool RustBookmarkStoreAdapter::prev(const QString &file, qint64 currentLine, Nav *out) const
+{
+    if (!m_store) return false;
+    const QByteArray fileBytes = file.toUtf8();
+    RustStr s(rust_bookmarks_prev(m_store, fileBytes.constData(), currentLine));
+    return parseNav(s.value(), out);
+}
+
+QString RustBookmarkStoreAdapter::toJson() const
+{
+    if (!m_store) return QStringLiteral("[]");
+    RustStr s(rust_bookmarks_json(m_store));
+    return s.isNull() ? QStringLiteral("[]") : s.value();
+}
+
+QString RustBookmarkStoreAdapter::toQtJson() const
+{
+    if (!m_store) return QStringLiteral("[]");
+    RustStr s(rust_bookmarks_to_qt_json(m_store));
+    return s.isNull() ? QStringLiteral("[]") : s.value();
+}
+
+void RustBookmarkStoreAdapter::loadQtJson(const QString &json)
+{
+    if (!m_store) return;
+    const QByteArray bytes = json.toUtf8();
+    rust_bookmarks_load_qt_json(m_store, bytes.constData());
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  RustSnippetStoreAdapter
+// ═══════════════════════════════════════════════════════════════════════
+
+RustSnippetStoreAdapter::RustSnippetStoreAdapter(QObject *parent)
+    : QObject(parent)
+    , m_store(rust_snippet_store_new())
+{
+}
+
+RustSnippetStoreAdapter::~RustSnippetStoreAdapter()
+{
+    if (m_store)
+        rust_snippet_store_free(m_store);
+}
+
+Snippet RustSnippetStoreAdapter::snippetFromJson(const QString &json)
+{
+    const QJsonDocument doc = QJsonDocument::fromJson(json.toUtf8());
+    return snippetFromJsonObj(doc.object());
+}
+
+QString RustSnippetStoreAdapter::snippetToJson(const Snippet &snippet)
+{
+    return QString::fromUtf8(
+        QJsonDocument(snippetToJsonObj(snippet)).toJson(QJsonDocument::Compact));
+}
+
+bool RustSnippetStoreAdapter::add(const Snippet &snippet)
+{
+    if (!m_store) return false;
+    const QByteArray bytes = snippetToJson(snippet).toUtf8();
+    return rust_snippet_store_add(m_store, bytes.constData());
+}
+
+bool RustSnippetStoreAdapter::update(const Snippet &snippet)
+{
+    if (!m_store) return false;
+    const QByteArray bytes = snippetToJson(snippet).toUtf8();
+    return rust_snippet_store_update(m_store, bytes.constData());
+}
+
+bool RustSnippetStoreAdapter::remove(const QString &id)
+{
+    if (!m_store) return false;
+    const QByteArray bytes = id.toUtf8();
+    return rust_snippet_store_remove(m_store, bytes.constData());
+}
+
+Snippet RustSnippetStoreAdapter::get(const QString &id) const
+{
+    if (!m_store) return Snippet{};
+    const QByteArray bytes = id.toUtf8();
+    RustStr s(rust_snippet_store_get(m_store, bytes.constData()));
+    return s.isNull() ? Snippet{} : snippetFromJson(s.value());
+}
+
+QList<Snippet> RustSnippetStoreAdapter::all() const
+{
+    QList<Snippet> out;
+    if (!m_store) return out;
+    size_t len = 0;
+    char **strs = rust_snippet_store_all(m_store, &len);
+    for (size_t i = 0; i < len; ++i)
+        out.append(snippetFromJson(QString::fromUtf8(strs[i])));
+    if (strs) rust_pm_free_strings(strs, len);
+    return out;
+}
+
+QList<Snippet> RustSnippetStoreAdapter::forLanguage(const QString &language) const
+{
+    QList<Snippet> out;
+    if (!m_store) return out;
+    const QByteArray bytes = language.toUtf8();
+    size_t len = 0;
+    char **strs = rust_snippet_store_for_language(m_store, bytes.constData(), &len);
+    for (size_t i = 0; i < len; ++i)
+        out.append(snippetFromJson(QString::fromUtf8(strs[i])));
+    if (strs) rust_pm_free_strings(strs, len);
+    return out;
+}
+
+QStringList RustSnippetStoreAdapter::prefixes() const
+{
+    QStringList out;
+    if (!m_store) return out;
+    size_t len = 0;
+    char **strs = rust_snippet_store_prefixes(m_store, &len);
+    for (size_t i = 0; i < len; ++i)
+        out.append(QString::fromUtf8(strs[i]));
+    if (strs) rust_pm_free_strings(strs, len);
+    return out;
+}
+
+bool RustSnippetStoreAdapter::hasPrefix(const QString &prefix, const QString &language) const
+{
+    if (!m_store) return false;
+    const QByteArray pBytes = prefix.toUtf8();
+    const QByteArray lBytes = language.toUtf8();
+    return rust_snippet_store_has_prefix(m_store, pBytes.constData(), lBytes.constData());
+}
+
+Snippet RustSnippetStoreAdapter::findForPrefix(const QString &prefix, const QString &language) const
+{
+    if (!m_store) return Snippet{};
+    const QByteArray pBytes = prefix.toUtf8();
+    const QByteArray lBytes = language.toUtf8();
+    RustStr s(rust_snippet_store_find(m_store, pBytes.constData(), lBytes.constData()));
+    return s.isNull() ? Snippet{} : snippetFromJson(s.value());
+}
+
+QString RustSnippetStoreAdapter::save() const
+{
+    if (!m_store) return QStringLiteral("[]");
+    RustStr s(rust_snippet_store_save(m_store));
+    return s.isNull() ? QStringLiteral("[]") : s.value();
+}
+
+void RustSnippetStoreAdapter::load(const QString &json)
+{
+    if (!m_store) return;
+    const QByteArray bytes = json.toUtf8();
+    rust_snippet_store_load(m_store, bytes.constData());
+}
+
+size_t RustSnippetStoreAdapter::importSnippets(const QString &json)
+{
+    if (!m_store) return 0;
+    const QByteArray bytes = json.toUtf8();
+    return rust_snippet_store_import(m_store, bytes.constData());
+}
+
+QString RustSnippetStoreAdapter::substituteVariables(const QString &body, const QVariantMap &vars)
+{
+    // Rust expects an array of [key, value] pairs.
+    QJsonArray pairs;
+    for (auto it = vars.constBegin(); it != vars.constEnd(); ++it) {
+        pairs.append(QJsonArray{ it.key(), it.value().toString() });
+    }
+    const QByteArray bodyBytes = body.toUtf8();
+    const QByteArray varsBytes = QString::fromUtf8(
+        QJsonDocument(pairs).toJson(QJsonDocument::Compact)).toUtf8();
+    RustStr s(rust_snippet_substitute_variables(bodyBytes.constData(), varsBytes.constData()));
+    return s.isNull() ? body : s.value();
 }

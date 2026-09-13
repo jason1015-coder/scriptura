@@ -43,7 +43,7 @@ The backend services are compiled into a static library (`libscriptura_backend.a
 
 **Editor core (`src/codeeditor.*`, `src/mainwindow_tabs.cpp`)**
 - Project workflow: open project / file-tree (`QFileSystemModel`) / expand-collapse / tabbed editing / save / save-as / recent projects-files / auto-save
-- Syntax highlighting (`CodeHighlighter` + `languageregistry.*`), line numbers, current-line, indent guides, `LargeFileHandler`, `EncodingManager` (detect / BOM / LF-CRLF), smart-indent + bracket auto-close
+- Syntax highlighting (`CodeHighlighter` + Rust `language_registry`), line numbers, current-line, indent guides, `LargeFileHandler`, `EncodingManager` (detect / BOM / LF-CRLF), smart-indent + bracket auto-close
 - Per-tab `Minimap` + `Breadcrumb` + `BreadcrumbBarWidget` + `CssBreadcrumbParser` (html / css / scss / xml / svg)
 - `FoldManager`, `BracketColorizer`, `MultiCursorManager` (`Ctrl+D`, above / below), `ColumnSelection`, `SnippetManager` + editor dialog, `BookmarkManager` + `BookmarkPanelWidget`, inlay-hints, ghost-text infra, `CodeLensManager`, `RefactoringManager`, `CodeActionController`
 

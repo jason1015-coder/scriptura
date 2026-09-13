@@ -51,8 +51,6 @@ signals:
     void colorsChanged();
 
 private:
-    void findBracketPairs();
-    int findMatchingBracket(int position, QChar open, QChar close) const;
     QColor colorForDepth(int depth) const;
     void applyExtraSelections();
     

@@ -30,6 +30,7 @@ pub type OnPluginEvent = extern "C" fn(*const c_char, *const c_char, *mut c_void
 /// Callback: (const char* task_id, int current, int total, void* user_data)
 pub type OnProgress = extern "C" fn(*const c_char, i32, i32, *mut c_void);
 
+use crate::app::ScripturaApp;
 use crate::lsp::LspClient;
 use crate::dap::DapClient;
 use crate::debug_session::DebugSession;
@@ -37,6 +38,7 @@ use crate::debug_config::DebugConfigurationManager;
 use crate::eventbus::EventBus;
 use crate::plugin::PluginManager;
 use crate::plugin::PluginCrashHandler;
+use crate::app_crash::AppCrashHandler;
 use crate::registry::PluginRegistry;
 use crate::service_locator::ServiceLocator;
 use crate::dependency_resolver::DependencyResolver;
@@ -52,6 +54,9 @@ use crate::framer::LengthPrefixedFramer;
 use crate::language_registry::LanguageRegistry;
 use crate::language_server_manager::LanguageServerManager;
 use crate::ui_actions::UiActionHandler;
+use crate::text_buffer::TextBuffer;
+use crate::bookmark_engine::BookmarkStore;
+use crate::snippet_engine::SnippetStore;
 
 // ── Opaque handle types ─────────────────────────────────────────────
 // These are the types that C++ sees as pointers. Rust never dereferences
@@ -78,7 +83,12 @@ pub enum RustLanguageRegistry {}
 pub enum RustLanguageServerManager {}
 pub enum RustDebugConfigurationManager {}
 pub enum RustPluginCrashHandler {}
+pub enum RustAppCrashHandler {}
 pub enum RustUiActionHandler {}
+pub enum RustTextBuffer {}
+pub enum RustBookmarkStore {}
+pub enum RustSnippetStore {}
+pub enum RustScripturaApp {}
 
 // ── Helper macros ────────────────────────────────────────────────────
 
@@ -103,7 +113,7 @@ macro_rules! make_free {
 }
 
 /// Helper to convert a raw c_char pointer to a Rust &str.
-unsafe fn ptr_to_str<'a>(ptr: *const c_char) -> &'a str {
+pub(crate) unsafe fn ptr_to_str<'a>(ptr: *const c_char) -> &'a str {
     crate::cstr_to_str(ptr)
 }
 
@@ -1297,6 +1307,61 @@ pub extern "C" fn rust_language_registry_detect(
     result.map(crate::str_to_cstring).unwrap_or(std::ptr::null_mut())
 }
 
+/// Return a JSON array of all registered language names.
+#[no_mangle]
+pub extern "C" fn rust_language_registry_names_json(
+    lr: *mut RustLanguageRegistry,
+) -> *mut c_char {
+    let reg = unsafe { &*(lr as *mut LanguageRegistry) };
+    let names: Vec<String> = reg.languages();
+    crate::str_to_cstring(&serde_json::to_string(&names).unwrap_or_default())
+}
+
+/// Full definition of one language as JSON (null if unknown).
+#[no_mangle]
+pub extern "C" fn rust_language_registry_definition_json(
+    lr: *mut RustLanguageRegistry, lang_id: *const c_char,
+) -> *mut c_char {
+    let reg = unsafe { &*(lr as *mut LanguageRegistry) };
+    reg.definition_json(unsafe { ptr_to_str(lang_id) })
+        .map(|s| crate::str_to_cstring(&s))
+        .unwrap_or(std::ptr::null_mut())
+}
+
+/// JSON array of ALL language definitions, in registration order.
+#[no_mangle]
+pub extern "C" fn rust_language_registry_all_definitions_json(
+    lr: *mut RustLanguageRegistry,
+) -> *mut c_char {
+    let reg = unsafe { &*(lr as *mut LanguageRegistry) };
+    crate::str_to_cstring(&reg.definitions_json())
+}
+
+/// Register/overwrite a language from a full definition JSON document.
+/// Returns true on success; false on parse failure (see rust_last_error()).
+#[no_mangle]
+pub extern "C" fn rust_language_registry_register_definition_json(
+    lr: *mut RustLanguageRegistry, definition_json: *const c_char,
+) -> bool {
+    let reg = unsafe { &mut *(lr as *mut LanguageRegistry) };
+    match reg.register_definition_json(unsafe { ptr_to_str(definition_json) }) {
+        Ok(()) => true,
+        Err(e) => {
+            crate::set_last_error(&e);
+            false
+        }
+    }
+}
+
+/// Language id for a file path (falls back to "text").
+#[no_mangle]
+pub extern "C" fn rust_language_registry_language_for_file(
+    lr: *mut RustLanguageRegistry, path: *const c_char,
+) -> *mut c_char {
+    let reg = unsafe { &*(lr as *mut LanguageRegistry) };
+    crate::str_to_cstring(&reg.language_for_file(unsafe { ptr_to_str(path) }))
+}
+
 // ═══════════════════════════════════════════════════════════════════════
 //  Language Server Manager
 // ═══════════════════════════════════════════════════════════════════════
@@ -1599,4 +1664,668 @@ pub extern "C" fn rust_ui_actions_log(
     let ptr = arr.as_mut_ptr();
     mem::forget(arr);
     ptr
+}
+
+#[no_mangle]
+pub extern "C" fn rust_text_buffer_new() -> *mut RustTextBuffer {
+    Box::into_raw(Box::new(TextBuffer::new())) as *mut RustTextBuffer
+}
+
+#[no_mangle]
+pub extern "C" fn rust_text_buffer_free(p: *mut RustTextBuffer) {
+    if !p.is_null() {
+        unsafe { let _ = Box::from_raw(p as *mut TextBuffer); }
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn rust_text_set(b: *mut RustTextBuffer, s: *const c_char) {
+    if b.is_null() { return; }
+    unsafe { (&mut *(b as *mut TextBuffer)).set_text(ptr_to_str(s)); }
+}
+
+#[no_mangle]
+pub extern "C" fn rust_text_get(b: *const RustTextBuffer) -> *mut c_char {
+    if b.is_null() { return crate::str_to_cstring(""); }
+    let s = unsafe { (&*(b as *const TextBuffer)).text() }.to_string();
+    crate::str_to_cstring(&s)
+}
+
+#[no_mangle]
+pub extern "C" fn rust_text_version(b: *const RustTextBuffer) -> u64 {
+    if b.is_null() { return 0; }
+    unsafe { (&*(b as *const TextBuffer)).version() }
+}
+
+#[no_mangle]
+pub extern "C" fn rust_text_line_count(b: *const RustTextBuffer) -> usize {
+    if b.is_null() { return 1; }
+    unsafe { (&*(b as *const TextBuffer)).line_count() }
+}
+
+#[no_mangle]
+pub extern "C" fn rust_text_line(b: *const RustTextBuffer, l: u32) -> *mut c_char {
+    if b.is_null() { return crate::str_to_cstring(""); }
+    let s = unsafe { (&*(b as *const TextBuffer)).line_text(l as usize) };
+    crate::str_to_cstring(&s)
+}
+
+#[no_mangle]
+pub extern "C" fn rust_text_insert(
+    b: *mut RustTextBuffer, line: u32, col: u32,
+    s: *const c_char, ol: *mut u32, oc: *mut u32,
+) {
+    if b.is_null() { return; }
+    let t = unsafe { ptr_to_str(s) }.to_string();
+    let (l, c) = unsafe { (&mut *(b as *mut TextBuffer)).insert(line, col, &t) };
+    if !ol.is_null() { unsafe { *ol = l; } }
+    if !oc.is_null() { unsafe { *oc = c; } }
+}
+
+#[no_mangle]
+pub extern "C" fn rust_text_delete(
+    b: *mut RustTextBuffer, sl: u32, sc: u32, el: u32, ec: u32,
+) -> *mut c_char {
+    if b.is_null() { return crate::str_to_cstring(""); }
+    let d = unsafe { (&mut *(b as *mut TextBuffer)).delete_range(sl, sc, el, ec) };
+    crate::str_to_cstring(&d)
+}
+
+#[no_mangle]
+pub extern "C" fn rust_text_undo(b: *mut RustTextBuffer) -> bool {
+    if b.is_null() { return false; }
+    unsafe { (&mut *(b as *mut TextBuffer)).undo() }
+}
+
+#[no_mangle]
+pub extern "C" fn rust_text_redo(b: *mut RustTextBuffer) -> bool {
+    if b.is_null() { return false; }
+    unsafe { (&mut *(b as *mut TextBuffer)).redo() }
+}
+
+#[no_mangle]
+pub extern "C" fn rust_edit_smart_indent(
+    line_text: *const c_char, tab_width: u32,
+) -> *mut c_char {
+    let t = unsafe { ptr_to_str(line_text) }.to_string();
+    let s = crate::edit_engine::smart_indent_insert(&t, tab_width as usize);
+    crate::str_to_cstring(&s)
+}
+
+#[no_mangle]
+pub extern "C" fn rust_edit_bracket_decision(
+    typed_utf8: *const c_char, next_utf8: *const c_char, has_next: bool,
+) -> i32 {
+    // Returns: 0 = insert-normal, 1 = auto-close, 2 = skip-over.
+    let t = unsafe { ptr_to_str(typed_utf8) }.chars().next().unwrap_or('\0');
+    let n: Option<char> = if !has_next { None }
+    else { unsafe { ptr_to_str(next_utf8) }.chars().next() };
+    match crate::edit_engine::bracket_decision(t, n) {
+        crate::edit_engine::BracketDecision::InsertNormal => 0,
+        crate::edit_engine::BracketDecision::AutoClose { .. } => 1,
+        crate::edit_engine::BracketDecision::SkipOver => 2,
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn rust_edit_bracket_close(
+    typed_utf8: *const c_char, out_buf: *mut c_char, out_len: usize,
+) -> bool {
+    let t = unsafe { ptr_to_str(typed_utf8) }.chars().next().unwrap_or('\0');
+    let close = match t {
+        '(' => ')', '[' => ']', '{' => '}', '"' => '"', '\'' => '\'',
+        _ => return false,
+    };
+    let s = close.to_string();
+    let bytes = s.as_bytes();
+    if out_buf.is_null() || out_len < bytes.len() + 1 { return false; }
+    unsafe {
+        std::ptr::copy_nonoverlapping(bytes.as_ptr(), out_buf as *mut u8, bytes.len());
+        *(out_buf.add(bytes.len())) = 0;
+    }
+    true
+}
+
+/// Next occurrence in UTF-16 (Qt document position) space.
+/// Returns true + sets out_start/out_end on hit.
+#[no_mangle]
+pub extern "C" fn rust_edit_next_occurrence_utf16(
+    text: *const c_char, needle: *const c_char, from_utf16: usize,
+    out_start: *mut usize, out_end: *mut usize,
+) -> bool {
+    let t = unsafe { ptr_to_str(text) }.to_string();
+    let n = unsafe { ptr_to_str(needle) }.to_string();
+    match crate::edit_engine::next_occurrence_utf16(&t, &n, from_utf16) {
+        Some((s, e)) => {
+            if !out_start.is_null() { unsafe { *out_start = s; } }
+            if !out_end.is_null() { unsafe { *out_end = e; } }
+            true
+        }
+        None => false,
+    }
+}
+
+/// All occurrences in UTF-16 space as JSON [[start,end],...].
+#[no_mangle]
+pub extern "C" fn rust_edit_all_occurrences_utf16(
+    text: *const c_char, needle: *const c_char,
+) -> *mut c_char {
+    let t = unsafe { ptr_to_str(text) }.to_string();
+    let n = unsafe { ptr_to_str(needle) }.to_string();
+    if n.is_empty() { return crate::str_to_cstring("[]"); }
+    // Reuse find_all on chars, then map to UTF-16 offsets.
+    let tchars: Vec<char> = t.chars().collect();
+    let nchars: Vec<char> = n.chars().collect();
+    let mut out = String::from("[");
+    let mut first = true;
+    let mut i = 0;
+    while i + nchars.len() <= tchars.len() {
+        if tchars[i..i + nchars.len()] == nchars[..] {
+            let s = crate::edit_engine::char_offset_to_utf16(&t, i);
+            let e = crate::edit_engine::char_offset_to_utf16(&t, i + nchars.len());
+            if !first { out.push(','); }
+            first = false;
+            out.push_str(&format!("[{},{}]", s, e));
+            i += nchars.len().max(1);
+        } else { i += 1; }
+    }
+    out.push(']');
+    crate::str_to_cstring(&out)
+}
+
+#[no_mangle]
+pub extern "C" fn rust_search_fuzzy(
+    pattern: *const c_char, text: *const c_char,
+) -> i32 {
+    let p = unsafe { ptr_to_str(pattern) }.to_string();
+    let t = unsafe { ptr_to_str(text) }.to_string();
+    crate::search_engine::fuzzy_score(&p, &t) as i32
+}
+
+#[no_mangle]
+pub extern "C" fn rust_fold_compute(
+    text: *const c_char, indent_based: bool,
+) -> *mut c_char {
+    let t = unsafe { ptr_to_str(text) }.to_string();
+    let lines: Vec<String> = t.split('\n').map(|s| s.to_string()).collect();
+    let mut regions = if indent_based {
+        crate::fold_engine::detect_indent_folds(&lines)
+    } else {
+        crate::fold_engine::detect_brace_folds(&lines)
+    };
+    let keyword = crate::fold_engine::detect_keyword_folds(&lines);
+    regions.extend(keyword);
+    regions.sort_by_key(|r| (r.start_line, r.end_line));
+    crate::str_to_cstring(&serde_json::to_string(&regions).unwrap_or("[]".into()))
+}
+
+#[no_mangle]
+pub extern "C" fn rust_brackets_compute(text: *const c_char) -> *mut c_char {
+    let t = unsafe { ptr_to_str(text) }.to_string();
+    let pairs = crate::bracket_engine::find_pairs(&t);
+    crate::str_to_cstring(&serde_json::to_string(&pairs).unwrap_or("[]".into()))
+}
+
+#[no_mangle]
+pub extern "C" fn rust_bookmarks_new() -> *mut RustBookmarkStore {
+    Box::into_raw(Box::new(BookmarkStore::new())) as *mut RustBookmarkStore
+}
+
+#[no_mangle]
+pub extern "C" fn rust_bookmarks_free(p: *mut RustBookmarkStore) {
+    if !p.is_null() {
+        unsafe { let _ = Box::from_raw(p as *mut BookmarkStore); }
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn rust_bookmarks_toggle(
+    s: *mut RustBookmarkStore, file: *const c_char, line: u32, text: *const c_char,
+) -> i32 {
+    if s.is_null() { return -2; }
+    let f = unsafe { ptr_to_str(file) }.to_string();
+    let t = unsafe { ptr_to_str(text) }.to_string();
+    match unsafe { (&mut *(s as *mut BookmarkStore)).toggle(&f, line, &t) } {
+        Some(id) => id,
+        None => -1,
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn rust_bookmarks_json(s: *const RustBookmarkStore) -> *mut c_char {
+    if s.is_null() { return crate::str_to_cstring("[]"); }
+    let v = unsafe { (&*(s as *const BookmarkStore)).all() };
+    crate::str_to_cstring(&serde_json::to_string(&v).unwrap_or("[]".into()))
+}
+
+#[no_mangle]
+pub extern "C" fn rust_snippets_new() -> *mut RustSnippetStore {
+    Box::into_raw(Box::new(SnippetStore::new())) as *mut RustSnippetStore
+}
+
+#[no_mangle]
+pub extern "C" fn rust_snippets_free(p: *mut RustSnippetStore) {
+    if !p.is_null() {
+        unsafe { let _ = Box::from_raw(p as *mut SnippetStore); }
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn rust_snippet_expand(
+    body: *const c_char, filename: *const c_char,
+) -> *mut c_char {
+    let b = unsafe { ptr_to_str(body) }.to_string();
+    let f = unsafe { ptr_to_str(filename) }.to_string();
+    let (text, stops) = crate::snippet_engine::expand(&b, &f);
+    let arr: Vec<serde_json::Value> = stops.iter().map(|s|
+        serde_json::json!({"offset": s.offset, "len": s.len})).collect();
+    crate::str_to_cstring(
+        &serde_json::json!({"text": text, "tabStops": arr}).to_string())
+}
+
+// ── Bookmark JSON (legacy Qt/camelCase shape) ──
+#[no_mangle]
+pub extern "C" fn rust_bookmarks_to_qt_json(
+    s: *const RustBookmarkStore,
+) -> *mut c_char {
+    if s.is_null() { return crate::str_to_cstring("[]"); }
+    let v = unsafe { (&*(s as *const BookmarkStore)).to_qt_json() };
+    crate::str_to_cstring(&v)
+}
+
+#[no_mangle]
+pub extern "C" fn rust_bookmarks_load_qt_json(
+    s: *mut RustBookmarkStore, json: *const c_char,
+) {
+    if s.is_null() { return; }
+    let j = unsafe { ptr_to_str(json) }.to_string();
+    unsafe { (&mut *(s as *mut BookmarkStore)).load_qt_json(&j); }
+}
+
+#[no_mangle]
+pub extern "C" fn rust_bookmarks_remove(
+    s: *mut RustBookmarkStore, id: i32,
+) -> bool {
+    if s.is_null() { return false; }
+    unsafe { (&mut *(s as *mut BookmarkStore)).remove(id).is_some() }
+}
+
+#[no_mangle]
+pub extern "C" fn rust_bookmarks_clear(s: *mut RustBookmarkStore) {
+    if s.is_null() { return; }
+    unsafe { (&mut *(s as *mut BookmarkStore)).clear(); }
+}
+
+#[no_mangle]
+pub extern "C" fn rust_bookmarks_clear_file(
+    s: *mut RustBookmarkStore, file: *const c_char,
+) {
+    if s.is_null() { return; }
+    let f = unsafe { ptr_to_str(file) }.to_string();
+    unsafe { (&mut *(s as *mut BookmarkStore)).clear_file(&f); }
+}
+
+#[no_mangle]
+pub extern "C" fn rust_bookmarks_is_bookmarked(
+    s: *const RustBookmarkStore, file: *const c_char, line: u32,
+) -> bool {
+    if s.is_null() { return false; }
+    let f = unsafe { ptr_to_str(file) }.to_string();
+    unsafe { (&*(s as *const BookmarkStore)).is_bookmarked(&f, line) }
+}
+
+#[no_mangle]
+pub extern "C" fn rust_bookmarks_at(
+    s: *const RustBookmarkStore, file: *const c_char, line: u32,
+) -> i32 {
+    if s.is_null() { return -1; }
+    let f = unsafe { ptr_to_str(file) }.to_string();
+    unsafe { (&*(s as *const BookmarkStore)).at(&f, line).unwrap_or(-1) }
+}
+
+#[no_mangle]
+pub extern "C" fn rust_bookmarks_next(
+    s: *const RustBookmarkStore, file: *const c_char, current_line: i64,
+) -> *mut c_char {
+    if s.is_null() { return crate::str_to_cstring(""); }
+    let f = unsafe { ptr_to_str(file) }.to_string();
+    let r = unsafe { (&*(s as *const BookmarkStore)).next_after(&f, current_line) };
+    crate::str_to_cstring(
+        &serde_json::to_string(&r).unwrap_or("null".into()))
+}
+
+#[no_mangle]
+pub extern "C" fn rust_bookmarks_prev(
+    s: *const RustBookmarkStore, file: *const c_char, current_line: i64,
+) -> *mut c_char {
+    if s.is_null() { return crate::str_to_cstring(""); }
+    let f = unsafe { ptr_to_str(file) }.to_string();
+    let r = unsafe { (&*(s as *const BookmarkStore)).prev_before(&f, current_line) };
+    crate::str_to_cstring(
+        &serde_json::to_string(&r).unwrap_or("null".into()))
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  Application Crash Handler
+// ═══════════════════════════════════════════════════════════════════════
+make_new!(rust_app_crash_new, AppCrashHandler, RustAppCrashHandler);
+make_free!(rust_app_crash_free, AppCrashHandler, RustAppCrashHandler);
+
+#[no_mangle]
+pub extern "C" fn rust_app_crash_install(h: *mut RustAppCrashHandler) {
+    if h.is_null() { return; }
+    unsafe { (&mut *(h as *mut AppCrashHandler)).install(); }
+}
+
+#[no_mangle]
+pub extern "C" fn rust_app_crash_dump_path(h: *const RustAppCrashHandler) -> *mut c_char {
+    if h.is_null() { return std::ptr::null_mut(); }
+    let path = unsafe { (&*(h as *const AppCrashHandler)).dump_path() };
+    crate::str_to_cstring(&path.to_string_lossy())
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  Snippet Store
+// ═══════════════════════════════════════════════════════════════════════
+
+make_new!(rust_snippet_store_new, SnippetStore, RustSnippetStore);
+make_free!(rust_snippet_store_free, SnippetStore, RustSnippetStore);
+
+#[no_mangle]
+pub extern "C" fn rust_snippet_store_add(
+    s: *mut RustSnippetStore, snippet_json: *const c_char,
+) -> bool {
+    if s.is_null() || snippet_json.is_null() { return false; }
+    let j = unsafe { ptr_to_str(snippet_json) };
+    match serde_json::from_str::<crate::snippet_engine::Snippet>(j) {
+        Ok(snippet) => {
+            unsafe { (&mut *(s as *mut SnippetStore)).add(snippet) };
+            true
+        }
+        Err(_) => false,
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn rust_snippet_store_update(
+    s: *mut RustSnippetStore, snippet_json: *const c_char,
+) -> bool {
+    if s.is_null() || snippet_json.is_null() { return false; }
+    let j = unsafe { ptr_to_str(snippet_json) };
+    match serde_json::from_str::<crate::snippet_engine::Snippet>(j) {
+        Ok(snippet) => {
+            unsafe { (&mut *(s as *mut SnippetStore)).update(snippet) };
+            true
+        }
+        Err(_) => false,
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn rust_snippet_store_remove(
+    s: *mut RustSnippetStore, id: *const c_char,
+) -> bool {
+    if s.is_null() { return false; }
+    let i = unsafe { ptr_to_str(id) };
+    unsafe { (&mut *(s as *mut SnippetStore)).remove(i) }
+}
+
+#[no_mangle]
+pub extern "C" fn rust_snippet_store_get(
+    s: *const RustSnippetStore, id: *const c_char,
+) -> *mut c_char {
+    if s.is_null() { return std::ptr::null_mut(); }
+    let i = unsafe { ptr_to_str(id) };
+    let result = unsafe { (&*(s as *const SnippetStore)).get(i) };
+    match result {
+        Some(sn) => crate::str_to_cstring(&serde_json::to_string(sn).unwrap_or_default()),
+        None => std::ptr::null_mut(),
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn rust_snippet_store_all(
+    s: *const RustSnippetStore, out_len: *mut usize,
+) -> *mut *mut c_char {
+    if s.is_null() { unsafe { *out_len = 0; } return std::ptr::null_mut(); }
+    let list = unsafe { (&*(s as *const SnippetStore)).all() };
+    let len = list.len();
+    unsafe { *out_len = len; }
+    if len == 0 { return std::ptr::null_mut(); }
+    let mut arr: Vec<*mut c_char> = list.iter()
+        .map(|s| crate::str_to_cstring(&serde_json::to_string(s).unwrap_or_default()))
+        .collect();
+    arr.shrink_to_fit();
+    let ptr = arr.as_mut_ptr();
+    mem::forget(arr);
+    ptr
+}
+
+#[no_mangle]
+pub extern "C" fn rust_snippet_store_for_language(
+    s: *const RustSnippetStore, language: *const c_char, out_len: *mut usize,
+) -> *mut *mut c_char {
+    if s.is_null() { unsafe { *out_len = 0; } return std::ptr::null_mut(); }
+    let l = unsafe { ptr_to_str(language) };
+    let list = unsafe { (&*(s as *const SnippetStore)).for_language(l) };
+    let len = list.len();
+    unsafe { *out_len = len; }
+    if len == 0 { return std::ptr::null_mut(); }
+    let mut arr: Vec<*mut c_char> = list.iter()
+        .map(|sn| crate::str_to_cstring(&serde_json::to_string(sn).unwrap_or_default()))
+        .collect();
+    arr.shrink_to_fit();
+    let ptr = arr.as_mut_ptr();
+    mem::forget(arr);
+    ptr
+}
+
+#[no_mangle]
+pub extern "C" fn rust_snippet_store_prefixes(
+    s: *const RustSnippetStore, out_len: *mut usize,
+) -> *mut *mut c_char {
+    if s.is_null() { unsafe { *out_len = 0; } return std::ptr::null_mut(); }
+    let list = unsafe { (&*(s as *const SnippetStore)).prefixes() };
+    let len = list.len();
+    unsafe { *out_len = len; }
+    if len == 0 { return std::ptr::null_mut(); }
+    let mut arr: Vec<*mut c_char> = list.iter()
+        .map(|s| crate::str_to_cstring(s))
+        .collect();
+    arr.shrink_to_fit();
+    let ptr = arr.as_mut_ptr();
+    mem::forget(arr);
+    ptr
+}
+
+#[no_mangle]
+pub extern "C" fn rust_snippet_store_has_prefix(
+    s: *const RustSnippetStore, prefix: *const c_char, language: *const c_char,
+) -> bool {
+    if s.is_null() { return false; }
+    let p = unsafe { ptr_to_str(prefix) };
+    let l = unsafe { ptr_to_str(language) };
+    unsafe { (&*(s as *const SnippetStore)).has_prefix(p, l) }
+}
+
+#[no_mangle]
+pub extern "C" fn rust_snippet_store_find(
+    s: *const RustSnippetStore, prefix: *const c_char, language: *const c_char,
+) -> *mut c_char {
+    if s.is_null() { return std::ptr::null_mut(); }
+    let p = unsafe { ptr_to_str(prefix) };
+    let l = unsafe { ptr_to_str(language) };
+    let result = unsafe { (&*(s as *const SnippetStore)).find_for_prefix(p, l) };
+    match result {
+        Some(sn) => crate::str_to_cstring(&serde_json::to_string(sn).unwrap_or_default()),
+        None => std::ptr::null_mut(),
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn rust_snippet_store_save(
+    s: *const RustSnippetStore,
+) -> *mut c_char {
+    if s.is_null() { return crate::str_to_cstring("[]"); }
+    let json = unsafe { (&*(s as *const SnippetStore)).save_to_json() };
+    crate::str_to_cstring(&json)
+}
+
+#[no_mangle]
+pub extern "C" fn rust_snippet_store_load(
+    s: *mut RustSnippetStore, json: *const c_char,
+) -> usize {
+    if s.is_null() { return 0; }
+    let j = unsafe { ptr_to_str(json) };
+    unsafe { (&mut *(s as *mut SnippetStore)).load_from_json(j) }
+}
+
+#[no_mangle]
+pub extern "C" fn rust_snippet_store_import(
+    s: *mut RustSnippetStore, json: *const c_char,
+) -> usize {
+    if s.is_null() { return 0; }
+    let j = unsafe { ptr_to_str(json) };
+    unsafe { (&mut *(s as *mut SnippetStore)).import_from_json(j) }
+}
+
+#[no_mangle]
+pub extern "C" fn rust_snippet_store_export(
+    s: *const RustSnippetStore,
+) -> *mut c_char {
+    if s.is_null() { return crate::str_to_cstring("[]"); }
+    let json = unsafe { (&*(s as *const SnippetStore)).export_to_json() };
+    crate::str_to_cstring(&json)
+}
+
+#[no_mangle]
+pub extern "C" fn rust_snippet_substitute_variables(
+    body: *const c_char, vars_json: *const c_char,
+) -> *mut c_char {
+    let b = unsafe { ptr_to_str(body) };
+    let v = if vars_json.is_null() {
+        vec![]
+    } else {
+        match serde_json::from_str::<Vec<(String, String)>>(unsafe { ptr_to_str(vars_json) }) {
+            Ok(v) => v,
+            Err(_) => return crate::str_to_cstring(b),
+        }
+    };
+    let vars: Vec<(&str, &str)> = v.iter().map(|(k, val)| (k.as_str(), val.as_str())).collect();
+    let result = crate::snippet_engine::subst_datetime(b, &vars);
+    crate::str_to_cstring(&result)
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  Application Core
+// ═══════════════════════════════════════════════════════════════════════
+make_new!(rust_app_new, ScripturaApp, RustScripturaApp);
+make_free!(rust_app_free, ScripturaApp, RustScripturaApp);
+
+#[no_mangle]
+pub extern "C" fn rust_app_initialize(app: *mut RustScripturaApp) {
+    if app.is_null() { return; }
+    let app: &mut ScripturaApp = unsafe { &mut *(app as *mut ScripturaApp) };
+    app.initialize();
+}
+
+#[no_mangle]
+pub extern "C" fn rust_app_shutdown(app: *mut RustScripturaApp) {
+    if app.is_null() { return; }
+    let app: &mut ScripturaApp = unsafe { &mut *(app as *mut ScripturaApp) };
+    app.shutdown();
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  Application Core — Accessor FFI Functions
+// ═══════════════════════════════════════════════════════════════════════
+#[no_mangle]
+pub extern "C" fn rust_app_workspace(app: *mut RustScripturaApp) -> *mut crate::workspace::Workspace {
+    if app.is_null() { return std::ptr::null_mut(); }
+    let app: &mut ScripturaApp = unsafe { &mut *(app as *mut ScripturaApp) };
+    app.workspace() as *mut _
+}
+#[no_mangle]
+pub extern "C" fn rust_app_eventbus(app: *mut RustScripturaApp) -> *mut crate::eventbus::EventBus {
+    if app.is_null() { return std::ptr::null_mut(); }
+    let app: &mut ScripturaApp = unsafe { &mut *(app as *mut ScripturaApp) };
+    app.event_bus() as *mut _
+}
+#[no_mangle]
+pub extern "C" fn rust_app_pluginmanager(app: *mut RustScripturaApp) -> *mut crate::plugin::PluginManager {
+    if app.is_null() { return std::ptr::null_mut(); }
+    let app: &mut ScripturaApp = unsafe { &mut *(app as *mut ScripturaApp) };
+    app.plugin_manager() as *mut _
+}
+#[no_mangle]
+pub extern "C" fn rust_app_taskrunner(app: *mut RustScripturaApp) -> *mut crate::task_runner::TaskRunner {
+    if app.is_null() { return std::ptr::null_mut(); }
+    let app: &mut ScripturaApp = unsafe { &mut *(app as *mut ScripturaApp) };
+    app.task_runner() as *mut _
+}
+#[no_mangle]
+pub extern "C" fn rust_app_updater(app: *mut RustScripturaApp) -> *mut crate::updater::Updater {
+    if app.is_null() { return std::ptr::null_mut(); }
+    let app: &mut ScripturaApp = unsafe { &mut *(app as *mut ScripturaApp) };
+    app.updater() as *mut _
+}
+#[no_mangle]
+pub extern "C" fn rust_app_configvalidator(app: *mut RustScripturaApp) -> *mut crate::config_validator::ConfigValidator {
+    if app.is_null() { return std::ptr::null_mut(); }
+    let app: &mut ScripturaApp = unsafe { &mut *(app as *mut ScripturaApp) };
+    app.config_validator() as *mut _
+}
+#[no_mangle]
+pub extern "C" fn rust_app_pluginregistry(app: *mut RustScripturaApp) -> *mut crate::registry::PluginRegistry {
+    if app.is_null() { return std::ptr::null_mut(); }
+    let app: &mut ScripturaApp = unsafe { &mut *(app as *mut ScripturaApp) };
+    app.plugin_registry() as *mut _
+}
+#[no_mangle]
+pub extern "C" fn rust_app_permissionmanager(app: *mut RustScripturaApp) -> *mut crate::permission::PermissionManager {
+    if app.is_null() { return std::ptr::null_mut(); }
+    let app: &mut ScripturaApp = unsafe { &mut *(app as *mut ScripturaApp) };
+    app.permission_manager() as *mut _
+}
+#[no_mangle]
+pub extern "C" fn rust_app_servicelocator(app: *mut RustScripturaApp) -> *mut crate::service_locator::ServiceLocator {
+    if app.is_null() { return std::ptr::null_mut(); }
+    let app: &mut ScripturaApp = unsafe { &mut *(app as *mut ScripturaApp) };
+    app.service_locator() as *mut _
+}
+#[no_mangle]
+pub extern "C" fn rust_app_dependencyresolver(app: *mut RustScripturaApp) -> *mut crate::dependency_resolver::DependencyResolver {
+    if app.is_null() { return std::ptr::null_mut(); }
+    let app: &mut ScripturaApp = unsafe { &mut *(app as *mut ScripturaApp) };
+    app.dependency_resolver() as *mut _
+}
+#[no_mangle]
+pub extern "C" fn rust_app_archiveextractor(app: *mut RustScripturaApp) -> *mut crate::archive_extractor::ArchiveExtractor {
+    if app.is_null() { return std::ptr::null_mut(); }
+    let app: &mut ScripturaApp = unsafe { &mut *(app as *mut ScripturaApp) };
+    app.archive_extractor() as *mut _
+}
+#[no_mangle]
+pub extern "C" fn rust_app_lspclient(app: *mut RustScripturaApp) -> *mut crate::lsp::LspClient {
+    if app.is_null() { return std::ptr::null_mut(); }
+    let app: &mut ScripturaApp = unsafe { &mut *(app as *mut ScripturaApp) };
+    app.lsp_client() as *mut _
+}
+#[no_mangle]
+pub extern "C" fn rust_app_dapclient(app: *mut RustScripturaApp) -> *mut crate::dap::DapClient {
+    if app.is_null() { return std::ptr::null_mut(); }
+    let app: &mut ScripturaApp = unsafe { &mut *(app as *mut ScripturaApp) };
+    app.dap_client() as *mut _
+}
+#[no_mangle]
+pub extern "C" fn rust_app_crashhandler(app: *mut RustScripturaApp) -> *mut crate::app_crash::AppCrashHandler {
+    if app.is_null() { return std::ptr::null_mut(); }
+    let app: &mut ScripturaApp = unsafe { &mut *(app as *mut ScripturaApp) };
+    app.crash_handler() as *mut _
+}
+#[no_mangle]
+pub extern "C" fn rust_app_uiactionshandler(app: *mut RustScripturaApp) -> *mut crate::ui_actions::UiActionHandler {
+    if app.is_null() { return std::ptr::null_mut(); }
+    let app: &mut ScripturaApp = unsafe { &mut *(app as *mut ScripturaApp) };
+    app.ui_actions() as *mut _
 }

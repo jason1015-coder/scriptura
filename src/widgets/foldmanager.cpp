@@ -1,4 +1,5 @@
 #include "foldmanager.h"
+#include "rust_adapter.h"
 #include <QPlainTextEdit>
 #include <QTextDocument>
 #include <QTextBlock>
@@ -6,11 +7,15 @@
 #include <QPen>
 #include <QPalette>
 #include <QApplication>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QJsonValue>
+#include <algorithm>
 
 FoldManager::FoldManager(QPlainTextEdit *editor, QObject *parent)
     : QObject(parent)
     , m_editor(editor)
-    , m_useBraceFolding(true)
 {
     reattachDocument();
     detectRegions();
@@ -43,188 +48,48 @@ void FoldManager::disconnectDocument()
 
 void FoldManager::detectRegions()
 {
+    // Rust owns all fold detection (brace, indent, keyword).
+    // Qt keeps hidden-line/viewport application only.
+    if (!m_editor || !m_editor->document()) return;
+
+    const QString flat = [&]() {
+        QString s;
+        QTextBlock b = m_editor->document()->begin();
+        bool first = true;
+        while (b.isValid()) {
+            if (!first) s += '\n';
+            first = false;
+            s += b.text();
+            b = b.next();
+        }
+        return s;
+    }();
+    const QString json = RustTextBufferAdapter::foldRanges(flat, false);
+    const QJsonDocument doc = QJsonDocument::fromJson(json.toUtf8());
+
     m_regions.clear();
     m_hiddenLines.clear();
 
-    if (!m_editor || !m_editor->document()) return;
+    for (const QJsonValue &v : doc.array()) {
+        const QJsonObject o = v.toObject();
+        FoldRegion r;
+        r.startLine = o.value("startLine").toInt(-1);
+        r.endLine = o.value("endLine").toInt(-1);
+        r.indentLevel = o.value("indentLevel").toInt(0);
+        r.collapsed = false;
+        r.valid = r.startLine >= 0 && r.endLine > r.startLine;
+        if (r.valid) m_regions.append(r);
+    }
 
-    detectBraceFolds();
-    detectKeywordFolds();
+    std::sort(m_regions.begin(), m_regions.end(),
+              [](const FoldRegion &a, const FoldRegion &b) {
+                  return a.startLine < b.startLine ||
+                         (a.startLine == b.startLine && a.endLine < b.endLine);
+              });
+
     updateHiddenLines();
     updateBlockVisibility();
-
     emit regionsChanged();
-}
-
-void FoldManager::detectBraceFolds()
-{
-    if (!m_useBraceFolding) return;
-    
-    QTextDocument *doc = m_editor->document();
-    QTextBlock block = doc->begin();
-    
-    while (block.isValid()) {
-        QString text = block.text().trimmed();
-        int line = block.blockNumber();
-        
-        // Check for opening braces
-        if (text.contains('{') && !text.contains('}')) {
-            // This line has an opening brace - find its matching close
-            int endLine = findMatchingBrace(line);
-            if (endLine > line) {
-                FoldRegion region;
-                region.startLine = line;
-                region.endLine = endLine;
-                region.indentLevel = calculateIndent(block.text());
-                region.collapsed = false;
-                region.valid = true;
-                m_regions.append(region);
-            }
-        }
-        
-        block = block.next();
-    }
-}
-
-void FoldManager::detectKeywordFolds()
-{
-    // Language-specific keyword folding (if/else/for/while/function/class)
-    QTextDocument *doc = m_editor->document();
-    QTextBlock block = doc->begin();
-    
-    QRegularExpression startPattern(
-        R"(^\s*(if|else|else\s+if|for|while|do|function|class|struct|enum|try|catch|switch|case)\s*[({]?)",
-        QRegularExpression::CaseInsensitiveOption
-    );
-    
-    while (block.isValid()) {
-        QString text = block.text();
-        int line = block.blockNumber();
-        
-        QRegularExpressionMatch match = startPattern.match(text);
-        if (match.hasMatch()) {
-            // Check if this region is already detected by brace folding
-            bool alreadyDetected = false;
-            for (const FoldRegion &r : m_regions) {
-                if (r.startLine == line) {
-                    alreadyDetected = true;
-                    break;
-                }
-            }
-            
-            if (!alreadyDetected) {
-                // Find the next block with same or lesser indentation
-                int indent = calculateIndent(text);
-                int endLine = line;
-                QTextBlock nextBlock = block.next();
-                
-                while (nextBlock.isValid()) {
-                    QString nextText = nextBlock.text().trimmed();
-                    if (!nextText.isEmpty()) {
-                        int nextIndent = calculateIndent(nextBlock.text());
-                        if (nextIndent <= indent && !nextText.startsWith("//")) {
-                            endLine = nextBlock.blockNumber() - 1;
-                            break;
-                        }
-                    }
-                    endLine = nextBlock.blockNumber();
-                    nextBlock = nextBlock.next();
-                }
-                
-                if (endLine > line) {
-                    FoldRegion region;
-                    region.startLine = line;
-                    region.endLine = endLine;
-                    region.indentLevel = indent;
-                    region.collapsed = false;
-                    region.valid = true;
-                    m_regions.append(region);
-                }
-            }
-        }
-        
-        block = block.next();
-    }
-}
-
-int FoldManager::findMatchingBrace(int line) const
-{
-    QTextDocument *doc = m_editor->document();
-    QTextBlock block = doc->findBlockByNumber(line);
-    if (!block.isValid()) return -1;
-    
-    int depth = 0;
-    QString text = block.text();
-    
-    // Start from the opening brace position
-    int startPos = text.indexOf('{');
-    if (startPos < 0) return -1;
-    
-    depth = 1;
-    int pos = startPos + 1;
-    
-    while (block.isValid()) {
-        while (pos < text.length()) {
-            QChar c = text.at(pos);
-            if (c == '{') depth++;
-            else if (c == '}') {
-                depth--;
-                if (depth == 0) {
-                    return block.blockNumber();
-                }
-            }
-            pos++;
-        }
-        
-        block = block.next();
-        if (block.isValid()) {
-            text = block.text();
-            pos = 0;
-        }
-    }
-    
-    return -1;
-}
-
-int FoldManager::findMatchingBraceReverse(int line) const
-{
-    QTextDocument *doc = m_editor->document();
-    QTextBlock block = doc->findBlockByNumber(line);
-    if (!block.isValid()) return -1;
-    
-    int depth = 0;
-    
-    while (block.isValid()) {
-        QString text = block.text();
-        int pos = (block.blockNumber() == line) ? text.length() - 1 : text.length() - 1;
-        
-        while (pos >= 0) {
-            QChar c = text.at(pos);
-            if (c == '}') depth++;
-            else if (c == '{') {
-                depth--;
-                if (depth == 0) {
-                    return block.blockNumber();
-                }
-            }
-            pos--;
-        }
-        
-        block = block.previous();
-    }
-    
-    return -1;
-}
-
-int FoldManager::calculateIndent(const QString &line) const
-{
-    int indent = 0;
-    for (const QChar &c : line) {
-        if (c == ' ') indent++;
-        else if (c == '\t') indent += 4;
-        else break;
-    }
-    return indent;
 }
 
 void FoldManager::toggleFold(int line)
