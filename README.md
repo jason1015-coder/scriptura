@@ -1,3 +1,22 @@
+<!-- nano collective announcement -->
+<div align="center">
+
+# 🎉 Scriptura Joins the Nano Collective!
+
+</div>
+
+<div align="center">
+
+<img src="nano.png" alt="Scriptura joining Nano Collective" width="600" />
+
+</div>
+
+We're excited to announce that **Scriptura** is now part of the **Nano Collective** — a community of lightweight, privacy-focused, and open-source tools built without trackers, bloat, or paid subscriptions.
+
+This partnership reflects our shared vision of creating software that respects user privacy, stays free from corporate influence, and remains accessible to everyone.
+
+---
+
 <div align="center">
 
 # Scriptura
