@@ -4,6 +4,7 @@
 #include <QPushButton>
 #include <QTreeWidget>
 #include <QApplication>
+#include <QSettings>
 #include "bookmarkmanager.h"
 #include "bookmarkpanel.h"
 #include "test_bookmarkpanel.h"

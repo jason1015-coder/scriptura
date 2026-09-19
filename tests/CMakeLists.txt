@@ -9,7 +9,7 @@ qt_add_executable(scriptura_tests
 )
 
 set_target_properties(scriptura_tests PROPERTIES
-    EXCLUDE_FROM_ALL TRUE
+    EXCLUDE_FROM_ALL FALSE
     FOLDER "Tests"
 )
 
