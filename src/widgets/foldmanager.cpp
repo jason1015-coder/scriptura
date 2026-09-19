@@ -10,39 +10,70 @@
 FoldManager::FoldManager(QPlainTextEdit *editor, QObject *parent)
     : QObject(parent)
     , m_editor(editor)
+    , m_document(editor ? editor->document() : nullptr)
+    , m_documentAttached(false)
     , m_useBraceFolding(true)
+    , m_suppressNextRegionDetection(false)
 {
     reattachDocument();
-    detectRegions();
 }
 
 void FoldManager::reattachDocument()
 {
+    QTextDocument *previousDocument = m_document;
+    const bool firstAttachment = !m_documentAttached;
+
     disconnectDocument();
-    if (!m_editor || !m_editor->document()) {
+    m_regions.clear();
+    m_hiddenLines.clear();
+    m_suppressNextRegionDetection = false;
+
+    if (!m_editor) {
         m_document = nullptr;
+        m_documentAttached = false;
         return;
     }
 
     m_document = m_editor->document();
+    m_documentAttached = m_document != nullptr;
+    if (!m_document)
+        return;
+
     connect(m_document, &QTextDocument::contentsChanged,
             this, &FoldManager::detectRegions);
+
+    if (!firstAttachment && m_document == previousDocument) {
+        m_suppressNextRegionDetection = true;
+        updateBlockVisibility();
+        return;
+    }
+
+    detectRegions();
 }
 
 void FoldManager::disconnectDocument()
 {
-    if (!m_document)
+    if (!m_document) {
+        m_documentAttached = false;
         return;
+    }
 
-    disconnect(m_document, &QTextDocument::contentsChanged,
-               this, &FoldManager::detectRegions);
-    disconnect(m_document, &QTextDocument::contentsChange,
-               this, &FoldManager::detectRegions);
+    disconnect(m_document, nullptr, this, nullptr);
     m_document = nullptr;
+    m_documentAttached = false;
 }
 
 void FoldManager::detectRegions()
 {
+    if (m_suppressNextRegionDetection) {
+        m_suppressNextRegionDetection = false;
+        m_regions.clear();
+        m_hiddenLines.clear();
+        updateBlockVisibility();
+        emit regionsChanged();
+        return;
+    }
+
     m_regions.clear();
     m_hiddenLines.clear();
 
@@ -364,14 +395,34 @@ void FoldManager::updateBlockVisibility()
     if (!m_editor || !m_editor->document())
         return;
 
-    QTextDocument *doc = m_editor->document();
-    QTextBlock block = doc->begin();
-    while (block.isValid()) {
-        bool hidden = m_hiddenLines.contains(block.blockNumber());
-        if (block.isVisible() != hidden)
-            block.setVisible(!hidden);
-        block = block.next();
+    QTextDocument *document = m_editor->document();
+
+    for (QTextBlock block = document->begin();
+         block.isValid();
+         block = block.next()) {
+        block.setVisible(true);
+        block.setLineCount(1);
     }
+
+    for (const FoldRegion &region : m_regions) {
+        if (!region.valid || !region.collapsed)
+            continue;
+
+        for (int line = region.startLine + 1;
+             line <= region.endLine;
+             ++line) {
+            QTextBlock block = document->findBlockByNumber(line);
+            if (!block.isValid())
+                continue;
+
+            block.setVisible(false);
+            block.setLineCount(0);
+        }
+    }
+
+    document->markContentsDirty(0, document->characterCount());
+    if (m_editor->viewport())
+        m_editor->viewport()->update();
 }
 
 void FoldManager::paintFoldIndicator(QPainter &painter, int x, int y, int blockNumber, int blockHeight)

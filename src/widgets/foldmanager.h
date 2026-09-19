@@ -84,6 +84,7 @@ private:
 
     QPlainTextEdit *m_editor;
     QTextDocument *m_document = nullptr;
+    bool m_documentAttached = false;
     QString m_editorFilePath;
     QList<FoldRegion> m_regions;
     QSet<int> m_hiddenLines;
@@ -92,6 +93,7 @@ private:
     QRegularExpression m_foldStartPattern;
     QRegularExpression m_foldEndPattern;
     bool m_useBraceFolding;
+    bool m_suppressNextRegionDetection = false;
 };
 
 #endif // FOLDMANAGER_H
