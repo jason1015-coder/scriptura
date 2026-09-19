@@ -15,6 +15,8 @@ We're excited to announce that **Scriptura** is now part of the **Nano Collectiv
 
 This partnership reflects our shared vision of creating software that respects user privacy, stays free from corporate influence, and remains accessible to everyone.
 
+**THANKS NC for accepting Scriptura and support it's further development.**
+
 ---
 
 <div align="center">
