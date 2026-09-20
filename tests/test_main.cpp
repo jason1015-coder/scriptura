@@ -1,8 +1,9 @@
 #include <QTest>
 #include <QApplication>
-#include <QSettings>
 #include <QDir>
 #include <QStandardPaths>
+#include <QTemporaryDir>
+#include "internals/settings_store.h"
 #include "test_aiinlinecompletion.h"
 #include "test_bookmarkmanager.h"
 #include "test_bookmarkpanel.h"
@@ -53,16 +54,21 @@ int main(int argc, char *argv[])
 
     QApplication app(argc, argv);
 
-    // Isolate QSettings so unit tests never touch the developer's real
-    // Scriptura configuration (SnippetManager/BookmarkManager/PluginContext
-    // constructors load from QSettings).
+    // Isolate the Rust settings store so unit tests never touch the
+    // developer's real Scriptura configuration (SnippetManager/
+    // BookmarkManager/PluginContext constructors load from SettingsStore).
+    // A dedicated app/org identity keeps the store in a test-only profile
+    // directory; SCRIPTURA_SETTINGS_DIR wins when set by CI.
     QCoreApplication::setOrganizationName(QStringLiteral("ScripturaTests"));
     QCoreApplication::setApplicationName(QStringLiteral("UnitTests"));
-    QSettings::setDefaultFormat(QSettings::IniFormat);
-    const QString settingsDir = QDir::tempPath() + QStringLiteral("/scriptura_unit_test_settings");
-    QDir().mkpath(settingsDir);
-    QSettings::setPath(QSettings::IniFormat, QSettings::UserScope, settingsDir);
-    QSettings().clear(); // start from a clean slate every run
+    if (qEnvironmentVariableIsEmpty("SCRIPTURA_SETTINGS_DIR")) {
+        static QTemporaryDir s_settingsDir;
+        s_settingsDir.setAutoRemove(true);
+        qputenv("SCRIPTURA_SETTINGS_DIR", s_settingsDir.path().toUtf8());
+    }
+    SettingsStore::instance().initialize(QStringLiteral("UnitTests"),
+                                         QStringLiteral("ScripturaTests"));
+    SettingsStore::instance().clear(); // start from a clean slate every run
 
     int status = 0;
     status |= QTest::qExec(new TestAiInlineCompletion, argc, argv);

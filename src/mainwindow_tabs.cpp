@@ -15,7 +15,7 @@
 #include <QMessageBox>
 #include <QDir>
 #include <QFileInfo>
-#include <QSettings>
+#include "internals/settings_store.h"
 #include <QProcess>
 #include <QMenu>
 #include <QInputDialog>
@@ -277,11 +277,10 @@ void MainWindow::openFileInTab(const QString &fileName)
     editor->setLanguageForFile(fileName);
     editor->installEventFilter(this);
     connect(editor, &CodeEditor::breakpointToggled, this, &MainWindow::onBreakpointToggled);
-    QSettings settings;
-    QFont savedFont = settings.value("editor/font", editor->font()).value<QFont>();
+    QFont savedFont = SettingsStore::instance().value("editor/font", editor->font()).value<QFont>();
     editor->setFont(savedFont);
-    editor->setTabWidth(settings.value("editor/tabWidth", editor->tabWidth()).toInt());
-    int w = settings.value("editor/width", 0).toInt();
+    editor->setTabWidth(SettingsStore::instance().value("editor/tabWidth", editor->tabWidth()).toInt());
+    int w = SettingsStore::instance().value("editor/width", 0).toInt();
     if (w > 0) editor->setMinimumWidth(w);
     editor->setPlainText(content);
 
@@ -365,12 +364,11 @@ void MainWindow::on_fileTreeView_clicked(const QModelIndex &index)
         CodeEditor *editor = new CodeEditor(this);
         editor->setLanguageForFile(path);
         connect(editor, &CodeEditor::breakpointToggled, this, &MainWindow::onBreakpointToggled);
-        QSettings settings;
-        QFont savedFont = settings.value("editor/font", editor->font()).value<QFont>();
+        QFont savedFont = SettingsStore::instance().value("editor/font", editor->font()).value<QFont>();
         editor->setFont(savedFont);
-        int savedTabWidth = settings.value("editor/tabWidth", editor->tabWidth()).toInt();
+        int savedTabWidth = SettingsStore::instance().value("editor/tabWidth", editor->tabWidth()).toInt();
         editor->setTabWidth(savedTabWidth);
-        int savedEditorWidth = settings.value("editor/width", 0).toInt();
+        int savedEditorWidth = SettingsStore::instance().value("editor/width", 0).toInt();
         if (savedEditorWidth > 0)
             editor->setMinimumWidth(savedEditorWidth);
         editor->setPlainText(content);

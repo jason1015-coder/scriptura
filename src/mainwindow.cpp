@@ -42,7 +42,7 @@
 #include <QInputDialog>
 #include <QLineEdit>
 #include <QFontDialog>
-#include <QSettings>
+#include "internals/settings_store.h"
 #include <QFileInfo>
 #include <QStackedWidget>
 #include <QLabel>
@@ -332,8 +332,7 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
                 if (targetTheme != selectedTheme) {
                     selectedTheme = targetTheme;
                     applyTheme(selectedTheme);
-                    QSettings s;
-                    s.setValue("theme/selected", themeToLegacyInt(selectedTheme));
+                    SettingsStore::instance().setValue("theme/selected", themeToLegacyInt(selectedTheme));
                 }
             }, Cat::Theme);
         }
@@ -361,8 +360,7 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
 
     loadRecentProjects();
 
-    QSettings settings;
-    int legacyTheme = settings.value("theme/selected", 0).toInt();
+    int legacyTheme = SettingsStore::instance().value("theme/selected", 0).toInt();
     selectedTheme = themeFromLegacyInt(legacyTheme);
     applyTheme(selectedTheme);
 
@@ -405,7 +403,7 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
     editorStack->addWidget(ui->tabWidget);
 
     // Plugin registry - load user-configured URL
-    registryUrl = QSettings().value("plugin/registryUrl", "https://raw.githubusercontent.com/jason1015-coder/scriptura/main/plugin-registry.json").toString();
+    registryUrl = SettingsStore::instance().value("plugin/registryUrl", "https://raw.githubusercontent.com/jason1015-coder/scriptura/main/plugin-registry.json").toString();
 
     // Create unified scrollable settings page (tab added when user opens settings)
     unifiedSettingsWidget = createUnifiedSettingsWidget();
@@ -626,10 +624,9 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
 
     // Restore panel layout from previous session
     {
-        QSettings settings;
-        if (settings.value("mainWindow/bottomPanelVisible", false).toBool()) {
+        if (SettingsStore::instance().value("mainWindow/bottomPanelVisible", false).toBool()) {
             ui->bottomPanelContainer->show();
-            int idx = settings.value("mainWindow/bottomPanelIndex", 0).toInt();
+            int idx = SettingsStore::instance().value("mainWindow/bottomPanelIndex", 0).toInt();
             if (idx >= 0 && idx < m_panelButtons.size()) {
                 showBottomPanelIndex(idx);
             }
@@ -911,12 +908,12 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
 
     // TODO: replace with nanocoder- inline completion
     // m_aiInline->setSettings(
-    //     QSettings().value("ai/provider", "ollama").toString(),
-    //     QSettings().value("ai/endpoint", "http://localhost:11434/api/chat").toString(),
-    //     QSettings().value("ai/model", "codellama").toString(),
-    //     QSettings().value("ai/enabled", false).toBool(),
-    //     QSettings().value("ai/debounceMs", 400).toInt(),
-    //     QSettings().value("ai/apiKey", {}).toString()
+    //     SettingsStore::instance().value("ai/provider", "ollama").toString(),
+    //     SettingsStore::instance().value("ai/endpoint", "http://localhost:11434/api/chat").toString(),
+    //     SettingsStore::instance().value("ai/model", "codellama").toString(),
+    //     SettingsStore::instance().value("ai/enabled", false).toBool(),
+    //     SettingsStore::instance().value("ai/debounceMs", 400).toInt(),
+    //     SettingsStore::instance().secret("ai/apiKey", {}).toString()
     // );
 
     connect(ui->tabWidget, &QTabWidget::currentChanged, this, [this](int index) {
@@ -1150,10 +1147,9 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
         }
         editor->installEventFilter(this);
         connect(editor, &CodeEditor::breakpointToggled, this, &MainWindow::onBreakpointToggled);
-        QSettings settings;
-        QFont savedFont = settings.value("editor/font", editor->font()).value<QFont>();
+        QFont savedFont = SettingsStore::instance().value("editor/font", editor->font()).value<QFont>();
         editor->setFont(savedFont);
-        editor->setTabWidth(settings.value("editor/tabWidth", editor->tabWidth()).toInt());
+        editor->setTabWidth(SettingsStore::instance().value("editor/tabWidth", editor->tabWidth()).toInt());
         editor->setPlainText(content);
         editor->document()->setModified(true);
         QString displayName = originalPath.isEmpty() ? tr("Untitled") : QFileInfo(originalPath).fileName();
@@ -1297,14 +1293,14 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
 
     // Config validator - validate settings on startup (Rust adapter handles this internally)
 
-    setSidebarCollapsed(settings.value("ui/sidebarCollapsed", true).toBool());
+    setSidebarCollapsed(SettingsStore::instance().value("ui/sidebarCollapsed", true).toBool());
 
     // Restore window geometry and state
-    if (settings.contains("mainWindow/geometry")) {
-        restoreGeometry(settings.value("mainWindow/geometry").toByteArray());
+    if (SettingsStore::instance().contains("mainWindow/geometry")) {
+        restoreGeometry(SettingsStore::instance().value("mainWindow/geometry").toByteArray());
     }
-    if (settings.contains("mainWindow/state")) {
-        restoreState(settings.value("mainWindow/state").toByteArray());
+    if (SettingsStore::instance().contains("mainWindow/state")) {
+        restoreState(SettingsStore::instance().value("mainWindow/state").toByteArray());
     }
 }
 

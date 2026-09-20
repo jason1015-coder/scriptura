@@ -45,23 +45,20 @@ mod session_engine;
 mod test_engine;
 mod ui_actions;
 
+use std::cell::RefCell;
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
 
+thread_local! {
+    static LAST_ERROR: RefCell<Option<String>> = const { RefCell::new(None) };
+}
+
 pub(crate) fn take_last_error() -> Option<String> {
-    use std::cell::RefCell;
-    thread_local! {
-        static LAST_ERROR: RefCell<Option<String>> = const { RefCell::new(None) };
-    }
     LAST_ERROR.with(|e| e.borrow_mut().take())
 }
 
 /// Record an error message for the C++ layer (retrieved via [`rust_last_error`]).
 pub(crate) fn set_last_error(message: impl Into<String>) {
-    use std::cell::RefCell;
-    thread_local! {
-        static LAST_ERROR: RefCell<Option<String>> = const { RefCell::new(None) };
-    }
     let message = message.into();
     log::error!("{}", message);
     LAST_ERROR.with(|e| *e.borrow_mut() = Some(message));

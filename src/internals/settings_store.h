@@ -10,19 +10,19 @@
 /**
  * @brief C++ front-end for the Rust encrypted settings store.
  *
- * Replaces `QSettings` for the whole application:
+ * Replaces QSettings for the whole application:
  *
- *  - **Settings** are written to `<app data>/settings.enc`, an AES-256-GCM
- *    encrypted file owned by the Rust backend, mode `0600` on Unix.
- *  - **Secrets** (`secret/*`, `*/token`, `*/password`, `*/apiKey`, …) are not
+ *  - Settings are written to "<app data>/settings.enc", an AES-256-GCM
+ *    encrypted file owned by the Rust backend, mode 0600 on Unix.
+ *  - Secrets ("secret/" prefix, token, password, apiKey, ...) are not
  *    written to disk at all: they go to the OS keychain (macOS Keychain,
  *    Windows Credential Manager, Linux Secret Service / kernel keyring) and
  *    only fall back to the encrypted file when no backend is available.
- *  - **Legacy data**: the Rust side imports the old `QSettings` file once at
+ *  - Legacy data: the Rust side imports the old QSettings file once at
  *    startup; existing values always win.
  *
- * Every write is persisted immediately, so `sync()` exists only for
- * `QSettings` source compatibility.
+ * Every write is persisted immediately, so sync() exists only for
+ * QSettings source compatibility.
  */
 class SettingsStore : public QObject
 {
@@ -39,7 +39,7 @@ public:
     bool initialize(const QString &applicationName, const QString &organizationName);
     bool isInitialized() const { return m_initialized; }
 
-    /// No-op: the Rust store persists on every write (`QSettings` parity).
+    /// No-op: the Rust store persists on every write (QSettings parity).
     void sync() {}
 
     // ── Settings ─────────────────────────────────────────────────────
@@ -50,7 +50,7 @@ public:
     void remove(const QString &key);
     bool contains(const QString &key) const;
 
-    /// Typed getters with defaults (`QSettings`-compatible).
+    /// Typed getters with defaults (QSettings-compatible).
     QVariant value(const QString &key, const QVariant &defaultValue = QVariant()) const;
     void setValue(const QString &key, const QVariant &value);
 
@@ -91,16 +91,16 @@ public:
     // ── Compatibility ────────────────────────────────────────────────
 
     /**
-     * @brief `QSettings`-compatible view of this store.
+     * @brief QSettings-compatible view of this store.
      *
-     * Backed by `QSettings::registerFormat` callbacks that route reads and
+     * Backed by QSettings::registerFormat callbacks that route reads and
      * writes through the Rust store, so plugin/legacy code keeps compiling
      * without touching plaintext configuration files. Deleting keys through
      * this view is supported via a load/write comparison.
      */
     QSettings *createLegacySettings(QObject *parent = nullptr);
 
-    // Encoding helpers (also used by the `QSettings` format callbacks)
+    // Encoding helpers (also used by the QSettings format callbacks)
     static QString encodeVariantForStorage(const QVariant &value, bool tagged);
     static QVariant decodeVariantFromStorage(const QString &raw, const QVariant &defaultValue);
 

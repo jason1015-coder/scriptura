@@ -8,7 +8,6 @@
 #include <QPushButton>
 #include <QListWidget>
 #include <QStringList>
-#include <QSettings>
 #include <QFileInfo>
 #include <QScreen>
 #include <QApplication>

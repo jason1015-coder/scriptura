@@ -34,7 +34,10 @@ public:
     QString currentProjectPath() const;
 
     /**
-     * @brief Settings access for application preferences
+     * @brief Settings access for application preferences.
+     *
+     * Legacy QSettings view backed by the Rust encrypted store (no plaintext
+     * files). New code should use SettingsStore directly.
      */
     QSettings* settings() const { return m_settings; }
 

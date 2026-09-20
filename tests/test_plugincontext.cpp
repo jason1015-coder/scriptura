@@ -1,5 +1,4 @@
 #include <QTest>
-#include <QSettings>
 #include <QCoreApplication>
 #include "plugincontext.h"
 #include "permission.h"

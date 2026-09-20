@@ -25,7 +25,7 @@
 #include <QFontComboBox>
 #include <QPushButton>
 #include <QLineEdit>
-#include <QSettings>
+#include "internals/settings_store.h"
 #include <QToolTip>
 #include <QFileInfo>
 #include <QStandardPaths>
@@ -115,8 +115,7 @@ QWidget* MainWindow::createUnifiedSettingsWidget()
                 if (e.theme != selectedTheme) {
                     selectedTheme = e.theme;
                     applyTheme(selectedTheme);
-                    QSettings s;
-                    s.setValue("theme/selected", themeToLegacyInt(selectedTheme));
+                    SettingsStore::instance().setValue("theme/selected", themeToLegacyInt(selectedTheme));
                 }
                 break;
             }
@@ -195,15 +194,14 @@ QWidget* MainWindow::createUnifiedSettingsWidget()
 
     // Apply editor settings
     auto applySettings = [=]() {
-        QSettings s;
         QFont f = fontCombo->currentFont();
         f.setPointSize(sizeSpin->value());
-        s.setValue("editor/font", f);
-        s.setValue("editor/tabWidth", tabSpin->value());
-        s.setValue("editor/width", widthSpin->value());
-        s.setValue("editor/wordWrap", wordWrapCheckbox->isChecked());
-        s.setValue("editor/showIndentGuides", indentGuidesCheckbox->isChecked());
-        s.setValue("editor/showLineNumbers", lineNumbersCheckbox->isChecked());
+        SettingsStore::instance().setValue("editor/font", f);
+        SettingsStore::instance().setValue("editor/tabWidth", tabSpin->value());
+        SettingsStore::instance().setValue("editor/width", widthSpin->value());
+        SettingsStore::instance().setValue("editor/wordWrap", wordWrapCheckbox->isChecked());
+        SettingsStore::instance().setValue("editor/showIndentGuides", indentGuidesCheckbox->isChecked());
+        SettingsStore::instance().setValue("editor/showLineNumbers", lineNumbersCheckbox->isChecked());
         for (int i = 0; i < ui->tabWidget->count(); i++) {
             if (CodeEditor *ed = qobject_cast<CodeEditor*>(ui->tabWidget->widget(i))) {
                 QFont ef = fontCombo->currentFont();
@@ -233,8 +231,7 @@ QWidget* MainWindow::createUnifiedSettingsWidget()
     shortcutsLayout->addWidget(shortcutEditor);
     connect(shortcutEditor, &ShortcutEditorWidget::shortcutChanged, this,
             [](const QString &action, const QKeySequence &shortcut) {
-        QSettings s;
-        s.setValue("shortcuts/" + action, shortcut.toString());
+        SettingsStore::instance().setValue("shortcuts/" + action, shortcut.toString());
     });
     mainLayout->addWidget(shortcutsGroup);
 
@@ -251,8 +248,7 @@ QWidget* MainWindow::createUnifiedSettingsWidget()
         if (editor && editor->snippetManager()) {
             // For now load empty; real data comes from settings
         }
-        QSettings s;
-        QString data = s.value("snippets/data").toString();
+        QString data = SettingsStore::instance().value("snippets/data", QString()).toString();
         if (!data.isEmpty()) {
             dlg.loadSnippets(QJsonDocument::fromJson(data.toUtf8()).object());
         }
@@ -278,7 +274,7 @@ QWidget* MainWindow::createUnifiedSettingsWidget()
                     arr.append(sObj);
                 }
             }
-            s.setValue("snippets", QJsonDocument(arr).toJson());
+            SettingsStore::instance().setValue("snippets", QJsonDocument(arr).toJson());
             // Sync to SnippetManager in all open editors
             for (int i = 0; i < ui->tabWidget->count(); ++i) {
                 if (CodeEditor *ed = qobject_cast<CodeEditor*>(ui->tabWidget->widget(i))) {
@@ -315,7 +311,7 @@ QWidget* MainWindow::createUnifiedSettingsWidget()
     registryUrlEdit->setText(registryUrl);
     connect(registryUrlEdit, &QLineEdit::textChanged, this, [this](const QString &url) {
         m_pluginRegistry->setRegistryUrl(url);
-        QSettings().setValue("plugin/registryUrl", url);
+        SettingsStore::instance().setValue("plugin/registryUrl", url);
     });
     registryLayout->addWidget(registryUrlLabel);
     registryLayout->addWidget(registryUrlEdit);
@@ -323,7 +319,7 @@ QWidget* MainWindow::createUnifiedSettingsWidget()
 
     // Connect update buttons
     connect(checkStableButton, &QPushButton::clicked, this, [this]() {
-        updater->checkForUpdates(QCoreApplication::applicationVersion(), QSettings().value("updates/url", "https://api.github.com/repos/jason1015-coder/scriptura/releases/latest").toString());
+        updater->checkForUpdates(QCoreApplication::applicationVersion(), SettingsStore::instance().value("updates/url", "https://api.github.com/repos/jason1015-coder/scriptura/releases/latest").toString());
     });
     connect(checkPreReleaseButton, &QPushButton::clicked, this, [this]() {
         QMessageBox::StandardButton reply = QMessageBox::warning(
@@ -333,7 +329,7 @@ QWidget* MainWindow::createUnifiedSettingsWidget()
                "Do you want to continue?"),
             QMessageBox::Yes | QMessageBox::No);
         if (reply == QMessageBox::Yes)
-            updater->checkForUpdates(QCoreApplication::applicationVersion(), QSettings().value("updates/url", "https://api.github.com/repos/jason1015-coder/scriptura/releases").toString());
+            updater->checkForUpdates(QCoreApplication::applicationVersion(), SettingsStore::instance().value("updates/url", "https://api.github.com/repos/jason1015-coder/scriptura/releases").toString());
     });
 
     // ── Danger Zone Section ──────────────────────────────────────────────
@@ -383,10 +379,8 @@ QWidget* MainWindow::createUnifiedSettingsWidget()
         if (second != QMessageBox::Yes)
             return;
 
-        // Wipe the entire settings store (default QSettings scope covers app + plugins)
-        QSettings s;
-        s.clear();
-        s.sync();
+        // Wipe the entire settings store (encrypted Rust store covers app + plugins)
+        SettingsStore::instance().clear();
 
         // Clear in-memory caches so stale data isn't re-persisted before a restart
         recentProjects.clear();
@@ -505,8 +499,7 @@ void MainWindow::applyTheme(const Theme &theme)
         }
     }
 
-    QSettings settings;
-    settings.setValue("theme/selected", themeToLegacyInt(theme));
+    SettingsStore::instance().setValue("theme/selected", themeToLegacyInt(theme));
 }
 
 void MainWindow::on_action_theme_triggered()
@@ -547,8 +540,7 @@ void MainWindow::on_action_license_triggered()
 
   void MainWindow::setSidebarCollapsed(bool collapsed)
 {
-    QSettings settings;
-    settings.setValue("ui/sidebarCollapsed", collapsed);
+    SettingsStore::instance().setValue("ui/sidebarCollapsed", collapsed);
 
     if (collapsed) {
         // Keep the title bar toggle in sync with the actual drawer state.

@@ -1,15 +1,15 @@
 #include <QTest>
 #include <QSignalSpy>
 #include <QPlainTextEdit>
-#include <QSettings>
+#include "internals/settings_store.h"
 #include "bookmarkmanager.h"
 #include "test_bookmarkmanager.h"
 
 void TestBookmarkManager::init()
 {
-    // BookmarkManager loads persisted bookmarks from QSettings in its
+    // BookmarkManager loads persisted bookmarks from SettingsStore in its
     // constructor; clear between tests so they don't leak into each other.
-    QSettings().clear();
+    SettingsStore::instance().clear();
 }
 
 void TestBookmarkManager::testInitialState()

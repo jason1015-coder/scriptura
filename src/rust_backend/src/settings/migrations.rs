@@ -389,9 +389,16 @@ mod tests {
     #[test]
     fn test_migration_import_once_semantics() {
         use crate::settings::keychain::KeyPolicy;
+        use std::sync::atomic::{AtomicU64, Ordering};
 
+        static COUNTER: AtomicU64 = AtomicU64::new(0);
         let dir = tempfile::tempdir().expect("temp dir");
-        let service = format!("com.scriptura.app.test.{}", std::process::id());
+        let service = format!(
+            "com.scriptura.app.test.{}.{:?}.{}",
+            std::process::id(),
+            std::thread::current().id(),
+            COUNTER.fetch_add(1, Ordering::Relaxed)
+        );
         let storage = SettingsStorage::in_dir_with_service(dir.path(), service, KeyPolicy::FileOnly)
             .expect("init");
         storage.set("theme/selected", "7").expect("seed");

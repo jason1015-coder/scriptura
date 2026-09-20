@@ -1,6 +1,7 @@
 #include "welcomemenuscreen.h"
 #include "rust_adapter.h"
 #include "scriptura_actions.h"
+#include "internals/settings_store.h"
 
 #include <QIcon>
 #include <QDir>
@@ -451,8 +452,7 @@ void WelcomeMenuScreen::setThemeBackground(const QColor &color)
 
 void WelcomeMenuScreen::loadRecentProjects()
 {
-    QSettings settings;
-    m_recentProjects = settings.value("recentProjects").toStringList();
+    m_recentProjects = SettingsStore::instance().value("recentProjects", QStringList()).toStringList();
     updateRecentProjectsList();
 }
 

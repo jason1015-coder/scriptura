@@ -790,7 +790,7 @@ QDialogButtonBox > QPushButton {
                 uiActions->handle(UiActions::WelcomeOpenProject);
             });
             // Rust decided "prompt for a folder" — the native dialog is the
-            // drawer's job. Recent-project storage stays in QSettings for now.
+            // drawer's job. Recent-project storage lives in the Rust store.
             QObject::connect(uiActions, &UiActionBridge::projectPromptOpenRequested, welcome, [uiActions]() {
                 QString dirName = QFileDialog::getExistingDirectory(
                     nullptr, WelcomeMenuScreen::tr("Open Project"), QString(),

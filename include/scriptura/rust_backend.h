@@ -491,6 +491,33 @@ char* rust_test_detect_framework(const char* project_path);
 char* rust_test_build_command(const char* framework, const char* project_path, const char* filter);
 char* rust_test_parse_output(const char* framework, const char* output);
 
+/* ══════════════════════════════════════════════════════════════════
+ *  Settings Store (encrypted file + OS keychain)
+ * ══════════════════════════════════════════════════════════════════ */
+int   settings_initialize(void);
+int   settings_initialize_with_names(const char* app, const char* org);
+char* settings_migration_status(void);
+char* settings_get(const char* key);
+int   settings_set(const char* key, const char* value);
+int   settings_remove(const char* key);
+int   settings_contains(const char* key);
+char* settings_get_all_json(void);
+int   settings_set_all_json(const char* json);
+int   settings_set_secret(const char* key, const char* value);
+char* settings_get_secret(const char* key);
+int   settings_delete_secret(const char* key);
+int   settings_has_secret(const char* key);
+int   settings_is_keychain_available(void);
+char* settings_keychain_backend(void);
+int   settings_keychain_is_persistent(void);
+char* settings_key_storage(void);
+char* settings_warnings_json(void);
+int   settings_clear_all(void);
+int   settings_factory_reset(void);
+char* settings_get_path(void);
+char* settings_get_dir(void);
+void  settings_free_string(char* s);
+
 /* ══════════════════════════════════════════════════════════════════════
  *  UI Action Handler
  * ══════════════════════════════════════════════════════════════════════

@@ -3,7 +3,7 @@
 
 #include <QObject>
 #include <QVariant>
-#include <QSettings>
+#include <QSettings> // legacy view only; storage is the Rust SettingsStore
 #include <functional>
 #include "plugininterface.h"
 #include "permission.h"

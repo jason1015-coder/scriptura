@@ -10,7 +10,7 @@
 
 #include <QMouseEvent>
 #include <QKeyEvent>
-#include <QSettings>
+#include "internals/settings_store.h"
 #include <QTimer>
 #include <QPropertyAnimation>
 #include <QEasingCurve>
@@ -186,12 +186,11 @@ void MainWindow::closeEvent(QCloseEvent *event)
         autoSaveTimer->stop();
         
         // Save window geometry and state
-        QSettings settings;
-        settings.setValue("mainWindow/geometry", saveGeometry());
-        settings.setValue("mainWindow/state", saveState());
-        settings.setValue("mainWindow/bottomPanelVisible", ui->bottomPanelContainer->isVisible());
-        settings.setValue("mainWindow/bottomPanelIndex", currentBottomPanelIndex());
-        settings.setValue("ui/sidebarCollapsed", ui->sidebarDrawer->isHidden());
+        SettingsStore::instance().setValue("mainWindow/geometry", saveGeometry());
+        SettingsStore::instance().setValue("mainWindow/state", saveState());
+        SettingsStore::instance().setValue("mainWindow/bottomPanelVisible", ui->bottomPanelContainer->isVisible());
+        SettingsStore::instance().setValue("mainWindow/bottomPanelIndex", currentBottomPanelIndex());
+        SettingsStore::instance().setValue("ui/sidebarCollapsed", ui->sidebarDrawer->isHidden());
         
         event->accept();
 

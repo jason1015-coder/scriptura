@@ -1,12 +1,13 @@
 #include "applicationcontext.h"
 #include "mainwindow.h"
+#include "internals/settings_store.h"
 #include "plugins/api/uiapi.h"
 #include "plugins/api/notificationapi.h"
 
 ApplicationContext::ApplicationContext(MainWindow* mainWindow, QObject* parent)
     : QObject(parent)
     , m_mainWindow(mainWindow)
-    , m_settings(new QSettings(this))
+    , m_settings(SettingsStore::instance().createLegacySettings(this))
     , m_uiApi(mainWindow ? new PluginUIApi(mainWindow, this) : nullptr)
     , m_notificationApi(mainWindow ? new PluginNotificationApi(mainWindow, this) : nullptr)
 {

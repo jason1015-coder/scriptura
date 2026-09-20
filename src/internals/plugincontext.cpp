@@ -1,6 +1,7 @@
 #include "plugincontext.h"
 #include "rust_adapter.h"
 #include "mainwindow.h"
+#include "internals/settings_store.h"
 #include "plugins/api/uiapi.h"
 #include "plugins/api/editorapi.h"
 #include "plugins/api/notificationapi.h"
@@ -20,7 +21,10 @@ PluginContext::PluginContext(MainWindow* mainWindow, QObject* parent)
     , m_themeApi(nullptr)
 {
     if (mainWindow) {
-        m_settings = new QSettings(this);
+        // Legacy QSettings view backed by the Rust encrypted store + OS
+        // keychain (no plaintext files). Kept as QSettings* so plugins keep
+        // compiling; new code should use SettingsStore directly.
+        m_settings = SettingsStore::instance().createLegacySettings(this);
         m_uiApi = new PluginUIApi(mainWindow, this);
         m_editorApi = new PluginEditorApi(mainWindow, this);
         m_notificationApi = new PluginNotificationApi(mainWindow, this);

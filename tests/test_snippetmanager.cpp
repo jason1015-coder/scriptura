@@ -3,15 +3,15 @@
 #include <QPlainTextEdit>
 #include <QTemporaryDir>
 #include <QFile>
-#include <QSettings>
+#include "internals/settings_store.h"
 #include "snippetmanager.h"
 #include "test_snippetmanager.h"
 
 void TestSnippetManager::init()
 {
-    // SnippetManager loads persisted snippets from QSettings in its
+    // SnippetManager loads persisted snippets from SettingsStore in its
     // constructor; clear between tests so they don't leak into each other.
-    QSettings().clear();
+    SettingsStore::instance().clear();
 }
 
 namespace {

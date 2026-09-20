@@ -9,7 +9,7 @@
 
 #include <QDebug>
 #include <QTimer>
-#include <QSettings>
+#include "internals/settings_store.h"
 #include <QStandardPaths>
 #include <QCoreApplication>
 
@@ -50,10 +50,9 @@ void MainWindow::setupApplicationDock()
         Q_UNUSED(name);
         Q_UNUSED(iconPath);
         // Remove from pending install list if it was there
-        QSettings settings;
-        QStringList pending = settings.value("apps/pendingInstall").toStringList();
+        QStringList pending = SettingsStore::instance().value("apps/pendingInstall", QStringList()).toStringList();
         if (pending.removeAll(id) > 0) {
-            settings.setValue("apps/pendingInstall", pending);
+            SettingsStore::instance().setValue("apps/pendingInstall", pending);
         }
     });
 
@@ -72,8 +71,7 @@ void MainWindow::setupApplicationDock()
 
             // Save selected apps to settings so they appear as "pending install"
             if (!dialog.skipped()) {
-                QSettings settings;
-                settings.setValue("apps/pendingInstall", dialog.selectedApps());
+                SettingsStore::instance().setValue("apps/pendingInstall", dialog.selectedApps());
             }
 
             qDebug() << "FirstRunInstallDialog: skipped?" << dialog.skipped()

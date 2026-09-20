@@ -485,9 +485,18 @@ pub fn create_default() -> Result<SettingsStorage, StorageError> {
 mod tests {
     use super::*;
     use crate::settings::keychain::KeyPolicy;
+    use std::sync::atomic::{AtomicU64, Ordering};
 
+    /// Unique service per test (see keychain tests) so parallel tests never
+    /// share keychain entries through the availability probe or secrets.
     fn test_service() -> String {
-        format!("com.scriptura.app.test.{}", std::process::id())
+        static COUNTER: AtomicU64 = AtomicU64::new(0);
+        format!(
+            "com.scriptura.app.test.{}.{:?}.{}",
+            std::process::id(),
+            std::thread::current().id(),
+            COUNTER.fetch_add(1, Ordering::Relaxed)
+        )
     }
 
     /// Storage rooted in a temporary directory, with an isolated keychain

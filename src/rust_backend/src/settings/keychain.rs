@@ -445,14 +445,24 @@ pub fn restrict_to_owner(_path: &Path, _mode: u32) -> io::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::atomic::{AtomicU64, Ordering};
 
     fn temp_dir() -> tempfile::TempDir {
         tempfile::tempdir().expect("temp dir")
     }
 
-    /// Unique service per test process so tests never touch real credentials.
+    /// Unique service per test (process id + thread + counter) so parallel
+    /// tests never share keychain entries with each other or touch real
+    /// credentials. The kernel keyring is process-global, so `process::id`
+    /// alone is not enough when tests run on multiple threads.
     fn test_service() -> String {
-        format!("com.scriptura.app.test.{}", std::process::id())
+        static COUNTER: AtomicU64 = AtomicU64::new(0);
+        format!(
+            "com.scriptura.app.test.{}.{:?}.{}",
+            std::process::id(),
+            std::thread::current().id(),
+            COUNTER.fetch_add(1, Ordering::Relaxed)
+        )
     }
 
     #[test]

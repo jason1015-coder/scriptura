@@ -2,7 +2,6 @@
 #include "codeeditor.h"
 #include <QMainWindow>
 #include <QTabWidget>
-#include <QSettings>
 #include <QJsonDocument>
 #include <QFile>
 #include <QDir>

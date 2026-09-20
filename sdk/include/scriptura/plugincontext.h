@@ -34,6 +34,7 @@ public:
     ~PluginContext() override;
 
     MainWindow* mainWindow() const;
+    // Legacy view backed by the Rust encrypted store (no plaintext files).
     QSettings* settings() const;
     CodeEditor* currentEditor() const;
     LspClient* lspClient() const;
