@@ -428,8 +428,15 @@ void MainWindow::on_action_project_search_triggered()
 {
     QString root = projectDir.isEmpty() ? QDir::homePath() : projectDir;
     findReplaceBar->setVisible(false);
-    showBottomPanelIndex(0);
-    projectSearchPanel->show();
+    // Find the search panel's index in m_panelButtons
+    int idx = 0;
+    for (int i = 0; i < m_panelButtons.size(); ++i) {
+        if (m_panelButtons[i].title == tr("Search")) {
+            idx = i;
+            break;
+        }
+    }
+    showBottomPanelIndex(idx);
     ui->bottomPanelContainer->show();
     projectSearchPanel->setRootPath(root);
     projectSearchPanel->search(QString(), root);

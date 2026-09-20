@@ -98,7 +98,7 @@ public:
     bool isDarkModeEnabled() const { return selectedTheme.mode == ThemeMode::Dark; }
 
     // Bottom panel button helpers (used by plugin API and dock)
-    int addBottomPanelButton(const QString &iconPath, const QString &tooltip, const QString &title, bool builtin = false);
+    int addBottomPanelButton(const QString &iconPath, const QString &tooltip, const QString &title, bool builtin = false, QWidget *panelWidget = nullptr);
     void showBottomPanelIndex(int index);
     int currentBottomPanelIndex() const;
     QString bottomPanelButtonTooltip(int index) const;
@@ -292,7 +292,7 @@ protected:
     void updateBottomTabBar();
     void updateTabBarVisibility();
     QIcon createSymbolIcon(QChar symbol) const;
-    QPushButton* createTabCloseButton(const QString &filePath);
+    QPushButton* createTabCloseButton();
     QPushButton* createEditorTabCloseButton(CodeEditor *editor);
     QPushButton* createSettingsTabCloseButton(int tabIndex);
     void newUntitledFile();

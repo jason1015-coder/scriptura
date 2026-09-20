@@ -456,6 +456,7 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
     // Add remaining panels to bottom stack
     bottomPanelStack->addWidget(projectSearchPanel);
     projectSearchPanel->hide();
+    addBottomPanelButton(":/icons/search.svg", tr("Search Results"), tr("Search"), true, projectSearchPanel);
 
     // Sidebar icon buttons (bottom of drawer)
     fileTreeToggleButton = new QToolButton(ui->sidebarDrawer);
@@ -625,9 +626,9 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
         syncTopBarToCurrentFile();
     });
 
-    // Bottom panel buttons (replacing QTabBar with SVG icon buttons)
-    addBottomPanelButton(":/icons/search.svg", tr("Search Results"), tr("Search Results") + tr(" (Ctrl+Shift+F)"), true);
-    m_panelButtons[0].button->setChecked(true);
+    // Bottom panel buttons — first button (Search) is checked by default
+    if (!m_panelButtons.isEmpty())
+        m_panelButtons[0].button->setChecked(true);
 
     // Sidebar connections
     connect(fileTreeToggleButton, &QToolButton::toggled, this, [this](bool checked) {
@@ -1043,19 +1044,19 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
     m_gitRebase = new GitRebaseWidget(this);
     bottomPanelStack->addWidget(m_gitRebase);
     m_gitRebase->hide();
-    addBottomPanelButton(":/icons/git.svg", tr("Git Rebase"), tr("Rebase"), true);
+    addBottomPanelButton(":/icons/git.svg", tr("Git Rebase"), tr("Rebase"), true, m_gitRebase);
 
     m_taskRunnerUI = new TaskRunnerUI(this);
     bottomPanelStack->addWidget(m_taskRunnerUI);
     m_taskRunnerUI->hide();
-    addBottomPanelButton(":/icons/check.svg", tr("Task Runner"), tr("Tasks"), true);
+    addBottomPanelButton(":/icons/check.svg", tr("Task Runner"), tr("Tasks"), true, m_taskRunnerUI);
 
     CodeEditor *currentEditor = getCurrentCodeEditor();
     BookmarkManager *bm = currentEditor ? currentEditor->bookmarkManager() : nullptr;
     m_bookmarkPanel = new BookmarkPanelWidget(bm, this);
     bottomPanelStack->addWidget(m_bookmarkPanel);
     m_bookmarkPanel->hide();
-    addBottomPanelButton(":/icons/file.svg", tr("Bookmarks"), tr("Bookmarks"), true);
+    addBottomPanelButton(":/icons/file.svg", tr("Bookmarks"), tr("Bookmarks"), true, m_bookmarkPanel);
 
     // Connect bookmark panel to active editor (per-tab sync)
     connect(ui->tabWidget, &QTabWidget::currentChanged, this, [this](int index) {
@@ -1108,7 +1109,7 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
     m_pluginMarketplace = new PluginMarketplaceWidget(m_pluginRegistry, this);
     bottomPanelStack->addWidget(m_pluginMarketplace);
     m_pluginMarketplace->hide();
-    addBottomPanelButton(":/icons/settings.svg", tr("Plugin Marketplace"), tr("Marketplace"), true);
+    addBottomPanelButton(":/icons/settings.svg", tr("Plugin Marketplace"), tr("Marketplace"), true, m_pluginMarketplace);
 
     // Connect marketplace signals
     connect(m_pluginMarketplace, &PluginMarketplaceWidget::pluginInstalled, this, [this](const QString &pluginId) {
@@ -1398,7 +1399,7 @@ CodeEditor* MainWindow::getCurrentCodeEditor()
     return qobject_cast<CodeEditor*>(ui->tabWidget->currentWidget());
 }
 
-int MainWindow::addBottomPanelButton(const QString &iconPath, const QString &tooltip, const QString &title, bool builtin)
+int MainWindow::addBottomPanelButton(const QString &iconPath, const QString &tooltip, const QString &title, bool builtin, QWidget *panelWidget)
 {
     QToolButton *btn = new QToolButton(bottomPanelButtons);
     btn->setIconSize(QSize(18, 18));
@@ -1414,7 +1415,7 @@ int MainWindow::addBottomPanelButton(const QString &iconPath, const QString &too
     entry.panelIndex = index;
     entry.title = title;
     entry.builtin = builtin;
-    entry.panelWidget = builtin ? bottomPanelStack->widget(index) : nullptr;
+    entry.panelWidget = builtin ? panelWidget : nullptr;
     m_panelButtons.append(entry);
 
     QHBoxLayout *layout = qobject_cast<QHBoxLayout*>(bottomPanelButtons->layout());
@@ -1430,7 +1431,7 @@ int MainWindow::addBottomPanelButton(const QString &iconPath, const QString &too
     // Also add a tab to the main tab bar for this panel
     int tabIndex = tabBar->addTab(title);
     tabBar->setTabData(tabIndex, QString("panel:%1").arg(index));
-    tabBar->setTabButton(tabIndex, QTabBar::RightSide, createTabCloseButton(QString("panel:%1").arg(index)));
+    tabBar->setTabButton(tabIndex, QTabBar::RightSide, createTabCloseButton());
 
     return index;
 }
@@ -1445,18 +1446,20 @@ void MainWindow::showBottomPanelIndex(int index)
         m_panelButtons[i].button->setChecked(i == index);
     }
 
-    // If the panel widget was removed (closed tab), re-add it for built-in panels
+    QWidget *widget = nullptr;
+
     if (m_panelButtons[index].builtin && m_panelButtons[index].panelWidget) {
-        QWidget *widget = m_panelButtons[index].panelWidget;
-        // Remove from current position if already in stack
-        bottomPanelStack->removeWidget(widget);
-        // Insert at the correct index
-        bottomPanelStack->insertWidget(index, widget);
-        m_panelButtons[index].panelWidget = nullptr;
+        widget = m_panelButtons[index].panelWidget;
+        // Re-add to stack only if it was previously removed (closed tab)
+        if (bottomPanelStack->indexOf(widget) < 0) {
+            bottomPanelStack->addWidget(widget);
+        }
     }
 
-    // QStackedWidget::setCurrentIndex shows the widget at index and hides all others
-    bottomPanelStack->setCurrentIndex(index);
+    // Show the correct widget in the stack
+    if (widget) {
+        bottomPanelStack->setCurrentWidget(widget);
+    }
 
     // Show the bottom panel container
     ui->bottomPanelContainer->show();
@@ -1503,6 +1506,7 @@ void MainWindow::closePanelTab(int panelIndex)
 {
     int tabIdx = findPanelTabIndex(panelIndex);
     if (tabIdx >= 0) {
+        QSignalBlocker blocker(tabBar);
         tabBar->removeTab(tabIdx);
     }
     // Also remove the button from bottom panel buttons
@@ -1515,7 +1519,7 @@ void MainWindow::closePanelTab(int panelIndex)
         // For built-in panels, save the widget reference before removing from stack
         QWidget *widget = nullptr;
         if (m_panelButtons[panelIndex].builtin) {
-            widget = bottomPanelStack->widget(panelIndex);
+            widget = m_panelButtons[panelIndex].panelWidget;
             if (widget) {
                 bottomPanelStack->removeWidget(widget);
                 widget->hide();
@@ -1523,18 +1527,26 @@ void MainWindow::closePanelTab(int panelIndex)
         }
         m_panelButtons[panelIndex].panelWidget = widget;
         m_panelButtons.removeAt(panelIndex);
-        // Update panelIndex for remaining buttons
+        // Update panelIndex for remaining buttons and fix stale tab bar data
         for (int i = panelIndex; i < m_panelButtons.size(); ++i) {
             m_panelButtons[i].panelIndex = i;
+            int tIdx = findPanelTabIndex(i + 1);
+            if (tIdx >= 0) {
+                tabBar->setTabData(tIdx, QString("panel:%1").arg(i));
+            }
         }
+    }
+    // Hide the bottom panel container if no panel tabs remain
+    if (tabBar->count() == 0) {
+        ui->bottomPanelContainer->hide();
     }
 }
 
 void MainWindow::removePanelTab(int panelIndex)
 {
     // Remove from bottomPanelStack as well (for plugin panels)
-    if (panelIndex >= 0 && panelIndex < bottomPanelStack->count()) {
-        QWidget *widget = bottomPanelStack->widget(panelIndex);
+    if (panelIndex >= 0 && panelIndex < m_panelButtons.size()) {
+        QWidget *widget = m_panelButtons[panelIndex].panelWidget;
         if (widget) {
             bottomPanelStack->removeWidget(widget);
             widget->deleteLater();
@@ -1543,27 +1555,44 @@ void MainWindow::removePanelTab(int panelIndex)
     closePanelTab(panelIndex);
 }
 
-QPushButton* MainWindow::createTabCloseButton(const QString &filePath)
+QPushButton* MainWindow::createTabCloseButton()
 {
     QPushButton *closeBtn = new QPushButton();
     ThemeIcons::instance()->setIcon(closeBtn, ":/icons/close.svg");
     closeBtn->setFixedSize(20, 20);
     closeBtn->setFlat(true);
     closeBtn->setCursor(Qt::ArrowCursor);
-    connect(closeBtn, &QPushButton::clicked, this, [this, filePath]() {
-        // Check if it's a panel tab
-        if (filePath.startsWith("panel:")) {
-            bool ok = false;
-            int panelIndex = filePath.mid(6).toInt(&ok);
-            if (ok) {
-                closePanelTab(panelIndex);
-            }
-            return;
-        }
-        // Look up the file's index in openFiles by path (not tabBar index)
-        for (int i = 0; i < openFiles.size(); ++i) {
-            if (openFiles[i].filePath == filePath) {
-                on_tabWidget_tabCloseRequested(i);
+    connect(closeBtn, &QPushButton::clicked, this, [this, closeBtn]() {
+        // Find which tabBar tab owns this button, then read the CURRENT data
+        // (not a stale capture — panel indices shift after close).
+        for (int i = 0; i < tabBar->count(); ++i) {
+            if (tabBar->tabButton(i, QTabBar::RightSide) == closeBtn) {
+                QVariant data = tabBar->tabData(i);
+                if (data.typeId() == QMetaType::QString) {
+                    QString str = data.toString();
+                    if (str.startsWith("panel:")) {
+                        bool ok = false;
+                        int panelIndex = str.mid(6).toInt(&ok);
+                        if (ok)
+                            closePanelTab(panelIndex);
+                    } else {
+                        // File tab — resolve by stable id
+                        for (auto it = m_tabIds.constBegin(); it != m_tabIds.constEnd(); ++it) {
+                            if (it.value() == str) {
+                                int widx = ui->tabWidget->indexOf(it.key());
+                                if (widx >= 0)
+                                    on_tabWidget_tabCloseRequested(widx);
+                                return;
+                            }
+                        }
+                        for (int k = 0; k < openFiles.size(); ++k) {
+                            if (openFiles[k].filePath == str) {
+                                on_tabWidget_tabCloseRequested(k);
+                                return;
+                            }
+                        }
+                    }
+                }
                 return;
             }
         }
