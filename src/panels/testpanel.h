@@ -48,7 +48,6 @@ private slots:
 
 private:
     void setupUI();
-    void populateTree(const QVariant &suite);
     void updateSummary(int passed, int failed, int skipped);
     void addOutputLine(const QString &line, bool isError = false);
 

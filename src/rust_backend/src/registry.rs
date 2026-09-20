@@ -116,7 +116,6 @@ impl PluginRegistry {
 mod tests {
     use super::*;
     use std::os::raw::c_char;
-    use std::sync::atomic::{AtomicBool, Ordering};
 
     #[test]
     fn test_new_registry() {

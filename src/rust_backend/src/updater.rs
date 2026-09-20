@@ -127,7 +127,7 @@ mod tests {
 
     #[test]
     fn test_version_comparison_logic() {
-        let mut u = Updater::new();
+        let u = Updater::new();
         // We can't easily test the HTTP path, but we can test the getters
         assert!(!u.is_update_available());
         u.latest_version();

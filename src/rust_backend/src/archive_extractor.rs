@@ -96,7 +96,6 @@ mod tests {
 
     #[test]
     fn test_new_extractor() {
-        let ae = ArchiveExtractor::new();
         let data = create_test_zip("hello", "test.txt");
         // No-op: just verify construction
         assert!(!data.is_empty());

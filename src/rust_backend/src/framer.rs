@@ -128,7 +128,7 @@ mod tests {
     use std::os::raw::c_char;
     use std::sync::atomic::{AtomicBool, Ordering};
 
-    extern "C" fn test_msg_callback(data: *const c_char, user_data: *mut c_void) {
+    extern "C" fn test_msg_callback(_data: *const c_char, user_data: *mut c_void) {
         unsafe {
             let flag = &*(user_data as *const AtomicBool);
             flag.store(true, Ordering::SeqCst);

@@ -63,7 +63,6 @@
 
 class FindReplaceBar;
 class ProjectSearchPanel;
-class ApplicationManager;
 class PluginMarketplaceWidget;
 class ThemeMarketplaceWidget;
 
@@ -262,11 +261,6 @@ protected:
     RustPluginRegistryAdapter *m_pluginRegistry;
     BreadcrumbBarWidget *m_breadcrumbBar;
     QMetaObject::Connection m_cssBreadcrumbConnection;
-
-    // Applications (installable apps, no dock UI)
-    ApplicationManager *m_appManager = nullptr;
-
-    void setupApplicationDock();
 
     // P0/P1/P2/P3 Feature Modules
     ZenMode *m_zenMode;

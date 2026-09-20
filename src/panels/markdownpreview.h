@@ -50,7 +50,6 @@ private:
     void setupUI();
     QString markdownToHtml(const QString &markdown) const;
     QString processInlineMarkdown(const QString &text) const;
-    QString processBlockMarkdown(const QString &text) const;
     
     QSplitter *m_splitter;
     QPlainTextEdit *m_editor;
