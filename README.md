@@ -86,7 +86,7 @@ The backend services are compiled into a static library (`libscriptura_backend.a
 
 **Plugins / themes / shell**
 - `ScripturaPlugin` SDK (`sdk/`, `include/scriptura/plugininterface.h`), `PluginManagerDialog`, `PluginContext` + Editor / Ui / Notification / Theme APIs, `ApplicationManager` + `FirstRunInstallDialog`
-- `PluginMarketplaceWidget` + `ThemeMarketplaceWidget` bottom panels, registry-URL setting, `ThemeManager` (8 families × Light / Dark) + `ThemeIcons`, `CustomTitleBar`, `WindowAnimator`, `WelcomeMenuScreen`, `StatusBarWidget`, `NotificationCenter`, `ZenMode`, `SplitManager`
+- `PluginMarketplaceWidget` bottom panel, registry-URL setting, `ThemeManager` (8 families × Light / Dark) + `ThemeIcons`, `CustomTitleBar`, `WindowAnimator`, `WelcomeMenuScreen`, `StatusBarWidget`, `NotificationCenter`, `ZenMode`, `SplitManager`
 - Tests: `cargo test` + ~36 `tests/test_*.cpp` (`ctest`), CI `build.yml` / `test.yml` on Linux / macOS / Windows
 
 ### 🚧 Partially implemented (code + tests exist, not wired)

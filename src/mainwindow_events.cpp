@@ -44,8 +44,16 @@ bool MainWindow::eventFilter(QObject *watched, QEvent *event)
                 if (data.typeId() == QMetaType::Int) {
                     // Settings tab — middle-click closes it like the X button
                     tabBar->removeTab(idx);
-                    if (tabBar->count() == 0)
+                    int cur = tabBar->currentIndex();
+                    if (cur < 0) {
                         showEditorInterface();
+                    } else {
+                        QVariant curData = tabBar->tabData(cur);
+                        bool isSettings = (curData.typeId() == QMetaType::Int
+                                           && static_cast<TabType>(curData.toInt()) == TabType::Settings);
+                        if (!isSettings)
+                            showEditorInterface();
+                    }
                     updateTabBarVisibility();
                     return true;
                 }

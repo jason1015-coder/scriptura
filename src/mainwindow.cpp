@@ -15,7 +15,6 @@
 #include "aiinlinecompletion.h"
 #include "codeactionui.h"
 #include "pluginmarketplace.h"
-#include "themarketplace.h"
 #include "plugins/api/uiapi.h"
 #include "plugins/api/editorapi.h"
 #include "plugins/api/notificationapi.h"
@@ -811,8 +810,50 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
         }
     });
 
-    QShortcut *shortcutCloseWindow = new QShortcut(QKeySequence("Ctrl+W"), this);
-    connect(shortcutCloseWindow, &QShortcut::activated, this, &QWidget::close);
+    // Ctrl+W is documented as "Close Tab" — close the active tab; only fall
+    // back to closing the window when there is nothing left to close.
+    QShortcut *shortcutCloseTab = new QShortcut(QKeySequence("Ctrl+W"), this);
+    connect(shortcutCloseTab, &QShortcut::activated, this, [this]() {
+        int idx = ui->tabWidget->currentIndex();
+        if (idx >= 0) {
+            on_tabWidget_tabCloseRequested(idx);
+            return;
+        }
+        // No file tabs — close the active settings/panel tab if one is open.
+        int topIdx = tabBar->currentIndex();
+        if (topIdx >= 0) {
+            QVariant data = tabBar->tabData(topIdx);
+            if (data.typeId() == QMetaType::Int) {
+                for (int i = 0; i < tabBar->count(); ++i) {
+                    if (tabBar->tabData(i).toInt() == static_cast<int>(TabType::Settings)) {
+                        tabBar->removeTab(i);
+                        break;
+                    }
+                }
+                int cur = tabBar->currentIndex();
+                if (cur < 0) {
+                    showEditorInterface();
+                } else {
+                    QVariant curData = tabBar->tabData(cur);
+                    bool isSettings = (curData.typeId() == QMetaType::Int
+                                       && static_cast<TabType>(curData.toInt()) == TabType::Settings);
+                    if (!isSettings)
+                        showEditorInterface();
+                }
+            } else if (data.typeId() == QMetaType::QString) {
+                QString strData = data.toString();
+                if (strData.startsWith("panel:")) {
+                    bool ok = false;
+                    int panelIndex = strData.mid(6).toInt(&ok);
+                    if (ok)
+                        closePanelTab(panelIndex);
+                }
+            }
+            updateTabBarVisibility();
+            return;
+        }
+        close();
+    });
 
     // Keyboard shortcuts previously defined on .ui action shortcuts (now removed with menus)
     QShortcut *shortcutSave = new QShortcut(QKeySequence("Ctrl+S"), this);
@@ -1069,17 +1110,7 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
     m_pluginMarketplace->hide();
     addBottomPanelButton(":/icons/settings.svg", tr("Plugin Marketplace"), tr("Marketplace"), true);
 
-    // P3: Theme Marketplace — kept as built-in (no app wrapper yet)
-    m_themeMarketplace = new ThemeMarketplaceWidget(this);
-    m_themeMarketplace->loadBuiltinThemes();
-    bottomPanelStack->addWidget(m_themeMarketplace);
-    m_themeMarketplace->hide();
-    addBottomPanelButton(":/icons/theme.svg", tr("Theme Marketplace"), tr("Themes"), true);
-
     // Connect marketplace signals
-    connect(m_themeMarketplace, &ThemeMarketplaceWidget::themeInstalled, this, [this](const QString &themeName) {
-        qDebug() << "Theme installed:" << themeName;
-    });
     connect(m_pluginMarketplace, &PluginMarketplaceWidget::pluginInstalled, this, [this](const QString &pluginId) {
         qDebug() << "Plugin installed:" << pluginId;
     });

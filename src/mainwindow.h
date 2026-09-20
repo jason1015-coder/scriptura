@@ -64,7 +64,6 @@
 class FindReplaceBar;
 class ProjectSearchPanel;
 class PluginMarketplaceWidget;
-class ThemeMarketplaceWidget;
 
 #include "themedefs.h"
 #include "breadcrumbbar.h"
@@ -285,7 +284,6 @@ protected:
     CssBreadcrumbParser *m_cssBreadcrumbParser;
     SnippetEditorDialog *m_snippetEditorDialog;
     PluginMarketplaceWidget *m_pluginMarketplace = nullptr;
-    ThemeMarketplaceWidget *m_themeMarketplace = nullptr;
 
     void updateCursorPosition();
     void updateStatusBar();

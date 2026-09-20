@@ -25,7 +25,6 @@
 #include <QStringConverter>
 #include "encodingmanager.h"
 #include "pluginmarketplace.h"
-#include "themarketplace.h"
 
 void MainWindow::showEditorInterface()
 {
@@ -511,14 +510,13 @@ void MainWindow::on_tabWidget_tabCloseRequested(int index)
         QString closedUri = QUrl::fromLocalFile(closedPath).toString();
         lspClient->didClose(closedUri);
     }
-    openFiles.removeAt(index);
-    m_tabIds.remove(widget);
-
-    ui->tabWidget->removeTab(index);
 
     int barIdx = findTabBarIndexForId(closedId);
     if (barIdx >= 0)
         tabBar->removeTab(barIdx);
+    openFiles.removeAt(index);
+    m_tabIds.remove(widget);
+    ui->tabWidget->removeTab(index);
     delete widget;
 
     if (ui->tabWidget->count() > 0) {
@@ -725,9 +723,17 @@ QPushButton* MainWindow::createSettingsTabCloseButton(int tabIndex)
                 break;
             }
         }
-        // If no tabs remain, show editor interface
-        if (tabBar->count() == 0) {
+        // After removal, ensure editorStack shows the editor if the new
+        // current tab is not a settings tab.
+        int cur = tabBar->currentIndex();
+        if (cur < 0) {
             showEditorInterface();
+        } else {
+            QVariant data = tabBar->tabData(cur);
+            bool isSettings = (data.typeId() == QMetaType::Int
+                               && static_cast<TabType>(data.toInt()) == TabType::Settings);
+            if (!isSettings)
+                showEditorInterface();
         }
         updateTabBarVisibility();
     });
