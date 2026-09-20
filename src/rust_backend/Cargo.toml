@@ -23,3 +23,51 @@ zip = { version = "2", default-features = false, features = ["deflate"] }
 reqwest = { version = "0.12", default-features = false, features = ["blocking", "json", "stream", "rustls-tls"] }
 semver = "1"
 tempfile = "3"
+
+# NEW: Encryption - AES-256-GCM authenticated encryption
+aes-gcm = "0.10"
+aead = "0.5"
+
+# NEW: Secure memory handling for sensitive data
+secrecy = { version = "0.10", features = ["serde"] }
+zeroize = { version = "1", features = ["serde"] }
+
+# NEW: Platform-specific directories for app data storage
+directories = "5"
+
+# NEW: Random number generation for cryptographic operations
+rand = "0.8"
+
+# ── OS-native keychain backends ───────────────────────────────────────
+# `keyring` v3 ships *no* default features: every platform credential store
+# has to be selected explicitly, otherwise the crate silently falls back to a
+# mock store that always errors.
+#
+#   macOS   → Keychain            (durable)
+#   Windows → Credential Manager  (durable)
+#   Linux   → in-kernel keyring   (session scoped, no extra system deps)
+#
+# The Linux backend is intentionally the pure-Rust `linux-native` (keyutils)
+# store so that no libdbus-1-dev is required to build Scriptura. Because kernel
+# keys do not survive a logout, the settings module keeps the *master
+# encryption key* in a 0600 file on Linux unless the Secret Service backend is
+# enabled at build time:
+#
+#   cargo build --features linux-secret-service      # requires libdbus-1-dev
+#
+# With that feature the Secret Service (GNOME Keyring / KWallet) becomes the
+# primary, persistent master-key store.
+[target.'cfg(target_os = "linux")'.dependencies]
+keyring = { version = "3", features = ["linux-native"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+keyring = { version = "3", features = ["apple-native"] }
+
+[target.'cfg(target_os = "windows")'.dependencies]
+keyring = { version = "3", features = ["windows-native"] }
+
+[features]
+default = []
+# Opt into the Secret Service credential store on Linux for durable keychain
+# storage (needs libdbus-1-dev at build time).
+linux-secret-service = ["keyring/linux-native-sync-persistent"]

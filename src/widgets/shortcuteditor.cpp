@@ -1,8 +1,10 @@
 #include "shortcuteditor.h"
+#include "internals/settings_store.h"
 #include <QHeaderView>
 #include <QMessageBox>
-#include <QSettings>
 #include <QKeyEvent>
+#include <QJsonDocument>
+#include <QJsonObject>
 
 void ShortcutEditorWidget::keyPressEvent(QKeyEvent *event)
 {
@@ -72,8 +74,6 @@ ShortcutEditorWidget::ShortcutEditorWidget(QWidget *parent)
 void ShortcutEditorWidget::loadShortcuts()
 {
     m_shortcuts.clear();
-    QSettings settings;
-    Q_UNUSED(settings);
 
     // Default shortcuts
     struct DefaultShortcut { QString action; QString category; QString shortcut; };
@@ -120,7 +120,7 @@ void ShortcutEditorWidget::loadShortcuts()
     };
 
     for (const auto &def : defaults) {
-        QString saved = settings.value("shortcuts/" + def.action).toString();
+        QString saved = SettingsStore::instance().value("shortcuts/" + def.action, QString()).toString();
         QKeySequence seq = saved.isEmpty() ? QKeySequence(def.shortcut) : QKeySequence(saved);
         m_shortcuts[def.action] = {def.action, def.category, QKeySequence(def.shortcut), seq};
     }
@@ -192,17 +192,25 @@ void ShortcutEditorWidget::resetToDefaults()
         it->currentShortcut = it->defaultShortcut;
     }
     populateTree();
-    QSettings().remove("shortcuts");
+    // Remove all shortcut overrides
+    QString allJson = SettingsStore::instance().getAllAsJson();
+    QJsonDocument doc = QJsonDocument::fromJson(allJson.toUtf8());
+    if (doc.isObject()) {
+        QJsonObject obj = doc.object();
+        for (auto it = obj.begin(); it != obj.end(); ++it) {
+            if (it.key().startsWith(QStringLiteral("shortcuts/")))
+                SettingsStore::instance().remove(it.key());
+        }
+    }
 }
 
 void ShortcutEditorWidget::saveShortcuts()
 {
-    QSettings settings;
     for (auto it = m_shortcuts.constBegin(); it != m_shortcuts.constEnd(); ++it) {
         if (it->currentShortcut != it->defaultShortcut) {
-            settings.setValue("shortcuts/" + it->actionName, it->currentShortcut.toString());
+            SettingsStore::instance().setValue("shortcuts/" + it->actionName, it->currentShortcut.toString());
         } else {
-            settings.remove("shortcuts/" + it->actionName);
+            SettingsStore::instance().remove("shortcuts/" + it->actionName);
         }
     }
 }

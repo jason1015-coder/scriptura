@@ -31,6 +31,7 @@ mod plugin;
 mod plugin_updater;
 mod registry;
 mod service_locator;
+mod settings;
 mod task_runner;
 mod updater;
 mod utils;
@@ -53,6 +54,17 @@ pub(crate) fn take_last_error() -> Option<String> {
         static LAST_ERROR: RefCell<Option<String>> = const { RefCell::new(None) };
     }
     LAST_ERROR.with(|e| e.borrow_mut().take())
+}
+
+/// Record an error message for the C++ layer (retrieved via [`rust_last_error`]).
+pub(crate) fn set_last_error(message: impl Into<String>) {
+    use std::cell::RefCell;
+    thread_local! {
+        static LAST_ERROR: RefCell<Option<String>> = const { RefCell::new(None) };
+    }
+    let message = message.into();
+    log::error!("{}", message);
+    LAST_ERROR.with(|e| *e.borrow_mut() = Some(message));
 }
 
 /// Get the last error message from any Rust backend (thread-local).

@@ -1,7 +1,7 @@
 #include "snippetmanager.h"
+#include "internals/settings_store.h"
 #include <QPlainTextEdit>
 #include <QTextCursor>
-#include <QSettings>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonArray>
@@ -217,9 +217,8 @@ void SnippetManager::clearTabStops()
 
 void SnippetManager::saveToSettings()
 {
-    QSettings settings;
     QJsonArray arr;
-    
+
     for (const Snippet &s : m_snippets) {
         QJsonObject obj;
         obj["id"] = s.id;
@@ -231,18 +230,17 @@ void SnippetManager::saveToSettings()
         obj["tabStops"] = s.tabStops;
         arr.append(obj);
     }
-    
-    settings.setValue("snippets", QJsonDocument(arr).toJson());
+
+    SettingsStore::instance().set("snippets", QString::fromUtf8(QJsonDocument(arr).toJson(QJsonDocument::Compact)));
 }
 
 void SnippetManager::loadFromSettings()
 {
-    QSettings settings;
-    QByteArray data = settings.value("snippets").toByteArray();
-    
-    if (data.isEmpty()) return;
-    
-    QJsonDocument doc = QJsonDocument::fromJson(data);
+    QString strData = SettingsStore::instance().get("snippets");
+
+    if (strData.isEmpty()) return;
+
+    QJsonDocument doc = QJsonDocument::fromJson(strData.toUtf8());
     QJsonArray arr = doc.array();
     
     m_snippets.clear();

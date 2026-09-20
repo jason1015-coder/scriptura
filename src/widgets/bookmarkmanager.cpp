@@ -1,5 +1,5 @@
 #include "bookmarkmanager.h"
-#include <QSettings>
+#include "internals/settings_store.h"
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonArray>
@@ -171,9 +171,8 @@ QList<Bookmark> BookmarkManager::bookmarksForFile(const QString &filePath) const
 
 void BookmarkManager::saveToSettings()
 {
-    QSettings settings;
     QJsonArray arr;
-    
+
     for (const Bookmark &bm : m_bookmarks) {
         QJsonObject obj;
         obj["filePath"] = bm.filePath;
@@ -182,23 +181,22 @@ void BookmarkManager::saveToSettings()
         obj["id"] = bm.id;
         arr.append(obj);
     }
-    
-    settings.setValue("bookmarks", QJsonDocument(arr).toJson());
+
+    SettingsStore::instance().set("bookmarks", QString::fromUtf8(QJsonDocument(arr).toJson(QJsonDocument::Compact)));
 }
 
 void BookmarkManager::loadFromSettings()
 {
-    QSettings settings;
-    QByteArray data = settings.value("bookmarks").toByteArray();
-    
+    QString data = SettingsStore::instance().get("bookmarks");
+
     if (data.isEmpty()) return;
-    
-    QJsonDocument doc = QJsonDocument::fromJson(data);
+
+    QJsonDocument doc = QJsonDocument::fromJson(data.toUtf8());
     QJsonArray arr = doc.array();
-    
+
     m_bookmarks.clear();
     m_nextId = 1;
-    
+
     for (const QJsonValue &v : arr) {
         QJsonObject obj = v.toObject();
         Bookmark bm;
@@ -207,7 +205,7 @@ void BookmarkManager::loadFromSettings()
         bm.text = obj["text"].toString();
         bm.id = obj["id"].toInt();
         m_bookmarks.append(bm);
-        
+
         if (bm.id >= m_nextId) {
             m_nextId = bm.id + 1;
         }

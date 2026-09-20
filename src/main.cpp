@@ -2,7 +2,7 @@
 #include "crashhandler.h"
 #include "splashscreen.h"
 #include <QFileDialog>
-#include <QSettings>
+#include "internals/settings_store.h"
 #include "welcomemenuscreen.h"
 #include "rust_adapter.h"
 #include "scriptura_actions.h"
@@ -10,7 +10,6 @@
 #include <QApplication>
 #include <QLocale>
 #include <QTranslator>
-#include <QSettings>
 #include <QPalette>
 #include <QColor>
 #include <QTimer>
@@ -288,7 +287,7 @@ QMenu::icon {
 QTabBar {
     background-color: transparent;
     border: none;
-    qproperty-drawBase: false;
+    qproperty-drawBase: 0;
 }
 
 QTabBar::tab {
@@ -692,7 +691,6 @@ QDialogButtonBox > QPushButton {
 
 /* ---- Focus ---- */
 :focus {
-    outline: none;
 }
 
 /* ---- Labels ---- */
@@ -709,8 +707,8 @@ QDialogButtonBox > QPushButton {
     }
 
     // Load theme before showing splash screen
-    QSettings settings;
-    int legacyTheme = settings.value("theme/selected", 0).toInt();
+    SettingsStore::instance().initialize();
+    int legacyTheme = SettingsStore::instance().value("theme/selected", 0).toInt();
     ThemeColorFamily family = getThemeFamily(legacyTheme);
     ThemeMode mode = getThemeMode(legacyTheme);
     QColor themeWindowColor = getThemeWindowColor(family, mode);
@@ -800,13 +798,12 @@ QDialogButtonBox > QPushButton {
                 if (dirName.isEmpty())
                     return;
                 // Save recent project
-                QSettings settings;
-                QStringList recent = settings.value("recentProjects").toStringList();
+                QStringList recent = SettingsStore::instance().value("recentProjects", QStringList()).toStringList();
                 if (!recent.contains(dirName)) {
                     recent.prepend(dirName);
                     while (recent.size() > 10)
                         recent.removeLast();
-                    settings.setValue("recentProjects", recent);
+                    SettingsStore::instance().setValue("recentProjects", recent);
                 }
                 uiActions->handle(UiActions::ProjectChosen, {{QStringLiteral("path"), dirName}});
             });

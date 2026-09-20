@@ -1,5 +1,5 @@
 #include "notificationcenter.h"
-#include <QSettings>
+#include "internals/settings_store.h"
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonArray>
@@ -124,7 +124,6 @@ QList<Notification> NotificationCenter::recentNotifications(int count) const
 
 void NotificationCenter::saveToSettings()
 {
-    QSettings settings;
     QJsonArray arr;
     for (const auto &notif : m_notifications) {
         QJsonObject obj;
@@ -137,13 +136,12 @@ void NotificationCenter::saveToSettings()
         obj["read"] = notif.read;
         arr.append(obj);
     }
-    settings.setValue("notifications/data", QString(QJsonDocument(arr).toJson()));
+    SettingsStore::instance().set("notifications/data", QString(QJsonDocument(arr).toJson()));
 }
 
 void NotificationCenter::loadFromSettings()
 {
-    QSettings settings;
-    QString data = settings.value("notifications/data").toString();
+    QString data = SettingsStore::instance().get("notifications/data");
     if (data.isEmpty()) return;
 
     QJsonDocument doc = QJsonDocument::fromJson(data.toUtf8());

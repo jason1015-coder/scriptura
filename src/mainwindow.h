@@ -121,7 +121,7 @@ protected:
     bool nativeEvent(const QByteArray &eventType, void *message, qintptr *result) override;
 #endif
 
-private slots:
+ private slots:
     void on_action_open_project_triggered();
     void on_action_save_triggered();
     void on_action_save_as_triggered();
@@ -132,6 +132,16 @@ private slots:
     void on_action_Redo_triggered();
     void on_action_add_file_directory_triggered();
     void on_action_delete_file_directory_triggered();
+    void on_fileTreeView_clicked(const QModelIndex &index);
+    void on_tabWidget_tabCloseRequested(int index);
+    void showSearchBar(bool show);
+    void showKeyboardShortcuts();
+    void onEditorTextChanged();
+    void requestHover();
+    void onBottomTabChanged(int index);
+    void onTopTabChanged(int index);
+
+ private:
     void on_action_new_window_triggered();
     void on_action_clone_window_triggered();
     void on_action_git_commit_triggered();
@@ -150,18 +160,11 @@ private slots:
     void on_action_go_to_type_definition_triggered();
     void on_action_go_to_implementation_triggered();
     void on_action_show_document_symbols_triggered();
-    void on_fileTreeView_clicked(const QModelIndex &index);
-    void on_fileTreeView_contextMenu(const QPoint &pos);
-    void on_tabWidget_tabCloseRequested(int index);
     void on_action_open_file_triggered();
-    void showSearchBar(bool show);
     void on_action_find_triggered();
     void on_action_replace_triggered();
     void on_action_project_search_triggered();
     void on_action_command_palette_triggered();
-    void showKeyboardShortcuts();
-    void onEditorTextChanged();
-    void requestHover();
     void on_action_run_debug_triggered();
     void on_action_stop_debug_triggered();
     void on_action_step_over_triggered();
@@ -169,11 +172,8 @@ private slots:
     void on_action_step_out_triggered();
     void on_action_continue_debug_triggered();
     void on_action_toggle_breakpoint_triggered();
+    void on_fileTreeView_contextMenu(const QPoint &pos);
 
-    void onBottomTabChanged(int index);
-    void onTopTabChanged(int index);
-
-private:
     enum class TabType {
         File = 0,
         Settings = 1,

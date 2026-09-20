@@ -14,7 +14,7 @@
 #include <QMessageBox>
 #include <QDir>
 #include <QFileInfo>
-#include <QSettings>
+#include "internals/settings_store.h"
 #include <QProcess>
 #include <QInputDialog>
 #include <QMenu>
@@ -305,16 +305,14 @@ void MainWindow::updateBottomTabBar()
 
 void MainWindow::loadRecentProjects()
 {
-    QSettings settings;
-    recentProjects = settings.value("recentProjects").toStringList();
-    recentFiles = settings.value("recentFiles").toStringList();
+    recentProjects = SettingsStore::instance().value("recentProjects", QStringList()).toStringList();
+    recentFiles = SettingsStore::instance().value("recentFiles", QStringList()).toStringList();
 }
 
 void MainWindow::saveRecentProjects()
 {
-    QSettings settings;
-    settings.setValue("recentProjects", recentProjects);
-    settings.setValue("recentFiles", recentFiles);
+    SettingsStore::instance().setValue("recentProjects", recentProjects);
+    SettingsStore::instance().setValue("recentFiles", recentFiles);
 }
 
 void MainWindow::addRecentFile(const QString &path)

@@ -1,4 +1,5 @@
 #include "regextester.h"
+#include "internals/settings_store.h"
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QSplitter>
@@ -6,7 +7,6 @@
 #include <QTextCursor>
 #include <QTextCharFormat>
 #include <QMessageBox>
-#include <QSettings>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonArray>
@@ -212,10 +212,9 @@ void RegexTester::onSavePattern()
 {
     QString pattern = m_patternEdit->text();
     if (pattern.isEmpty()) return;
-    
-    QSettings settings;
-    QJsonArray patterns = QJsonDocument::fromJson(settings.value("regex/patterns").toByteArray()).array();
-    
+
+    QJsonArray patterns = QJsonDocument::fromJson(SettingsStore::instance().get("regex/patterns").toUtf8()).array();
+
     QJsonObject obj;
     obj["pattern"] = pattern;
     obj["caseInsensitive"] = m_caseInsensitive->isChecked();
@@ -223,21 +222,20 @@ void RegexTester::onSavePattern()
     obj["multiline"] = m_multiline->isChecked();
     obj["global"] = m_global->isChecked();
     patterns.append(obj);
-    
-    settings.setValue("regex/patterns", QJsonDocument(patterns).toJson());
+
+    SettingsStore::instance().set("regex/patterns", QString::fromUtf8(QJsonDocument(patterns).toJson(QJsonDocument::Compact)));
     emit patternSaved(QString(), pattern);
 }
 
 void RegexTester::onLoadPattern()
 {
-    QSettings settings;
-    QByteArray data = settings.value("regex/patterns").toByteArray();
+    QString data = SettingsStore::instance().get("regex/patterns");
     if (data.isEmpty()) {
         QMessageBox::information(this, tr("Load Pattern"), tr("No saved patterns found."));
         return;
     }
-    
-    QJsonArray patterns = QJsonDocument::fromJson(data).array();
+
+    QJsonArray patterns = QJsonDocument::fromJson(data.toUtf8()).array();
     if (patterns.isEmpty()) return;
     
     // Load the most recent pattern

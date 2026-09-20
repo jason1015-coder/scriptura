@@ -387,7 +387,7 @@ QString ThemeManager::generateGlobalStylesheet() const
     lines << QString("QMenu::item:selected {");
     lines << QString("    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 %1, stop:1 %2);")
         .arg(d.highlightColor.lighter(105).name(), d.highlightColor.name());
-    lines << QString("    color: palette(highlighted-text);");
+    lines << QString("    color: palette(highlightedText);");
     lines << QString("}");
     lines << QString("");
     lines << QString("QMenu::separator {");
@@ -475,7 +475,7 @@ QString ThemeManager::generateGlobalStylesheet() const
     lines << QString("    border-radius: 10px;");
     lines << QString("    background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 %1, stop:1 %2);")
         .arg(d.highlightColor.lighter(105).name(), d.highlightColor.darker(103).name());
-    lines << QString("    color: palette(highlighted-text);");
+    lines << QString("    color: palette(highlightedText);");
     lines << QString("}");
     lines << QString("");
     lines << QString("QPushButton:disabled,");
@@ -528,7 +528,7 @@ QString ThemeManager::generateGlobalStylesheet() const
         .arg(d.baseColor.darker(102).name(), d.baseColor.lighter(102).name());
     lines << QString("    color: palette(text);");
     lines << QString("    selection-background-color: palette(highlight);");
-    lines << QString("    selection-color: palette(highlighted-text);");
+    lines << QString("    selection-color: palette(highlightedText);");
     lines << QString("    min-height: 18px;");
     lines << QString("}");
     lines << QString("");
@@ -547,7 +547,6 @@ QString ThemeManager::generateGlobalStylesheet() const
     lines << QString("    border: none;");
     lines << QString("    border-radius: 8px;");
     lines << QString("    background-color: transparent;");
-    lines << QString("    outline: none;");
     lines << QString("    padding: 2px;");
     lines << QString("}");
     lines << QString("");
@@ -567,7 +566,7 @@ QString ThemeManager::generateGlobalStylesheet() const
     lines << QString("QTreeView::item:selected,");
     lines << QString("QListView::item:selected {");
     lines << QString("    background-color: palette(highlight);");
-    lines << QString("    color: palette(highlighted-text);");
+    lines << QString("    color: palette(highlightedText);");
     lines << QString("}");
     lines << QString("");
     lines << QString("QTreeView::branch {");
@@ -678,7 +677,7 @@ QString ThemeManager::generateGlobalStylesheet() const
     lines << QString("");
     lines << QString("QRadioButton::indicator:checked {");
     lines << QString("    border: 1px solid %1;").arg(d.highlightColor.name());
-    lines << QString("    background: qradialgradient(cx:0.5, cy:0.5, radius:0.5, fx:0.5, fy:0.5, stop:0.35 palette(highlighted-text), stop:0.4 %1);")
+    lines << QString("            background: qradialgradient(cx:0.5, cy:0.5, radius:0.5, fx:0.5, fy:0.5, stop:0.35 palette(highlightedText), stop:0.4 %1);")
         .arg(d.highlightColor.name());
     lines << QString("}");
     lines << QString("");
@@ -699,7 +698,7 @@ QString ThemeManager::generateGlobalStylesheet() const
     lines << QString("");
     lines << QString("/* Primary Button — neumorphic raised */");
     lines << QString("QPushButton#primaryButton {");
-    lines << QString("    color: palette(highlighted-text);");
+    lines << QString("    color: palette(highlightedText);");
     lines << QString("    border: 1px solid %1;").arg(d.highlightColor.darker(110).name());
     lines << QString("    border-top-color: %1;").arg(d.highlightColor.lighter(115).name());
     lines << QString("    border-left-color: %1;").arg(d.highlightColor.lighter(115).name());
@@ -719,7 +718,6 @@ QString ThemeManager::generateGlobalStylesheet() const
     lines << QString("");
     lines << QString("/* Animations / Transitions */");
     lines << QString("QWidget[animated=\"true\"] {");
-    lines << QString("    transition: all 150ms ease-in-out;");
     lines << QString("}");
 
     return lines.join("\n");
