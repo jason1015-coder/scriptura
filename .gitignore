@@ -123,6 +123,7 @@ moc_predefs.h
 ./kdev4/
 .kdev4/
 .freebuff/
+.crush/
 
 # Qt autogen
 *_autogen/
