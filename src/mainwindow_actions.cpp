@@ -269,8 +269,12 @@ void MainWindow::updateTabModified(int index, bool modified)
         title = "*" + title;
     if (index < ui->tabWidget->count())
         ui->tabWidget->setTabText(index, title);
-    if (index < tabBar->count())
-        tabBar->setTabText(index, title);
+    // The top tab bar also holds settings/panel tabs, so its indices do NOT
+    // line up with openFiles — resolve the file tab by its stable id.
+    QWidget *page = ui->tabWidget->widget(index);
+    int barIdx = findTabBarIndexForId(m_tabIds.value(page, openFiles[index].filePath));
+    if (barIdx >= 0)
+        tabBar->setTabText(barIdx, title);
     // Update status bar modified indicator
     if (m_statusBarWidget) {
         m_statusBarWidget->setModified(modified);

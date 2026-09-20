@@ -41,6 +41,14 @@ bool MainWindow::eventFilter(QObject *watched, QEvent *event)
             int idx = tabBar->tabAt(me->pos());
             if (idx >= 0) {
                 QVariant data = tabBar->tabData(idx);
+                if (data.typeId() == QMetaType::Int) {
+                    // Settings tab — middle-click closes it like the X button
+                    tabBar->removeTab(idx);
+                    if (tabBar->count() == 0)
+                        showEditorInterface();
+                    updateTabBarVisibility();
+                    return true;
+                }
                 if (data.typeId() == QMetaType::QString) {
                     QString strData = data.toString();
                     if (strData.startsWith("panel:")) {
@@ -50,8 +58,24 @@ bool MainWindow::eventFilter(QObject *watched, QEvent *event)
                             closePanelTab(panelIndex);
                             return true;
                         }
-                    } else if (idx < openFiles.size()) {
-                        on_tabWidget_tabCloseRequested(idx);
+                    } else {
+                        // File tab: resolve via the stable tab id, never by
+                        // position — the top bar mixes file/settings/panel
+                        // tabs so idx != openFiles index.
+                        for (auto it = m_tabIds.constBegin(); it != m_tabIds.constEnd(); ++it) {
+                            if (it.value() == strData) {
+                                int widx = ui->tabWidget->indexOf(it.key());
+                                if (widx >= 0)
+                                    on_tabWidget_tabCloseRequested(widx);
+                                return true;
+                            }
+                        }
+                        for (int i = 0; i < openFiles.size(); ++i) {
+                            if (openFiles[i].filePath == strData) {
+                                on_tabWidget_tabCloseRequested(i);
+                                return true;
+                            }
+                        }
                     }
                 }
             }

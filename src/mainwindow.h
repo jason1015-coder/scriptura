@@ -188,6 +188,13 @@ protected:
     ThemeFileIconProvider *m_fileIconProvider = nullptr;
     QToolButton *fileTreeToggleButton;
     QTabBar *tabBar;
+    QToolButton *m_newTabButton = nullptr;
+    int m_untitledCounter = 0;
+    // Stable per-tab id for file tabs: the file path, or "untitled:N" for
+    // unsaved tabs. tabBar->tabData() stores this id so file tabs can be
+    // found even after Save As renames the path (the old code captured the
+    // path string in lambdas/buttons and went stale).
+    QMap<QWidget*, QString> m_tabIds;
     QWidget *bottomPanelButtons;
     struct PanelButtonEntry {
         QToolButton *button = nullptr;
@@ -288,7 +295,12 @@ protected:
     void updateTabBarVisibility();
     QIcon createSymbolIcon(QChar symbol) const;
     QPushButton* createTabCloseButton(const QString &filePath);
+    QPushButton* createEditorTabCloseButton(CodeEditor *editor);
     QPushButton* createSettingsTabCloseButton(int tabIndex);
+    void newUntitledFile();
+    void showNewTabPanel();
+    int findTabBarIndexForId(const QString &id) const;
+    void syncTopBarToCurrentFile();
     QPlainTextEdit* getCurrentEditor();
     QWidget* createUnifiedSettingsWidget();
     void startLanguageServer(const QString &filePath);

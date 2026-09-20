@@ -199,6 +199,8 @@ private:
     void updateHoverTooltip(const QPoint &pos);
     void updateAllSelections();
     void handleSmartIndent(QKeyEvent *event);
+    void indentSelection();
+    void unindentSelection();
     // Returns true if the key was handled (auto-close performed). The caller
     // must NOT rely on event->isAccepted() afterwards: QKeyEvent arrives
     // accepted by default, so a void handler that silently does nothing would

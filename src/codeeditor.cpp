@@ -1082,6 +1082,116 @@ void CodeEditor::handleSmartIndent(QKeyEvent *event)
     }
 }
 
+void CodeEditor::indentSelection()
+{
+    QTextCursor cursor = textCursor();
+    const QString indent(m_tabWidth, QLatin1Char(' '));
+    if (!cursor.hasSelection()) {
+        cursor.insertText(indent);
+        setTextCursor(cursor);
+        return;
+    }
+
+    // Multi-line selection: indent every covered block. Work on a copy so
+    // the original anchor/position survive the edits, then restore them
+    // shifted by the inserted indent.
+    int selStart = cursor.selectionStart();
+    int selEnd = cursor.selectionEnd();
+    QTextDocument *doc = document();
+    QTextBlock startBlock = doc->findBlock(selStart);
+    QTextBlock endBlock = doc->findBlock(selEnd);
+    // If the selection ends exactly at a block start (and isn't a
+    // single-point selection), that trailing block isn't covered.
+    if (selEnd == endBlock.position() && endBlock != startBlock)
+        endBlock = endBlock.previous();
+
+    cursor.beginEditBlock();
+    for (QTextBlock b = startBlock; b.isValid() && b.position() <= endBlock.position(); b = b.next()) {
+        QTextCursor bc(b);
+        bc.movePosition(QTextCursor::StartOfBlock);
+        bc.insertText(indent);
+    }
+    cursor.endEditBlock();
+
+    // Restore the selection, shifted right by one indent level. The start
+    // block's own indent pushes selStart right; every inserted indent before
+    // selEnd pushes it right as well.
+    int blockCount = 0;
+    for (QTextBlock b = startBlock; b.isValid() && b.position() <= endBlock.position(); b = b.next())
+        ++blockCount;
+    QTextCursor restored(doc);
+    restored.setPosition(selStart + m_tabWidth);
+    restored.setPosition(selEnd + blockCount * m_tabWidth, QTextCursor::KeepAnchor);
+    setTextCursor(restored);
+}
+
+void CodeEditor::unindentSelection()
+{
+    QTextCursor cursor = textCursor();
+    if (!cursor.hasSelection()) {
+        // Single caret: delete up to one indent level before the caret.
+        QTextBlock block = cursor.block();
+        int col = cursor.positionInBlock();
+        QString line = block.text().left(col);
+        int removable = 0;
+        while (removable < m_tabWidth && !line.isEmpty() && line.endsWith(QLatin1Char(' '))) {
+            line.chop(1);
+            ++removable;
+        }
+        if (removable == 0 && col > 0 && block.text().at(col - 1) == QLatin1Char('\t'))
+            removable = 1; // legacy hard-tab: remove the whole character
+        if (removable > 0) {
+            QTextCursor c(document());
+            c.setPosition(cursor.position() - removable);
+            c.setPosition(cursor.position(), QTextCursor::KeepAnchor);
+            c.removeSelectedText();
+            setTextCursor(c);
+        }
+        return;
+    }
+
+    int selStart = cursor.selectionStart();
+    int selEnd = cursor.selectionEnd();
+    QTextDocument *doc = document();
+    QTextBlock startBlock = doc->findBlock(selStart);
+    QTextBlock endBlock = doc->findBlock(selEnd);
+    if (selEnd == endBlock.position() && endBlock != startBlock)
+        endBlock = endBlock.previous();
+
+    // Count how much each covered block will actually lose so the restored
+    // selection stays aligned with the text.
+    QList<QPair<int, int>> removals; // (blockPosition, charsRemoved)
+    for (QTextBlock b = startBlock; b.isValid() && b.position() <= endBlock.position(); b = b.next()) {
+        QString text = b.text();
+        int n = 0;
+        while (n < m_tabWidth && n < text.size() && text.at(n) == QLatin1Char(' '))
+            ++n;
+        if (n == 0 && !text.isEmpty() && text.at(0) == QLatin1Char('\t'))
+            n = 1;
+        removals.append(qMakePair(b.position(), n));
+    }
+
+    cursor.beginEditBlock();
+    for (const auto &r : removals) {
+        if (r.second == 0)
+            continue;
+        QTextCursor bc(doc);
+        bc.setPosition(r.first);
+        bc.setPosition(r.first + r.second, QTextCursor::KeepAnchor);
+        bc.removeSelectedText();
+    }
+    cursor.endEditBlock();
+
+    int startLost = removals.isEmpty() ? 0 : removals.first().second;
+    int totalLost = 0;
+    for (const auto &r : removals)
+        totalLost += r.second;
+    QTextCursor restored(doc);
+    restored.setPosition(qMax(startBlock.position(), selStart - startLost));
+    restored.setPosition(qMax(restored.position(), selEnd - totalLost), QTextCursor::KeepAnchor);
+    setTextCursor(restored);
+}
+
 bool CodeEditor::handleBracketAutoClose(QKeyEvent *event)
 {
     QMap<QChar, QChar> pairs = {{'(', ')'}, {'[', ']'}, {'{', '}'}, {'"', '"'}, {'\'', '\''}};
@@ -1219,9 +1329,22 @@ void CodeEditor::keyPressEvent(QKeyEvent *event)
         // the caret advancing. The earlier branches already consumed Tab
         // when Emmet expanded an abbreviation or when ghost text was
         // accepted, so this only fires for the plain "indent" case.
-        if (event->key() == Qt::Key_Tab) {
-            QTextCursor tabCursor = textCursor();
-            tabCursor.insertText(QStringLiteral("\t"));
+        // The status bar advertises "Spaces: N", so Tab inserts spaces
+        // (m_tabWidth of them), never a literal '\t'. Shift+Tab / Backtab
+        // unindents. With a multi-line selection, all covered lines are
+        // indented/unindented together.
+        if (event->key() == Qt::Key_Tab
+            && !(event->modifiers() & Qt::ControlModifier)
+            && !(event->modifiers() & Qt::AltModifier)) {
+            if (event->modifiers() & Qt::ShiftModifier)
+                unindentSelection();
+            else
+                indentSelection();
+            event->accept();
+            return;
+        }
+        if (event->key() == Qt::Key_Backtab) {
+            unindentSelection();
             event->accept();
             return;
         }

@@ -394,6 +394,35 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
     editorStack = ui->editorStack;
     bottomPanelStack = ui->bottomPanelStack;
     tabBar = ui->tabBar;
+
+    // The QTabWidget that hosts the editor pages keeps its own internal tab
+    // bar, which duplicated the custom top tabBar (double tab rows, clicks
+    // on one not reflected on the other). The top tabBar is the single
+    // source of truth — hide the inner one.
+    ui->tabWidget->tabBar()->hide();
+
+    // Wrap the top tab bar in a row with a "+" new-tab button at the end.
+    {
+        int barPos = ui->editorContainerLayout->indexOf(tabBar);
+        ui->editorContainerLayout->removeWidget(tabBar);
+        QWidget *tabBarRow = new QWidget(ui->editorContainer);
+        tabBarRow->setObjectName("tabBarRow");
+        QHBoxLayout *rowLayout = new QHBoxLayout(tabBarRow);
+        rowLayout->setContentsMargins(0, 0, 4, 0);
+        rowLayout->setSpacing(4);
+        rowLayout->addWidget(tabBar, 1);
+        m_newTabButton = new QToolButton(tabBarRow);
+        m_newTabButton->setObjectName("newTabButton");
+        m_newTabButton->setText(QStringLiteral("+"));
+        m_newTabButton->setToolTip(tr("New Tab (Ctrl+T)"));
+        m_newTabButton->setFixedSize(28, 28);
+        m_newTabButton->setCursor(Qt::PointingHandCursor);
+        rowLayout->addWidget(m_newTabButton, 0, Qt::AlignVCenter);
+        ui->editorContainerLayout->insertWidget(qMax(0, barPos), tabBarRow);
+        connect(m_newTabButton, &QToolButton::clicked, this, &MainWindow::showNewTabPanel);
+    }
+    QShortcut *shortcutNewTab = new QShortcut(QKeySequence("Ctrl+T"), this);
+    connect(shortcutNewTab, &QShortcut::activated, this, &MainWindow::showNewTabPanel);
     bottomPanelButtons = ui->bottomPanelButtons;
     QHBoxLayout *btnLayout = qobject_cast<QHBoxLayout*>(bottomPanelButtons->layout());
     if (btnLayout) {
@@ -590,6 +619,12 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
     tabBar->installEventFilter(this);
     connect(tabBar, &QTabBar::currentChanged, this, &MainWindow::onTopTabChanged);
     connect(ui->tabWidget, &QTabWidget::currentChanged, this, &MainWindow::updateStatusBar);
+    // Keep the top tab bar in sync when the editor stack changes behind its
+    // back (Save As, session restore, programmatic switches). Blocked
+    // signals prevent ping-pong with onTopTabChanged.
+    connect(ui->tabWidget, &QTabWidget::currentChanged, this, [this]() {
+        syncTopBarToCurrentFile();
+    });
 
     // Bottom panel buttons (replacing QTabBar with SVG icon buttons)
     addBottomPanelButton(":/icons/search.svg", tr("Search Results"), tr("Search Results") + tr(" (Ctrl+Shift+F)"), true);
@@ -1153,9 +1188,16 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
         editor->setPlainText(content);
         editor->document()->setModified(true);
         QString displayName = originalPath.isEmpty() ? tr("Untitled") : QFileInfo(originalPath).fileName();
-        int tabIndex = openFiles.size();
+        // Dynamic index lookup — a captured index goes stale when other tabs close.
+        QPointer<CodeEditor> hotEdGuard(editor);
         connect(editor, &QPlainTextEdit::modificationChanged, this,
-                [this, tabIndex](bool m) { updateTabModified(tabIndex, m); });
+                [this, hotEdGuard](bool m) {
+                    if (!hotEdGuard)
+                        return;
+                    int i = ui->tabWidget->indexOf(hotEdGuard);
+                    if (i >= 0)
+                        updateTabModified(i, m);
+                });
         connect(editor, &QPlainTextEdit::cursorPositionChanged, this, &MainWindow::updateStatusBar);
         connect(editor, &QPlainTextEdit::textChanged, this, [this]() {
             lspDebounceTimer->start();
@@ -1165,11 +1207,17 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
             autoSaveTimer->start();
         });
         openFiles.append({originalPath, displayName, true});
+        // Untitled buffers need a unique stable id — the empty path would
+        // collide across tabs and break tab-bar lookups.
+        QString hotId = originalPath.isEmpty()
+            ? QStringLiteral("untitled:%1").arg(++m_untitledCounter)
+            : originalPath;
+        m_tabIds[editor] = hotId;
         showEditorInterface();
         ui->tabWidget->addTab(editor, "*" + displayName);
         int tabBarIndex = tabBar->addTab("*" + displayName);
-        tabBar->setTabData(tabBarIndex, originalPath);
-        tabBar->setTabButton(tabBarIndex, QTabBar::RightSide, createTabCloseButton(originalPath));
+        tabBar->setTabData(tabBarIndex, hotId);
+        tabBar->setTabButton(tabBarIndex, QTabBar::RightSide, createEditorTabCloseButton(editor));
         ui->tabWidget->setCurrentWidget(editor);
         tabBar->setCurrentIndex(tabBarIndex);
         // Restore cursor position

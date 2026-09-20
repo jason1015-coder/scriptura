@@ -150,13 +150,29 @@ void MainWindow::on_action_save_triggered()
 
     int editorIndex = ui->tabWidget->indexOf(editor);
     editor->document()->setModified(false);
-    if (editorIndex >= 0)
-        updateTabModified(editorIndex, false);
-    for (OpenFile &f : openFiles) {
-        if (f.filePath == targetFile) {
-            f.modified = false;
-            break;
+    if (editorIndex >= 0 && editorIndex < openFiles.size()) {
+        if (openFiles[editorIndex].filePath.isEmpty()) {
+            // An untitled tab is getting its first real path: promote it so
+            // openFiles, the top tab bar id, and the tooltip all agree.
+            QString oldId = m_tabIds.value(editor);
+            openFiles[editorIndex].filePath = targetFile;
+            openFiles[editorIndex].fileName = QFileInfo(targetFile).fileName();
+            m_tabIds[editor] = targetFile;
+            int barIdx = findTabBarIndexForId(oldId);
+            if (barIdx >= 0) {
+                tabBar->setTabData(barIdx, targetFile);
+                tabBar->setTabToolTip(barIdx, targetFile);
+            }
+            addRecentFile(targetFile);
+        } else {
+            for (OpenFile &f : openFiles) {
+                if (f.filePath == targetFile) {
+                    f.modified = false;
+                    break;
+                }
+            }
         }
+        updateTabModified(editorIndex, false);
     }
 
     setWindowTitle(QFileInfo(targetFile).fileName() + " - Scriptura");
@@ -186,6 +202,7 @@ void MainWindow::on_action_save_as_triggered()
     file.close();
 
     int editorIndex = ui->tabWidget->indexOf(editor);
+    QString oldId = m_tabIds.value(editor);
     for (int i = 0; i < openFiles.size(); i++) {
         if (editorIndex >= 0 && i != editorIndex)
             continue;
@@ -200,6 +217,15 @@ void MainWindow::on_action_save_as_triggered()
             }
             if (codeEditor)
                 codeEditor->setFilePath(fileName);
+            // The stored tab id/path changed — refresh the top tab bar entry
+            // before updateTabModified() looks it up by the new id.
+            m_tabIds[editor] = fileName;
+            int barIdx = findTabBarIndexForId(oldId);
+            if (barIdx >= 0) {
+                tabBar->setTabData(barIdx, fileName);
+                tabBar->setTabToolTip(barIdx, fileName);
+                tabBar->setTabText(barIdx, openFiles[i].fileName);
+            }
             if (editorIndex >= 0)
                 updateTabModified(editorIndex, false);
             else
@@ -304,8 +330,18 @@ void MainWindow::openFileInTab(const QString &fileName)
     connect(editor, &QPlainTextEdit::cursorPositionChanged, breadcrumb, &Breadcrumb::updateFromCursor);
 
     int tabIndex = openFiles.size();
+    Q_UNUSED(tabIndex);
+    // Look the tab index up dynamically: a captured index goes stale as soon
+    // as any other tab closes (the '*' would land on the wrong tab).
+    QPointer<CodeEditor> edGuard(editor);
     connect(editor, &QPlainTextEdit::modificationChanged, this,
-            [this, tabIndex](bool m) { updateTabModified(tabIndex, m); });
+            [this, edGuard](bool m) {
+                if (!edGuard)
+                    return;
+                int i = ui->tabWidget->indexOf(edGuard);
+                if (i >= 0)
+                    updateTabModified(i, m);
+            });
     // Re-arm the idle-debounce auto-save timer on every edit.
     connect(editor, &QPlainTextEdit::textChanged, this, [this]() {
         autoSaveTimer->start();
@@ -323,7 +359,8 @@ void MainWindow::openFileInTab(const QString &fileName)
     int tabBarIndex = tabBar->addTab(QFileInfo(fileName).fileName());
     tabBar->setTabData(tabBarIndex, fileName);
     tabBar->setTabToolTip(tabBarIndex, fileName);
-    tabBar->setTabButton(tabBarIndex, QTabBar::RightSide, createTabCloseButton(fileName));
+    tabBar->setTabButton(tabBarIndex, QTabBar::RightSide, createEditorTabCloseButton(editor));
+    m_tabIds[editor] = fileName;
     ui->tabWidget->setCurrentWidget(editor);
     tabBar->setCurrentIndex(tabBarIndex);
     currentFile = fileName;
@@ -363,6 +400,7 @@ void MainWindow::on_fileTreeView_clicked(const QModelIndex &index)
         
         CodeEditor *editor = new CodeEditor(this);
         editor->setLanguageForFile(path);
+        editor->installEventFilter(this);
         connect(editor, &CodeEditor::breakpointToggled, this, &MainWindow::onBreakpointToggled);
         QFont savedFont = SettingsStore::instance().value("editor/font", editor->font()).value<QFont>();
         editor->setFont(savedFont);
@@ -393,9 +431,18 @@ void MainWindow::on_fileTreeView_clicked(const QModelIndex &index)
         connect(editor, &QPlainTextEdit::cursorPositionChanged, breadcrumb, &Breadcrumb::updateFromCursor);
 
         int tabIndex = openFiles.size();
+        Q_UNUSED(tabIndex);
         connect(editor, &QPlainTextEdit::cursorPositionChanged, this, &MainWindow::updateCursorPosition);
+        // Dynamic lookup — a captured index goes stale when other tabs close.
+        QPointer<CodeEditor> treeEdGuard(editor);
         connect(editor, &QPlainTextEdit::modificationChanged, this,
-                [this, tabIndex](bool m) { updateTabModified(tabIndex, m); });
+                [this, treeEdGuard](bool m) {
+                    if (!treeEdGuard)
+                        return;
+                    int i = ui->tabWidget->indexOf(treeEdGuard);
+                    if (i >= 0)
+                        updateTabModified(i, m);
+                });
         connect(editor, &QPlainTextEdit::textChanged, this, [this]() {
             lspDebounceTimer->start();
         });
@@ -413,7 +460,8 @@ void MainWindow::on_fileTreeView_clicked(const QModelIndex &index)
         ui->tabWidget->addTab(editor, openFile.fileName);
         int tabBarIndex = tabBar->addTab(openFile.fileName);
         tabBar->setTabData(tabBarIndex, path);
-        tabBar->setTabButton(tabBarIndex, QTabBar::RightSide, createTabCloseButton(path));
+        tabBar->setTabButton(tabBarIndex, QTabBar::RightSide, createEditorTabCloseButton(editor));
+        m_tabIds[editor] = path;
         ui->tabWidget->setCurrentWidget(editor);
         tabBar->setCurrentIndex(tabBarIndex);
 
@@ -431,6 +479,8 @@ void MainWindow::on_fileTreeView_clicked(const QModelIndex &index)
 
 void MainWindow::on_tabWidget_tabCloseRequested(int index)
 {
+    if (index < 0 || index >= openFiles.size() || index >= ui->tabWidget->count())
+        return;
     if (openFiles[index].modified) {
         QMessageBox::StandardButton reply = QMessageBox::question(
             this, tr("Unsaved Changes"),
@@ -450,24 +500,25 @@ void MainWindow::on_tabWidget_tabCloseRequested(int index)
 
     // Remove encoding/line ending metadata on tab close
     QString closedPath = openFiles[index].filePath;
-    m_fileEncodings.remove(closedPath);
-    m_fileLineEndings.remove(closedPath);
-    // LSP: Close file in language server
-    QString closedUri = QUrl::fromLocalFile(closedPath).toString();
-    lspClient->didClose(closedUri);
-    openFiles.removeAt(index);
-
     QWidget *widget = ui->tabWidget->widget(index);
-    ui->tabWidget->removeTab(index);
-    
-    // Find and remove the corresponding tabBar tab by file path
-    for (int i = 0; i < tabBar->count(); ++i) {
-        QVariant data = tabBar->tabData(i);
-        if (data.typeId() == QMetaType::QString && data.toString() == closedPath) {
-            tabBar->removeTab(i);
-            break;
-        }
+    // Resolve the top-bar tab by its stable id, not by position: the top bar
+    // also holds settings/panel tabs so indices don't line up with openFiles.
+    QString closedId = m_tabIds.value(widget, closedPath);
+    if (!closedPath.isEmpty()) {
+        m_fileEncodings.remove(closedPath);
+        m_fileLineEndings.remove(closedPath);
+        // LSP: Close file in language server
+        QString closedUri = QUrl::fromLocalFile(closedPath).toString();
+        lspClient->didClose(closedUri);
     }
+    openFiles.removeAt(index);
+    m_tabIds.remove(widget);
+
+    ui->tabWidget->removeTab(index);
+
+    int barIdx = findTabBarIndexForId(closedId);
+    if (barIdx >= 0)
+        tabBar->removeTab(barIdx);
     delete widget;
 
     if (ui->tabWidget->count() > 0) {
@@ -616,15 +667,30 @@ void MainWindow::onTopTabChanged(int index)
             }
             // Keep editor stack showing the current file (don't switch editorStack)
         } else {
-            // File tab - find by file path
-            QString filePath = strData;
-            for (int i = 0; i < openFiles.size(); ++i) {
-                if (openFiles[i].filePath == filePath) {
-                    currentFile = filePath;
-                    ui->tabWidget->setCurrentIndex(i);
-                    editorStack->setCurrentWidget(ui->tabWidget);
+            // File tab — resolve by stable id (file path, or "untitled:N").
+            // The old code matched openFiles by path positionally, which
+            // broke for untitled tabs (empty path) and after Save As.
+            QString id = strData;
+            QWidget *page = nullptr;
+            for (auto it = m_tabIds.constBegin(); it != m_tabIds.constEnd(); ++it) {
+                if (it.value() == id) {
+                    page = it.key();
                     break;
                 }
+            }
+            int i = page ? ui->tabWidget->indexOf(page) : -1;
+            if (i < 0) {
+                for (int k = 0; k < openFiles.size(); ++k) {
+                    if (openFiles[k].filePath == id) {
+                        i = k;
+                        break;
+                    }
+                }
+            }
+            if (i >= 0) {
+                currentFile = openFiles[i].filePath;
+                ui->tabWidget->setCurrentIndex(i);
+                editorStack->setCurrentWidget(ui->tabWidget);
             }
         }
     }
@@ -674,5 +740,165 @@ void MainWindow::onBottomTabChanged(int index)
     // The stack index and panel visibility are already handled there.
     // This slot is kept for external notification purposes (e.g., plugin API).
     Q_UNUSED(index);
+}
+
+int MainWindow::findTabBarIndexForId(const QString &id) const
+{
+    for (int i = 0; i < tabBar->count(); ++i) {
+        QVariant data = tabBar->tabData(i);
+        if (data.typeId() == QMetaType::QString && data.toString() == id)
+            return i;
+    }
+    return -1;
+}
+
+void MainWindow::syncTopBarToCurrentFile()
+{
+    QWidget *cur = ui->tabWidget->currentWidget();
+    if (!cur)
+        return;
+    QString id = m_tabIds.value(cur);
+    if (id.isEmpty())
+        return;
+    int barIdx = findTabBarIndexForId(id);
+    if (barIdx >= 0 && barIdx != tabBar->currentIndex()) {
+        QSignalBlocker blocker(tabBar);
+        tabBar->setCurrentIndex(barIdx);
+    }
+}
+
+QPushButton* MainWindow::createEditorTabCloseButton(CodeEditor *editor)
+{
+    QPushButton *closeBtn = new QPushButton();
+    ThemeIcons::instance()->setIcon(closeBtn, ":/icons/close.svg");
+    closeBtn->setFixedSize(20, 20);
+    closeBtn->setFlat(true);
+    closeBtn->setCursor(Qt::ArrowCursor);
+    // Resolve the tab dynamically at click time: captured paths/indices go
+    // stale after Save As renames the file or other tabs close.
+    QPointer<CodeEditor> guard(editor);
+    connect(closeBtn, &QPushButton::clicked, this, [this, guard]() {
+        if (!guard)
+            return;
+        int widx = ui->tabWidget->indexOf(guard);
+        if (widx >= 0)
+            on_tabWidget_tabCloseRequested(widx);
+    });
+    return closeBtn;
+}
+
+void MainWindow::newUntitledFile()
+{
+    CodeEditor *editor = new CodeEditor(this);
+    editor->installEventFilter(this);
+    connect(editor, &CodeEditor::breakpointToggled, this, &MainWindow::onBreakpointToggled);
+    QFont savedFont = SettingsStore::instance().value("editor/font", editor->font()).value<QFont>();
+    editor->setFont(savedFont);
+    editor->setTabWidth(SettingsStore::instance().value("editor/tabWidth", editor->tabWidth()).toInt());
+    editor->setPlainText(QString());
+
+    // Create minimap for this editor
+    Minimap *minimap = new Minimap(editor, this);
+    minimap->setDocument(editor->document());
+    connect(minimap, &Minimap::viewportRequested, editor, [editor](int position) {
+        QTextCursor cursor(editor->document());
+        cursor.movePosition(QTextCursor::Start);
+        cursor.movePosition(QTextCursor::Down, QTextCursor::MoveAnchor, position);
+        editor->setTextCursor(cursor);
+        editor->centerCursor();
+    });
+
+    // Create breadcrumb for this editor
+    Breadcrumb *breadcrumb = new Breadcrumb(editor, this);
+    breadcrumb->setFilePath(QString());
+    connect(breadcrumb, &Breadcrumb::breadcrumbClicked, this, [this](const QString & /*path*/) {
+        // Untitled file has no path to navigate to
+    });
+    connect(editor, &QPlainTextEdit::cursorPositionChanged, breadcrumb, &Breadcrumb::updateFromCursor);
+
+    // Dynamic index lookup — a captured index goes stale when other tabs close.
+    QPointer<CodeEditor> edGuard(editor);
+    connect(editor, &QPlainTextEdit::modificationChanged, this,
+            [this, edGuard](bool m) {
+                if (!edGuard)
+                    return;
+                int i = ui->tabWidget->indexOf(edGuard);
+                if (i >= 0)
+                    updateTabModified(i, m);
+            });
+    // Re-arm the idle-debounce auto-save timer on every edit.
+    connect(editor, &QPlainTextEdit::textChanged, this, [this]() {
+        autoSaveTimer->start();
+    });
+    // Only one cursorPositionChanged connection: updateStatusBar handles everything
+    connect(editor, &QPlainTextEdit::cursorPositionChanged, this, &MainWindow::updateStatusBar);
+    connect(editor, &QPlainTextEdit::cursorPositionChanged, this, [this]() {
+        if (lspClient->isRunning())
+            m_hoverTimer->start();
+    });
+
+    ++m_untitledCounter;
+    QString id = QStringLiteral("untitled:%1").arg(m_untitledCounter);
+    QString displayName = tr("Untitled %1").arg(m_untitledCounter);
+    openFiles.append({QString(), displayName, false});
+    m_tabIds[editor] = id;
+    showEditorInterface();
+    ui->tabWidget->addTab(editor, displayName);
+    int tabBarIndex = tabBar->addTab(displayName);
+    tabBar->setTabData(tabBarIndex, id);
+    tabBar->setTabToolTip(tabBarIndex, displayName);
+    tabBar->setTabButton(tabBarIndex, QTabBar::RightSide, createEditorTabCloseButton(editor));
+    ui->tabWidget->setCurrentWidget(editor);
+    tabBar->setCurrentIndex(tabBarIndex);
+    currentFile = QString();
+    setWindowTitle(displayName + " - Scriptura");
+    showSearchBar(true);
+    editor->setFocus();
+}
+
+void MainWindow::showNewTabPanel()
+{
+    // Floating panel listing every available tab type, anchored under the
+    // "+" button at the end of the tab bar.
+    QMenu *menu = new QMenu(this);
+    menu->setAttribute(Qt::WA_DeleteOnClose);
+    menu->setObjectName("newTabPanel");
+    menu->setStyleSheet(
+        "QMenu#newTabPanel { background-color: palette(window);"
+        " border: 1px solid palette(mid); border-radius: 10px; padding: 6px; }"
+        "QMenu#newTabPanel::item { padding: 6px 24px 6px 12px; border-radius: 6px; }"
+        "QMenu#newTabPanel::item:selected { background-color: palette(highlight);"
+        " color: palette(highlighted-text); }"
+        "QMenu#newTabPanel::separator { height: 1px; background: palette(mid);"
+        " margin: 4px 8px; }");
+
+    QAction *emptyAction = menu->addAction(tr("New Empty File"));
+    ThemeIcons::instance()->setIcon(emptyAction, ":/icons/file.svg");
+    connect(emptyAction, &QAction::triggered, this, &MainWindow::newUntitledFile);
+
+    QAction *openAction = menu->addAction(tr("Open File..."));
+    ThemeIcons::instance()->setIcon(openAction, ":/icons/folder.svg");
+    connect(openAction, &QAction::triggered, this, &MainWindow::on_action_open_file_triggered);
+
+    QAction *settingsAction = menu->addAction(tr("Settings"));
+    ThemeIcons::instance()->setIcon(settingsAction, ":/icons/settings.svg");
+    connect(settingsAction, &QAction::triggered, this, &MainWindow::on_action_editor_settings_triggered);
+
+    if (!m_panelButtons.isEmpty()) {
+        menu->addSeparator();
+        for (int i = 0; i < m_panelButtons.size(); ++i) {
+            QAction *panelAction = menu->addAction(m_panelButtons[i].title);
+            connect(panelAction, &QAction::triggered, this, [this, i]() {
+                showBottomPanelIndex(i);
+            });
+        }
+    }
+
+    QPoint pos;
+    if (m_newTabButton)
+        pos = m_newTabButton->mapToGlobal(QPoint(0, m_newTabButton->height() + 4));
+    else
+        pos = tabBar->mapToGlobal(QPoint(tabBar->width(), tabBar->height()));
+    menu->exec(pos);
 }
 
