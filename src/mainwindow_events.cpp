@@ -222,7 +222,11 @@ void MainWindow::closeEvent(QCloseEvent *event)
         SettingsStore::instance().setValue("mainWindow/state", saveState());
         SettingsStore::instance().setValue("mainWindow/bottomPanelVisible", ui->bottomPanelContainer->isVisible());
         SettingsStore::instance().setValue("mainWindow/bottomPanelIndex", currentBottomPanelIndex());
-        SettingsStore::instance().setValue("ui/sidebarCollapsed", ui->sidebarDrawer->isHidden());
+        // The drawer is collapsed by zeroing its width, never by hiding it, so
+        // isHidden() is always false here and used to persist "expanded" on
+        // every quit — a collapsed drawer came back open. m_sidebarCollapsed is
+        // the settled state the toggle and applyLayout() maintain.
+        SettingsStore::instance().setValue("ui/sidebarCollapsed", m_sidebarCollapsed);
         
         event->accept();
 

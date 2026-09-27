@@ -29,6 +29,7 @@
 #include "test_httpclientpanel.h"
 #include "test_largefilehandler.h"
 #include "test_mainwindow_editing.h"
+#include "test_mainwindow_sidebar.h"
 #include "test_minimap.h"
 #include "test_multicursor.h"
 #include "test_plugincontext.h"
@@ -95,6 +96,7 @@ int main(int argc, char *argv[])
     status |= QTest::qExec(new TestHttpClientPanel, argc, argv);
     status |= QTest::qExec(new TestLargeFileHandler, argc, argv);
     status |= QTest::qExec(new TestMainWindowEditing, argc, argv);
+    status |= QTest::qExec(new TestMainWindowSidebar, argc, argv);
     status |= QTest::qExec(new TestMinimap, argc, argv);
     status |= QTest::qExec(new TestMultiCursor, argc, argv);
     status |= QTest::qExec(new TestCodeEditorMultiCursor, argc, argv);

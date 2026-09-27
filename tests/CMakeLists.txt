@@ -6,6 +6,9 @@ file(GLOB_RECURSE TEST_SOURCES
 
 qt_add_executable(scriptura_tests
     ${TEST_SOURCES}
+    # Compiled here (not inherited from scriptura_core, which no longer carries
+    # the qrc) so the tests can resolve ":/icons/..." for the ThemeIcons cases.
+    "${CMAKE_SOURCE_DIR}/src/resources.qrc"
 )
 
 set_target_properties(scriptura_tests PROPERTIES

@@ -1,6 +1,7 @@
 #include "breadcrumbbar.h"
 #include "codeeditor.h"
 #include "cssbreadcrumb.h"
+#include "themeicons.h"
 #include <QFileInfo>
 #include <QDir>
 #include <QScrollBar>
@@ -21,9 +22,11 @@ void BreadcrumbBarWidget::setupUI()
     mainLayout->setContentsMargins(8, 2, 8, 2);
     mainLayout->setSpacing(0);
 
-    // File icon label
+    // File icon label. Routed through ThemeIcons so it re-tints with the theme
+    // instead of being frozen at the hard-coded colour it was created with.
     m_fileLabel = new QLabel(this);
-    m_fileLabel->setPixmap(QIcon(":/icons/file-tree.svg").pixmap(12, 12));
+    m_fileLabel->setPixmap(ThemeIcons::instance()->pixmap(":/icons/file-tree.svg",
+                                                          ThemeIcons::Role::Normal, 12));
     m_fileLabel->setFixedSize(16, 16);
     mainLayout->addWidget(m_fileLabel);
 

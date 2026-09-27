@@ -62,15 +62,16 @@ void CustomTitleBar::setupLayout()
     m_spacingXs = spacingXs;
     m_spacingSm = spacingSm;
 
-    // -- Leading: sidebar toggle --
+    // -- Leading: file tree toggle --
     sidebarToggleButton = new QPushButton(this);
-    sidebarToggleButton->setObjectName("TitleBarSidebarToggle");
+    sidebarToggleButton->setObjectName("TitleBarFileTreeToggle");
     sidebarToggleButton->setFixedSize(36, 36);
-    sidebarToggleButton->setToolTip(tr("Toggle Sidebar"));
+    sidebarToggleButton->setToolTip(tr("File Tree"));
     sidebarToggleButton->setCheckable(true);
-    sidebarToggleButton->setChecked(true);
-    ThemeIcons::instance()->setIcon(sidebarToggleButton, ":/icons/sidebar-toggle.svg");
+    sidebarToggleButton->setChecked(false);
     sidebarToggleButton->setIconSize(QSize(18, 18));
+    ThemeIcons::instance()->setIcon(sidebarToggleButton, ":/icons/folder.svg",
+                                    ThemeIcons::Role::Normal, 18);
     connect(sidebarToggleButton, &QPushButton::clicked, this, &CustomTitleBar::sidebarToggleClicked);
     layout->addWidget(sidebarToggleButton);
 
@@ -108,8 +109,9 @@ void CustomTitleBar::setupLayout()
     inspectorToggleButton->setFixedSize(36, 36);
     inspectorToggleButton->setToolTip(tr("Toggle Inspector"));
     inspectorToggleButton->setCheckable(true);
-    ThemeIcons::instance()->setIcon(inspectorToggleButton, ":/icons/inspector.svg");
     inspectorToggleButton->setIconSize(QSize(18, 18));
+    ThemeIcons::instance()->setIcon(inspectorToggleButton, ":/icons/inspector.svg",
+                                    ThemeIcons::Role::Normal, 18);
     connect(inspectorToggleButton, &QPushButton::clicked, this, &CustomTitleBar::inspectorToggleClicked);
     layout->addWidget(inspectorToggleButton);
 
@@ -163,7 +165,7 @@ void CustomTitleBar::setMirrored(bool mirrored)
         delete layout->takeAt(0);
 
     if (!mirrored) {
-        // Leading: sidebar toggle, title, stretch, then the trailing cluster.
+        // Leading: file tree toggle, title, stretch, then the trailing cluster.
         layout->addWidget(sidebarToggleButton);
         layout->addSpacing(m_spacingXs);
         layout->addWidget(titleLabel, 0, Qt::AlignVCenter);
@@ -241,6 +243,23 @@ void CustomTitleBar::styleButtons()
     minimizeButton->setStyleSheet(windowButtonStyle);
     maximizeButton->setStyleSheet(windowButtonStyle);
     closeButton->setStyleSheet(windowButtonStyle);
+    
+    // File tree toggle button - non-checkable, simple button style
+    const QString simpleButtonStyle = QString(R"(
+        QPushButton {
+            border: none;
+            background-color: transparent;
+            color: palette(text);
+            border-radius: %1px;
+            padding: 0px;
+        }
+        QPushButton:hover {
+            background-color: rgba(128, 128, 128, 0.10);
+        }
+        QPushButton:pressed {
+            background-color: rgba(128, 128, 128, 0.18);
+        }
+    )").arg(radius);
     sidebarToggleButton->setStyleSheet(checkableButtonStyle);
     inspectorToggleButton->setStyleSheet(checkableButtonStyle);
 

@@ -7,8 +7,16 @@
 #include <QLabel>
 #include <QPainter>
 #include <QPixmap>
-#include <QImageReader>
+#include <QImage>
 #include <QFileInfo>
+#include <QSvgRenderer>
+
+#include <atomic>
+
+namespace {
+// 每次真正光柵化 SVG 就遞增，供測試驗證快取命中率。
+std::atomic<int> g_rasterizations{0};
+} // namespace
 
 ThemeIcons* ThemeIcons::instance()
 {
@@ -16,8 +24,16 @@ ThemeIcons* ThemeIcons::instance()
     return &s_instance;
 }
 
+int ThemeIcons::rasterizationCount()
+{
+    return g_rasterizations.load(std::memory_order_relaxed);
+}
+
 ThemeIcons::ThemeIcons(QObject* parent)
     : QObject(parent)
+    // 以「填滿所有實際會用到的組合」為上限：20 個圖示 × 幾種尺寸 × 幾種
+    // 角色色，遠低於預設值；主題切換時整池清空即可，不需要 LRU 逐出。
+    , m_tintCache(4096)
 {
 }
 
@@ -50,153 +66,194 @@ QColor ThemeIcons::colorForRole(Role role) const
     }
 }
 
-// 以目標尺寸渲染 SVG (透過 Qt 的 SVG 圖像外掛，不需連結 Svg 開發模組)。
-// 若無法在目標尺寸渲染，則以內部尺寸渲染後平滑縮放。
-QPixmap renderSvg(const QString& path, int size)
+std::shared_ptr<QSvgRenderer> ThemeIcons::rendererFor(const QString& path) const
 {
-    if (size <= 0) {
-        return QPixmap();
-    }
+    const auto cached = m_renderers.constFind(path);
+    if (cached != m_renderers.constEnd())
+        return cached.value();
 
-    QImageReader reader(path);
-    if (reader.canRead()) {
-        reader.setScaledSize(QSize(size, size));
-        const QImage img = reader.read();
-        if (!img.isNull()) {
-            return QPixmap::fromImage(img);
-        }
-    }
-
-    // 降級：直接以資源路徑載入 (Qt 會在內部尺寸渲染 SVG)
-    QPixmap pm(path);
-    if (pm.isNull()) {
-        return QPixmap();
-    }
-    return pm.scaled(size, size, Qt::KeepAspectRatio, Qt::SmoothTransformation);
-}
-
-QPixmap tintedPixmap(const QString& path, const QColor& color, int size)
-{
-    const QPixmap shape = renderSvg(path, size);
-    if (shape.isNull()) {
-        return QPixmap();
-    }
-
-    // 用「目標顏色」作為底色，再以 DestinationIn 用 SVG 的 alpha 形狀遮罩，
-    // 得到「形狀不變、顏色 = 目前主題前景色」的圖標。
-    QPixmap out(size, size);
-    out.fill(color);
+    std::shared_ptr<QSvgRenderer> renderer;
     {
-        QPainter p(&out);
-        p.setCompositionMode(QPainter::CompositionMode_DestinationIn);
-        p.drawPixmap(0, 0, shape);
-    }
-    return out;
-}
-
-QIcon ThemeIcons::makeIcon(const QString& path, const QColor& color) const
-{
-    // 提供多種尺寸以在各縮放下保持清晰
-    static const QList<int> sizes = {16, 18, 20, 24, 32, 48, 64};
-    QIcon result;
-    for (int s : sizes) {
-        const QPixmap pm = tintedPixmap(path, color, s);
-        if (!pm.isNull()) {
-            result.addPixmap(pm, QIcon::Normal);
-            // 停用態：用較暗的顏色
-            const QPixmap disabled = tintedPixmap(path, color.darker(160), s);
-            if (!disabled.isNull()) {
-                result.addPixmap(disabled, QIcon::Disabled);
-            }
+        auto r = std::make_shared<QSvgRenderer>();
+        if (r->load(path)) {
+            renderer = r;
         }
     }
-    if (result.isNull()) {
+    // 失敗也記錄 (nullptr)，避免每次都重試同一個壞路徑。
+    m_renderers.insert(path, renderer);
+    return renderer;
+}
+
+QPixmap ThemeIcons::tintPixmap(const QString& path, const QColor& color,
+                               int logicalSize) const
+{
+    const qreal dpr = qApp ? qApp->devicePixelRatio() : 1.0;
+    const int deviceSize = qMax(1, qRound(logicalSize * dpr));
+
+    const TintKey key{path, deviceSize, color, dpr};
+    // QCache 以指標儲存並在逐出時自行 delete；nullptr 即等同未命中。
+    if (const QPixmap* cached = m_tintCache.object(key))
+        return *cached;
+
+    const std::shared_ptr<QSvgRenderer> renderer = rendererFor(path);
+    if (!renderer)
+        return QPixmap();
+
+    // 單一 QImage 內完成「光柵化 + 著色」：先把 SVG 以正常模式畫進透明畫布，
+    // 再以 SourceIn 換色。
+    //
+    // 合成模式是關鍵：SourceIn 的語意是「保留 destination 的 alpha、套用
+    // source 的顏色」— 這正是「用 SVG 的 alpha 當形狀遮罩、顏色換成目標色」。
+    // 反過來用 DestinationIn（保留 destination 顏色、套 source alpha）不行：
+    // Qt 的 raster engine 在 source 是 QSvgRenderer 這種複雜繪製器時不會把
+    // destination 未被覆蓋處的 alpha 降為 0，整張圖會變成不透明色塊。
+    //
+    // 原檔是 currentColor、#888888 還是 fill="white" 都不影響輸出，因為 SVG
+    // 的顏色在換色那一步就被丟棄了；邊緣半透明的像素則得到半透明的目標色。
+    //
+    // 專案內的 SVG 都只宣告 viewBox 而沒有 width/height，所以不能依賴
+    // QSvgRenderer::defaultSize()，必須顯式指定渲染範圍。
+    QImage image(deviceSize, deviceSize, QImage::Format_ARGB32_Premultiplied);
+    image.fill(Qt::transparent);
+    {
+        QPainter painter(&image);
+        painter.setRenderHint(QPainter::Antialiasing, true);
+        painter.setRenderHint(QPainter::SmoothPixmapTransform, true);
+        renderer->render(&painter, QRectF(0, 0, deviceSize, deviceSize));
+        painter.setCompositionMode(QPainter::CompositionMode_SourceIn);
+        painter.fillRect(image.rect(), color);
+    }
+    // 標記實際解析度，QIcon 才能在高 DPI 螢幕上取到正確的圖樣而不必放大。
+    image.setDevicePixelRatio(dpr);
+
+    QPixmap pixmap = QPixmap::fromImage(image);
+    m_tintCache.insert(key, new QPixmap(pixmap));
+    g_rasterizations.fetch_add(1, std::memory_order_relaxed);
+    return pixmap;
+}
+
+QIcon ThemeIcons::icon(const QString& path, Role role, int size) const
+{
+    return icon(path, colorForRole(role), size);
+}
+
+QPixmap ThemeIcons::pixmap(const QString& path, Role role, int size) const
+{
+    return tintPixmap(path, colorForRole(role), size);
+}
+
+QIcon ThemeIcons::icon(const QString& path, const QColor& color, int size) const
+{
+    const QPixmap pm = tintPixmap(path, color, size);
+    if (pm.isNull()) {
         // 降級：直接以資源路徑建立原始圖標
         return QIcon(path);
     }
+
+    QIcon result;
+    // pixmap 自帶 devicePixelRatio，QIcon 會據此歸檔到正確的解析度。
+    result.addPixmap(pm, QIcon::Normal);
     return result;
 }
 
-QIcon ThemeIcons::icon(const QString& path, Role role) const
+QPixmap ThemeIcons::pixmap(const QString& path, const QColor& color, int size) const
 {
-    return makeIcon(path, colorForRole(role));
+    return tintPixmap(path, color, size);
 }
 
-void ThemeIcons::setIcon(QAbstractButton* button, const QString& path, Role role)
+void ThemeIcons::setIcon(QAbstractButton* button, const QString& path, Role role, int size)
 {
     if (!button) return;
-    button->setIcon(icon(path, role));
-    Entry e;
-    e.target = button;
-    e.path = path;
-    e.role = role;
-    e.size = QSize();
-    m_entries.append(e);
+    button->setIcon(icon(path, role, size));
+    m_entries.insert(button, Entry{button, path, role, size});
+    pruneDeadEntries();
 }
 
-void ThemeIcons::setIcon(QAction* action, const QString& path, Role role)
+void ThemeIcons::setIcon(QAction* action, const QString& path, Role role, int size)
 {
     if (!action) return;
-    action->setIcon(icon(path, role));
-    Entry e;
-    e.target = action;
-    e.path = path;
-    e.role = role;
-    e.size = QSize();
-    m_entries.append(e);
+    action->setIcon(icon(path, role, size));
+    m_entries.insert(action, Entry{action, path, role, size});
+    pruneDeadEntries();
 }
 
 void ThemeIcons::setIcon(QLabel* label, const QString& path, Role role, const QSize& size)
 {
     if (!label) return;
-    const int extent = size.isEmpty() ? 16 : qMax(size.width(), size.height());
-    label->setPixmap(tintedPixmap(path, colorForRole(role), extent));
-    Entry e;
-    e.target = label;
-    e.path = path;
-    e.role = role;
-    e.size = (size.isEmpty() ? QSize(extent, extent) : size);
-    m_entries.append(e);
+    const int extent = size.isEmpty() ? DefaultSize : qMax(size.width(), size.height());
+    label->setPixmap(tintPixmap(path, colorForRole(role), extent));
+    m_entries.insert(label, Entry{label, path, role, extent});
+    pruneDeadEntries();
+}
+
+void ThemeIcons::pruneDeadEntries()
+{
+    for (auto it = m_entries.begin(); it != m_entries.end();) {
+        if (it->target.isNull())
+            it = m_entries.erase(it);
+        else
+            ++it;
+    }
 }
 
 void ThemeIcons::recolorAll()
 {
-    // 反向迭代以便安全移除失效條目
-    for (int i = m_entries.size() - 1; i >= 0; --i) {
-        const Entry& e = m_entries.at(i);
-        QObject* target = e.target.data();
-        if (!target) {
-            m_entries.removeAt(i);
+    // 顏色全變，著色快取整池失效；SVG 解析結果與主題無關，保留。
+    m_tintCache.clear();
+    pruneDeadEntries();
+
+    for (auto it = m_entries.begin(); it != m_entries.end(); ++it) {
+        // 取出副本：setIcon() 觸發樣式重算，理論上可能引發重入。
+        const Entry entry = it.value();
+        QObject* target = entry.target.data();
+        if (!target)
             continue;
-        }
 
-        const QColor color = colorForRole(e.role);
-
+        const QColor color = colorForRole(entry.role);
         if (auto* btn = qobject_cast<QAbstractButton*>(target)) {
-            btn->setIcon(makeIcon(e.path, color));
+            btn->setIcon(icon(entry.path, entry.role, entry.size));
         } else if (auto* action = qobject_cast<QAction*>(target)) {
-            action->setIcon(makeIcon(e.path, color));
+            action->setIcon(icon(entry.path, entry.role, entry.size));
         } else if (auto* label = qobject_cast<QLabel*>(target)) {
-            const int extent = e.size.isEmpty() ? 16 : qMax(e.size.width(), e.size.height());
-            label->setPixmap(tintedPixmap(e.path, color, extent));
-        } else {
-            m_entries.removeAt(i);
+            label->setPixmap(tintPixmap(entry.path, color, entry.size));
         }
     }
+}
+
+QIcon ThemeFileIconProvider::memoized(const QString& path) const
+{
+    ThemeIcons* ti = ThemeIcons::instance();
+    const QColor color = ti->colorForRole(ThemeIcons::Role::Normal);
+    const qreal dpr = qApp ? qApp->devicePixelRatio() : 1.0;
+
+    // 主题色或 dpr 變了就整批失效 — 兩者都會改變像素結果。
+    if (m_cacheColor != color || m_cacheDpr != dpr) {
+        m_cache.clear();
+        m_cacheColor = color;
+        m_cacheDpr = dpr;
+    }
+
+    const auto cached = m_cache.constFind(path);
+    if (cached != m_cache.constEnd())
+        return cached.value();
+
+    const QIcon result = ti->icon(path);
+    m_cache.insert(path, result);
+    return result;
 }
 
 QIcon ThemeFileIconProvider::icon(QFileIconProvider::IconType type) const
 {
     if (type == QFileIconProvider::Folder) {
-        return ThemeIcons::instance()->icon(":/icons/folder.svg");
+        return memoized(":/icons/folder.svg");
     }
-    return ThemeIcons::instance()->icon(":/icons/file.svg");
+    return memoized(":/icons/file.svg");
 }
 
 QIcon ThemeFileIconProvider::icon(const QFileInfo& info) const
 {
     if (info.isDir()) {
-        return ThemeIcons::instance()->icon(":/icons/folder.svg");
+        return memoized(":/icons/folder.svg");
     }
-    return ThemeIcons::instance()->icon(":/icons/file.svg");
+    return memoized(":/icons/file.svg");
 }

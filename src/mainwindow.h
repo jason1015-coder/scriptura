@@ -96,6 +96,44 @@ struct OpenFile {
 
 class PluginManagerDialog;
 
+/**
+ * @class FileTreeModel
+ * @brief The file-tree model: switchable folder glyphs, and theme-fresh icons.
+ *
+ * QFileSystemModel caches every icon its QFileIconProvider returns inside the
+ * per-item private data and never asks again, which breaks two things: the
+ * folder glyphs could not be switched off while the sidebar drawer is drawn out,
+ * and a theme change left the old colours on screen (neither dataChanged nor
+ * layoutChanged clears that cache — both re-read return the cached icon).
+ * Overriding data() re-asks on every repaint, which is what makes both work;
+ * the provider is memoised so a repaint costs a hash lookup rather than a
+ * re-rasterisation.
+ */
+class FileTreeModel : public QFileSystemModel
+{
+    Q_OBJECT
+
+public:
+    using QFileSystemModel::QFileSystemModel;
+
+    QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const override;
+
+    bool folderIconsVisible() const { return m_folderIconsVisible; }
+
+    void setFolderIconsVisible(bool visible);
+
+    /**
+     * @brief 通知視圖重新取得所有資料列的裝飾圖標。
+     *
+     * 主題切換時圖標顏色改變，但資料列數與順序不變 — 發 layoutChanged 會強迫
+     * 檔案樹重新配置並重跑整個模型的 layout，成本遠高於實際需求。
+     */
+    void refreshDecorationRole();
+
+private:
+    bool m_folderIconsVisible = true;
+};
+
 class MainWindow : public QMainWindow
 {
     Q_OBJECT
@@ -196,9 +234,8 @@ protected:
     QString projectDir;
     QModelIndex rootIndex;
     QList<OpenFile> openFiles;
-    QFileSystemModel *fileModel = nullptr;
+    FileTreeModel *fileModel = nullptr;
     ThemeFileIconProvider *m_fileIconProvider = nullptr;
-    QToolButton *fileTreeToggleButton;
     QTabBar *tabBar;
     QToolButton *m_newTabButton = nullptr;
     int m_untitledCounter = 0;
@@ -216,6 +253,16 @@ protected:
         QWidget *panelWidget = nullptr;
     };
     QList<PanelButtonEntry> m_panelButtons;
+    // Menus are built once and kept, rather than rebuilt per right-click: each
+    // rebuild re-registers every action with ThemeIcons and re-rasterises its
+    // icon. Only the enabled/disabled state depends on the clicked row.
+    QMenu *m_fileContextMenu = nullptr;
+    QAction *m_ctxNewFile = nullptr;
+    QAction *m_ctxNewFolder = nullptr;
+    QAction *m_ctxRename = nullptr;
+    QAction *m_ctxDelete = nullptr;
+    QMenu *m_newTabMenu = nullptr;
+    int m_newTabMenuPanelCount = -1;
     QStackedWidget *bottomPanelStack;
     FindReplaceBar *findReplaceBar;
     ProjectSearchPanel *projectSearchPanel;
@@ -247,6 +294,13 @@ protected:
     // layout switch can cancel them — a stale end value would otherwise fight
     // whatever width applyLayout() just decided on.
     QList<QPointer<QAbstractAnimation>> m_sidebarAnims;
+    // The sidebar drawer's collapse state, mirroring the "ui/sidebarCollapsed"
+    // setting. The drawer is collapsed by animating its width to zero, never by
+    // hiding it, so isHidden() can never answer this — and during the 200 ms
+    // animation its width is a mid-flight value, not the settled one. This
+    // member is written by setSidebarCollapsed() and applyLayout() (the startup
+    // path) and is the only thing closeEvent() and the toggle consult.
+    bool m_sidebarCollapsed = true;
     // Inspector header pieces, kept so applyPaneMirroring() can swap the close
     // button and title to the leading edge in the mirrored layout.
     QHBoxLayout *m_inspectorHeaderLayout = nullptr;
@@ -342,6 +396,8 @@ protected:
     void openFileInTab(const QString &fileName);
     void applyTheme(const Theme &theme);
     void setSidebarCollapsed(bool collapsed);
+    bool isSidebarCollapsed() const { return m_sidebarCollapsed; }
+    void updateFileTreeFolderIcons();
     void cancelSidebarAnimations();
     void applyLayout(LayoutType layout);
     void setLayoutType(LayoutType layout);

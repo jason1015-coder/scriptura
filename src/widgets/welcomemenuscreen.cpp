@@ -15,43 +15,9 @@
 #include <QStandardPaths>
 #include <QPainter>
 #include <QPixmap>
-#include <QImageReader>
 #include <QDebug>
 
-// ── Helper: render & tint a monochrome SVG icon ───────────────────────
-// Uses QImageReader (handles SVG via Qt's built-in plugin) so we don't
-// need to link against the QtSvg module directly.
-static QPixmap renderSvgPixmap(const QString &path, int size)
-{
-    QImageReader reader(path);
-    if (reader.canRead()) {
-        reader.setScaledSize(QSize(size, size));
-        QImage img = reader.read();
-        if (!img.isNull())
-            return QPixmap::fromImage(img);
-    }
-    QPixmap fallback(path);
-    if (!fallback.isNull())
-        return fallback.scaled(size, size, Qt::KeepAspectRatio, Qt::SmoothTransformation);
-    return QPixmap();
-}
-
-static QIcon tintedIcon(const QString &svgPath, const QColor &color, int size = 20)
-{
-    QPixmap shape = renderSvgPixmap(svgPath, size);
-    if (shape.isNull())
-        return QIcon(svgPath);
-    QPixmap out(size, size);
-    out.fill(color);
-    {
-        QPainter p(&out);
-        p.setCompositionMode(QPainter::CompositionMode_DestinationIn);
-        p.drawPixmap(0, 0, shape);
-    }
-    QIcon icon;
-    icon.addPixmap(out, QIcon::Normal);
-    return icon;
-}
+#include "themeicons.h"
 
 // ── Static helpers ────────────────────────────────────────────────────
 
@@ -288,9 +254,10 @@ void WelcomeMenuScreen::setupUI()
         return btn;
     };
 
-    QPushButton *openProjectBtn = makeActionBtn(
-        QIcon(":/icons/folder.svg"), tr("  Open New Project"), QStringLiteral("openProjectBtn"));
-    openProjectBtn->setStyleSheet(
+    m_openProjectBtn = makeActionBtn(
+        ThemeIcons::instance()->icon(":/icons/folder.svg"),
+        tr("  Open New Project"), QStringLiteral("openProjectBtn"));
+    m_openProjectBtn->setStyleSheet(
         "QPushButton#openProjectBtn {"
         "  background-color: palette(highlight);"
         "  color: palette(highlighted-text);"
@@ -304,14 +271,16 @@ void WelcomeMenuScreen::setupUI()
         "  opacity: 0.9;"
         "}"
     );
-    leftPanel->addWidget(openProjectBtn);
+    leftPanel->addWidget(m_openProjectBtn);
 
     m_cloneBtn = makeActionBtn(
-        QIcon(":/icons/git.svg"), tr("  Clone Repository"), QStringLiteral("cloneBtn"));
+        ThemeIcons::instance()->icon(":/icons/git.svg"),
+        tr("  Clone Repository"), QStringLiteral("cloneBtn"));
     leftPanel->addWidget(m_cloneBtn);
 
     m_newFileBtn = makeActionBtn(
-        QIcon(":/icons/file.svg"), tr("  New File"), QStringLiteral("newFileBtn"));
+        ThemeIcons::instance()->icon(":/icons/file.svg"),
+        tr("  New File"), QStringLiteral("newFileBtn"));
     leftPanel->addWidget(m_newFileBtn);
 
     leftPanel->addStretch();
@@ -356,7 +325,7 @@ void WelcomeMenuScreen::setupUI()
     mainLayout->addLayout(contentLayout);
 
     // ── Connect signals ─────────────────────────────────────────────
-    connect(openProjectBtn, &QPushButton::clicked, this, [this]() {
+    connect(m_openProjectBtn, &QPushButton::clicked, this, [this]() {
         emit openProjectRequested();
     });
 
@@ -443,11 +412,16 @@ void WelcomeMenuScreen::setThemeBackground(const QColor &color)
         .arg(midColor.name())
         .arg(isDark ? QColor(180, 180, 255).name() : QColor(0, 100, 200).name()));
 
-    // Tint SVG icons to match the theme
+    // Tint SVG icons to match the theme, through the shared cache. buttonTextColor
+    // is computed from the widget's own palette, so pass it explicitly rather
+    // than let a role guess it.
+    auto themeIcons = ThemeIcons::instance();
+    if (m_openProjectBtn)
+        m_openProjectBtn->setIcon(themeIcons->icon(":/icons/folder.svg", buttonTextColor));
     if (m_cloneBtn)
-        m_cloneBtn->setIcon(tintedIcon(":/icons/git.svg", buttonTextColor));
+        m_cloneBtn->setIcon(themeIcons->icon(":/icons/git.svg", buttonTextColor));
     if (m_newFileBtn)
-        m_newFileBtn->setIcon(tintedIcon(":/icons/file.svg", buttonTextColor));
+        m_newFileBtn->setIcon(themeIcons->icon(":/icons/file.svg", buttonTextColor));
 }
 
 void WelcomeMenuScreen::loadRecentProjects()

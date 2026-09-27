@@ -600,10 +600,14 @@ void MainWindow::on_action_license_triggered()
   void MainWindow::setSidebarCollapsed(bool collapsed)
   {
     SettingsStore::instance().setValue("ui/sidebarCollapsed", collapsed);
+    m_sidebarCollapsed = collapsed;
 
     // Keep the title bar toggle in sync with the actual drawer state.
     if (m_titleBar && m_titleBar->sidebarToggleButton)
         m_titleBar->sidebarToggleButton->setChecked(!collapsed);
+
+    // Drawn out → the file tree lists files straight away, folder glyphs dropped.
+    updateFileTreeFolderIcons();
 
     // Cancel any in-flight collapse first: two animations driving the same
     // property fight each other, and the loser writes a stale end value.

@@ -148,10 +148,12 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
     // 主題切換時自動重新著色所有追蹤中的圖標，確保在各主題下都保持可見
     connect(m_themeManager, &ThemeManager::themeChanged,
             ThemeIcons::instance(), &ThemeIcons::recolorAll);
-    // 檔案樹使用主題感知的圖標提供者，切換主題後需重新取得圖標
+    // 檔案樹使用主題感知的圖標提供者，切換主題後需重新取得圖標。
+    // 只喚醒裝飾角色：資料列數與順序都沒變，layoutChanged 會白白強迫整棵樹
+    // 重新配置。
     connect(m_themeManager, &ThemeManager::themeChanged, this, [this]() {
         if (fileModel) {
-            fileModel->layoutChanged();
+            fileModel->refreshDecorationRole();
         }
     });
     m_windowAnimator = new WindowAnimator(this);
@@ -216,8 +218,8 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
     if (centralWidget())
         centralWidget()->setMouseTracking(true);
 
-    connect(m_titleBar, &CustomTitleBar::sidebarToggleClicked, this, [uiActions]() {
-        uiActions->handle(UiActions::TitlebarSidebarToggle);
+    connect(m_titleBar, &CustomTitleBar::sidebarToggleClicked, this, [this]() {
+        setSidebarCollapsed(!m_sidebarCollapsed);
     });
     connect(m_titleBar, &CustomTitleBar::inspectorToggleClicked, this, [uiActions]() {
         uiActions->handle(UiActions::TitlebarInspectorToggle);
@@ -228,9 +230,10 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
 
     // Execute the commands Rust decided:
     connect(uiActions, &UiActionBridge::sidebarToggleRequested, this, [this]() {
-        // sidebarDrawer has zero width when collapsed (not hidden), so check width
-        bool isCollapsed = ui->sidebarDrawer->maximumWidth() == 0 || ui->sidebarDrawer->width() < 10;
-        setSidebarCollapsed(!isCollapsed);
+        // The settled state lives in m_sidebarCollapsed; the drawer's width is a
+        // mid-animation value while a collapse is in flight, so reading it here
+        // would make a fast double-toggle flip back to the same state.
+        setSidebarCollapsed(!m_sidebarCollapsed);
     });
     connect(uiActions, &UiActionBridge::inspectorToggleRequested, this, [this]() {
         toggleInspector();
@@ -378,7 +381,7 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
                qMin(available.height() * 7 / 10, 800));
     }
     
-    fileModel = new QFileSystemModel(this);
+    fileModel = new FileTreeModel(this);
     // 使用主題感知的圖標提供者，確保檔案樹圖標在淺/深色/高對比下都可見
     m_fileIconProvider = new ThemeFileIconProvider();
     fileModel->setIconProvider(m_fileIconProvider);
@@ -466,16 +469,6 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
     projectSearchPanel->hide();
     addBottomPanelButton(":/icons/search.svg", tr("Search Results"), tr("Search"), true, projectSearchPanel);
 
-    // Sidebar icon buttons (bottom of drawer)
-    fileTreeToggleButton = new QToolButton(ui->sidebarDrawer);
-    ThemeIcons::instance()->setIcon(fileTreeToggleButton, ":/icons/file-tree.svg");
-    fileTreeToggleButton->setIconSize(QSize(20, 20));
-    fileTreeToggleButton->setToolTip(tr("File Tree"));
-    fileTreeToggleButton->setCheckable(true);
-    fileTreeToggleButton->setChecked(true);
-    fileTreeToggleButton->setFixedSize(32, 32);
-    ui->sidebarDrawerLayout->addWidget(fileTreeToggleButton);
-
     // Keep an empty iconBar for plugins to add custom buttons via UI API
     QWidget *iconBar = new QWidget(ui->sidebarDrawer);
     m_sidebarIconBar = iconBar;
@@ -547,10 +540,14 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
     contentLayout->setSpacing(12);
     contentLayout->setAlignment(Qt::AlignCenter);
 
-    // Sparkle icon placeholder
+    // Sparkle icon placeholder. The logo is full-colour, so it deliberately
+    // bypasses ThemeIcons (which tints). The DPR-aware pixmap() overload is
+    // still used so a HiDPI screen gets a natively-sized bitmap rather than an
+    // upscaled 48px one.
     QLabel *iconLabel = new QLabel(inspectorContent);
     iconLabel->setObjectName("assistantIcon");
-    iconLabel->setPixmap(QIcon(":/icons/app-icon.svg").pixmap(48, 48));
+    iconLabel->setPixmap(QIcon(":/icons/app-icon.svg").pixmap(
+        QSize(48, 48), qApp ? qApp->devicePixelRatio() : 1.0));
     iconLabel->setAlignment(Qt::AlignCenter);
 
     // TODO: nanocoder assistant in here
@@ -636,20 +633,6 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
     // signals prevent ping-pong with onTopTabChanged.
     connect(ui->tabWidget, &QTabWidget::currentChanged, this, [this]() {
         syncTopBarToCurrentFile();
-    });
-
-    // Bottom panel buttons — first button (Search) is checked by default
-    if (!m_panelButtons.isEmpty())
-        m_panelButtons[0].button->setChecked(true);
-
-    // Sidebar connections
-    connect(fileTreeToggleButton, &QToolButton::toggled, this, [this](bool checked) {
-        Q_UNUSED(checked);
-        if (ui->fileTreeView->isHidden()) {
-            ui->fileTreeView->show();
-        } else {
-            ui->fileTreeView->hide();
-        }
     });
 
     // File tree
@@ -1441,6 +1424,10 @@ void MainWindow::applyLayout(LayoutType layout)
         sidebar->setMaximumWidth(collapsed ? 0 : 240);
         if (m_titleBar && m_titleBar->sidebarToggleButton)
             m_titleBar->sidebarToggleButton->setChecked(!collapsed);
+        // applyLayout() is also the startup path for the drawer state, so the
+        // file tree's folder icons have to be re-synced here too.
+        m_sidebarCollapsed = collapsed;
+        updateFileTreeFolderIcons();
     }
 
     if (mirrored) {
@@ -1503,17 +1490,81 @@ void MainWindow::applyPaneMirroring(bool mirrored)
         }
     }
 
-    // The drawer's bottom bar (file-tree toggle + plugin icon bar) is pinned to
-    // the leading edge; mirror it so it hugs the same side as the drawer. Keep
-    // the two controls in their original order — only the edge they hug changes.
+    // The drawer's bottom bar (plugin icon bar) is pinned to
+    // the leading edge; mirror it so it hugs the same side as the drawer.
     const Qt::Alignment barAlign = mirrored ? (Qt::AlignRight | Qt::AlignVCenter)
                                             : (Qt::AlignLeft | Qt::AlignVCenter);
-    ui->sidebarDrawerLayout->removeWidget(fileTreeToggleButton);
-    ui->sidebarDrawerLayout->addWidget(fileTreeToggleButton, 0, barAlign);
     if (m_sidebarIconBar) {
         ui->sidebarDrawerLayout->removeWidget(m_sidebarIconBar);
         ui->sidebarDrawerLayout->addWidget(m_sidebarIconBar, 0, barAlign);
     }
+}
+
+QVariant FileTreeModel::data(const QModelIndex &index, int role) const
+{
+    if (role == Qt::DecorationRole) {
+        if (!index.isValid())
+            return QVariant();
+        // Folders lose their glyph while the drawer is open; files keep theirs.
+        if (!m_folderIconsVisible && isDir(index))
+            return QVariant();
+        // Ask the provider directly instead of going through QFileSystemModel,
+        // which stores each icon in per-item private data and never re-asks —
+        // a theme change would otherwise leave stale colours on screen.
+        // ThemeFileIconProvider memoises per (colour, dpr), so a repaint of the
+        // visible rows costs a hash lookup, not a re-tint.
+        //
+        // The static_cast relies on the model only ever being given a
+        // QFileIconProvider: MainWindow installs m_fileIconProvider (a
+        // ThemeFileIconProvider) and nothing else calls setIconProvider.
+        // QAbstractFileIconProvider is not a QObject, so qobject_cast cannot
+        // express the check.
+        if (const auto *provider = static_cast<const QFileIconProvider *>(iconProvider()))
+            return provider->icon(fileInfo(index));
+        return QVariant();
+    }
+    return QFileSystemModel::data(index, role);
+}
+
+void FileTreeModel::setFolderIconsVisible(bool visible)
+{
+    if (m_folderIconsVisible == visible)
+        return;
+    m_folderIconsVisible = visible;
+    // The top-level rows are only the wake-up call — data() above re-answers for
+    // every row the view repaints, so nested folders follow without a walk.
+    const QModelIndex root = index(rootPath());
+    const int rows = rowCount(root);
+    if (rows > 0) {
+        emit dataChanged(index(0, 0, root), index(rows - 1, 0, root),
+                         { Qt::DecorationRole });
+    }
+}
+
+void FileTreeModel::refreshDecorationRole()
+{
+    // Top-level rows are the wake-up call: QFileSystemModel re-queries the icon
+    // provider per row as the view repaints, and ThemeFileIconProvider now
+    // answers from its own memo, so nested folders follow without a walk.
+    const QModelIndex root = index(rootPath());
+    const int rows = rowCount(root);
+    if (rows > 0) {
+        emit dataChanged(index(0, 0, root), index(rows - 1, 0, root),
+                         { Qt::DecorationRole });
+    }
+}
+
+void MainWindow::updateFileTreeFolderIcons()
+{
+    if (!fileModel)
+        return;
+    // Drawer drawn out → the tree goes straight to the file list, no folder
+    // glyphs; collapsed → the drawer is just a rail, so bring them back.
+    fileModel->setFolderIconsVisible(m_sidebarCollapsed);
+    // dataChanged only covers the top level; repaint the whole tree so rows the
+    // view never re-lays-out drop their folder icon too.
+    if (ui->fileTreeView)
+        ui->fileTreeView->viewport()->update();
 }
 
 void MainWindow::cancelSidebarAnimations()
@@ -1551,7 +1602,7 @@ int MainWindow::addBottomPanelButton(const QString &iconPath, const QString &too
     btn->setCheckable(true);
     btn->setToolTip(tooltip);
     btn->setCursor(Qt::PointingHandCursor);
-    ThemeIcons::instance()->setIcon(btn, iconPath);
+    ThemeIcons::instance()->setIcon(btn, iconPath, ThemeIcons::Role::Normal, 18);
 
     int index = m_panelButtons.size();
     PanelButtonEntry entry;

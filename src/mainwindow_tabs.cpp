@@ -548,27 +548,36 @@ void MainWindow::on_fileTreeView_contextMenu(const QPoint &pos)
         ui->fileTreeView->setCurrentIndex(index);
     }
 
-    QMenu menu(this);    QAction *newFileAction = menu.addAction(tr("New File..."));
-    ThemeIcons::instance()->setIcon(newFileAction, ":/icons/file.svg");
+    if (!m_fileContextMenu) {
+        m_fileContextMenu = new QMenu(this);
+        ThemeIcons *icons = ThemeIcons::instance();
 
-    QAction *newFolderAction = menu.addAction(tr("New Folder..."));
-    ThemeIcons::instance()->setIcon(newFolderAction, ":/icons/folder.svg");
+        m_ctxNewFile = m_fileContextMenu->addAction(tr("New File..."));
+        icons->setIcon(m_ctxNewFile, ":/icons/file.svg");
 
-    menu.addSeparator();
+        m_ctxNewFolder = m_fileContextMenu->addAction(tr("New Folder..."));
+        icons->setIcon(m_ctxNewFolder, ":/icons/folder.svg");
 
-    QAction *renameAction = menu.addAction(tr("Rename..."));
-    QAction *deleteAction = menu.addAction(tr("Delete"));
-    ThemeIcons::instance()->setIcon(deleteAction, ":/icons/close.svg");
+        m_fileContextMenu->addSeparator();
 
-    // Disable rename/delete if nothing selected
-    if (!index.isValid()) {
-        renameAction->setEnabled(false);
-        deleteAction->setEnabled(false);
+        m_ctxRename = m_fileContextMenu->addAction(tr("Rename..."));
+        m_ctxDelete = m_fileContextMenu->addAction(tr("Delete"));
+        icons->setIcon(m_ctxDelete, ":/icons/close.svg");
     }
 
-    QAction *selected = menu.exec(ui->fileTreeView->mapToGlobal(pos));
+    // Rename/Delete need a row to act on; the rest work anywhere.
+    const bool hasTarget = index.isValid();
+    m_ctxRename->setEnabled(hasTarget);
+    m_ctxDelete->setEnabled(hasTarget);
+
+    QAction *selected = m_fileContextMenu->exec(ui->fileTreeView->mapToGlobal(pos));
     if (!selected)
         return;
+
+    QAction *newFileAction = m_ctxNewFile;
+    QAction *newFolderAction = m_ctxNewFolder;
+    QAction *renameAction = m_ctxRename;
+    QAction *deleteAction = m_ctxDelete;
 
     if (selected == newFileAction || selected == newFolderAction) {
         // Determine target directory
@@ -865,39 +874,52 @@ void MainWindow::newUntitledFile()
 void MainWindow::showNewTabPanel()
 {
     // Floating panel listing every available tab type, anchored under the
-    // "+" button at the end of the tab bar.
-    QMenu *menu = new QMenu(this);
-    menu->setAttribute(Qt::WA_DeleteOnClose);
-    menu->setObjectName("newTabPanel");
-    menu->setStyleSheet(
-        "QMenu#newTabPanel { background-color: palette(window);"
-        " border: 1px solid palette(mid); border-radius: 10px; padding: 6px; }"
-        "QMenu#newTabPanel::item { padding: 6px 24px 6px 12px; border-radius: 6px; }"
-        "QMenu#newTabPanel::item:selected { background-color: palette(highlight);"
-        " color: palette(highlighted-text); }"
-        "QMenu#newTabPanel::separator { height: 1px; background: palette(mid);"
-        " margin: 4px 8px; }");
+    // "+" button at the end of the tab bar. Kept alive between uses: a
+    // WA_DeleteOnClose menu meant re-registering and re-rasterising every icon
+    // on each visit.
+    if (!m_newTabMenu) {
+        m_newTabMenu = new QMenu(this);
+        m_newTabMenu->setObjectName("newTabPanel");
+        m_newTabMenu->setStyleSheet(
+            "QMenu#newTabPanel { background-color: palette(window);"
+            " border: 1px solid palette(mid); border-radius: 10px; padding: 6px; }"
+            "QMenu#newTabPanel::item { padding: 6px 24px 6px 12px; border-radius: 6px; }"
+            "QMenu#newTabPanel::item:selected { background-color: palette(highlight);"
+            " color: palette(highlighted-text); }"
+            "QMenu#newTabPanel::separator { height: 1px; background: palette(mid);"
+            " margin: 4px 8px; }");
+        m_newTabMenuPanelCount = -1;
+    }
 
-    QAction *emptyAction = menu->addAction(tr("New Empty File"));
-    ThemeIcons::instance()->setIcon(emptyAction, ":/icons/file.svg");
-    connect(emptyAction, &QAction::triggered, this, &MainWindow::newUntitledFile);
+    // Plugin panels can be registered after the menu was first built, so the
+    // body is rebuilt only when the panel list has actually changed.
+    const int panelCount = m_panelButtons.size();
+    if (m_newTabMenuPanelCount != panelCount) {
+        m_newTabMenu->clear();
+        ThemeIcons *icons = ThemeIcons::instance();
 
-    QAction *openAction = menu->addAction(tr("Open File..."));
-    ThemeIcons::instance()->setIcon(openAction, ":/icons/folder.svg");
-    connect(openAction, &QAction::triggered, this, &MainWindow::on_action_open_file_triggered);
+        QAction *emptyAction = m_newTabMenu->addAction(tr("New Empty File"));
+        icons->setIcon(emptyAction, ":/icons/file.svg");
+        connect(emptyAction, &QAction::triggered, this, &MainWindow::newUntitledFile);
 
-    QAction *settingsAction = menu->addAction(tr("Settings"));
-    ThemeIcons::instance()->setIcon(settingsAction, ":/icons/settings.svg");
-    connect(settingsAction, &QAction::triggered, this, &MainWindow::on_action_editor_settings_triggered);
+        QAction *openAction = m_newTabMenu->addAction(tr("Open File..."));
+        icons->setIcon(openAction, ":/icons/folder.svg");
+        connect(openAction, &QAction::triggered, this, &MainWindow::on_action_open_file_triggered);
 
-    if (!m_panelButtons.isEmpty()) {
-        menu->addSeparator();
-        for (int i = 0; i < m_panelButtons.size(); ++i) {
-            QAction *panelAction = menu->addAction(m_panelButtons[i].title);
-            connect(panelAction, &QAction::triggered, this, [this, i]() {
-                showBottomPanelIndex(i);
-            });
+        QAction *settingsAction = m_newTabMenu->addAction(tr("Settings"));
+        icons->setIcon(settingsAction, ":/icons/settings.svg");
+        connect(settingsAction, &QAction::triggered, this, &MainWindow::on_action_editor_settings_triggered);
+
+        if (panelCount > 0) {
+            m_newTabMenu->addSeparator();
+            for (int i = 0; i < panelCount; ++i) {
+                QAction *panelAction = m_newTabMenu->addAction(m_panelButtons[i].title);
+                connect(panelAction, &QAction::triggered, this, [this, i]() {
+                    showBottomPanelIndex(i);
+                });
+            }
         }
+        m_newTabMenuPanelCount = panelCount;
     }
 
     QPoint pos;
@@ -905,6 +927,6 @@ void MainWindow::showNewTabPanel()
         pos = m_newTabButton->mapToGlobal(QPoint(0, m_newTabButton->height() + 4));
     else
         pos = tabBar->mapToGlobal(QPoint(tabBar->width(), tabBar->height()));
-    menu->exec(pos);
+    m_newTabMenu->exec(pos);
 }
 

@@ -19,7 +19,7 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y wget file dpkg fakeroot qt6-base-dev libqt6sql6-sqlite
+          sudo apt-get install -y wget file dpkg fakeroot qt6-base-dev qt6-svg-dev libqt6sql6-sqlite
 
       - name: Download linuxdeploy
         run: |

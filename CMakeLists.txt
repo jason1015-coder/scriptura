@@ -41,8 +41,8 @@ if(WIN32 AND MSVC)
     set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreadedDLL")
 endif()
 
-find_package(QT NAMES Qt6 Qt5 REQUIRED COMPONENTS Widgets LinguistTools Network Sql Test)
-find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Widgets LinguistTools Network Sql Test)
+find_package(QT NAMES Qt6 Qt5 REQUIRED COMPONENTS Widgets LinguistTools Network Sql Test Svg)
+find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Widgets LinguistTools Network Sql Test Svg)
 
 enable_testing()
 
@@ -102,6 +102,16 @@ add_custom_target(rust_backend
 file(GLOB_RECURSE SCRIPTURA_CORE_SOURCES CONFIGURE_DEPENDS
     "src/*.cpp" "src/*.h" "src/*.ui" "src/*.qrc" "src/*.h.in"
 )
+
+# The *.qrc glob above also picks up src/resources.qrc, which PROJECT_SOURCES
+# already compiles into the `scriptura` executable. Compiling it into both the
+# executable and this static library embeds two copies of the data and runs the
+# resource initialiser twice per process. Keep exactly one copy: the executable
+# (PROJECT_SOURCES) and the test binary (tests/CMakeLists.txt). The C++ in
+# scriptura_core that resolves ":/icons/..." still works, because QResource
+# registration is process-global rather than per-module, and every binary that
+# loads this library also links the one that registers the resources.
+list(FILTER SCRIPTURA_CORE_SOURCES EXCLUDE REGEX "src/resources\\.qrc$")
 
 # ── Exclude backend C++ files (replaced by Rust FFI modules) ─────────
 list(FILTER SCRIPTURA_CORE_SOURCES EXCLUDE REGEX "src/plugins/git/")
@@ -188,6 +198,7 @@ target_link_libraries(scriptura_core PUBLIC
     Qt${QT_VERSION_MAJOR}::Widgets
     Qt${QT_VERSION_MAJOR}::Network
     Qt${QT_VERSION_MAJOR}::Sql
+    Qt${QT_VERSION_MAJOR}::Svg
     ZLIB::ZLIB
 )
 

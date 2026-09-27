@@ -2,24 +2,14 @@
 <qresource prefix="/">
     <file>icon.png</file>
     <file alias="icons/app-icon.svg">resources/icons/app-icon.svg</file>
-    <file alias="icons/sidebar-toggle.svg">resources/icons/sidebar-toggle.svg</file>
-    <file alias="icons/go-up.svg">resources/icons/go-up.svg</file>
-    <file alias="icons/file-tree.svg">resources/icons/file-tree.svg</file>
-    <file alias="icons/todo.svg">resources/icons/todo.svg</file>
-    <file alias="icons/terminal.svg">resources/icons/terminal.svg</file>
-    <file alias="icons/problems.svg">resources/icons/problems.svg</file>
-    <file alias="icons/git.svg">resources/icons/git.svg</file>
-    <file alias="icons/theme.svg">resources/icons/theme.svg</file>
-    <file alias="icons/settings.svg">resources/icons/settings.svg</file>
-    <file alias="icons/close.svg">resources/icons/close.svg</file>
     <file alias="icons/check.svg">resources/icons/check.svg</file>
-    <file alias="icons/folder.svg">resources/icons/folder.svg</file>
+    <file alias="icons/close.svg">resources/icons/close.svg</file>
+    <file alias="icons/file-tree.svg">resources/icons/file-tree.svg</file>
     <file alias="icons/file.svg">resources/icons/file.svg</file>
-    <file alias="icons/minimize.svg">resources/icons/minimize.svg</file>
-    <file alias="icons/maximize.svg">resources/icons/maximize.svg</file>
-    <file alias="icons/menu.svg">resources/icons/menu.svg</file>
-    <file alias="icons/search.svg">resources/icons/search.svg</file>
+    <file alias="icons/folder.svg">resources/icons/folder.svg</file>
+    <file alias="icons/git.svg">resources/icons/git.svg</file>
     <file alias="icons/inspector.svg">resources/icons/inspector.svg</file>
-    <file alias="icons/tools.svg">resources/icons/tools.svg</file>
+    <file alias="icons/search.svg">resources/icons/search.svg</file>
+    <file alias="icons/settings.svg">resources/icons/settings.svg</file>
 </qresource>
 </RCC>

@@ -60,6 +60,7 @@ private:
     bool m_maximized = false;
 
     // Action buttons (for icon recoloring)
+    QPushButton *m_openProjectBtn = nullptr;
     QPushButton *m_cloneBtn = nullptr;
     QPushButton *m_newFileBtn = nullptr;
 };
