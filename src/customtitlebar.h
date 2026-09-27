@@ -25,9 +25,13 @@ public:
     QPushButton* closeButton;
     QLabel* titleLabel;
     QPushButton* sidebarToggleButton;
-    QPushButton* settingsButton;
     QPushButton* inspectorToggleButton;
     QLineEdit* searchField;
+
+    // Mirror the whole control row: what sits at the leading edge in the
+    // classic layout moves to the trailing edge, and vice versa.
+    void setMirrored(bool mirrored);
+    bool isMirrored() const { return m_mirrored; }
 
 signals:
     void windowMoveRequested();
@@ -35,7 +39,6 @@ signals:
     void minimizeRequest();
     void closeRequest();
     void sidebarToggleClicked();
-    void settingsClicked();
     void inspectorToggleClicked();
     void searchRequested(const QString &query);
 
@@ -48,6 +51,10 @@ protected:
 private:
     bool m_isDragging = false;
     QPoint m_dragPosition;
+    bool m_mirrored = false;
+    QHBoxLayout *m_layout = nullptr;
+    int m_spacingXs = 4;
+    int m_spacingSm = 8;
 
     void styleButtons();
     void setupLayout();

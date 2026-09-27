@@ -24,10 +24,13 @@
 #include <QRadioButton>
 #include <QCheckBox>
 #include <QGroupBox>
+#include <QButtonGroup>
 #include <QGridLayout>
 #include <QTabBar>
 #include <QScrollArea>
 #include <QPointer>
+#include <QAbstractAnimation>
+#include <QHBoxLayout>
 #include <memory>
 #include "codeeditor.h"
 #include "findreplace.h"
@@ -60,6 +63,16 @@
 #include "thememanager.h"
 #include "themeicons.h"
 #include "rust_adapter.h"
+
+// Window chrome arrangements, switchable at runtime from Settings → Layout.
+// Classic  — sidebar | editor | inspector, with the bottom panel.
+// Mirrored — Classic left-to-right reversed: the inspector takes the left edge
+//            and the sidebar the right, and every control inside the window
+//            (title bar, status bar, panes) mirrors its position to match.
+enum class LayoutType {
+    Classic,
+    Mirrored
+};
 
 class FindReplaceBar;
 class ProjectSearchPanel;
@@ -226,6 +239,21 @@ protected:
     RustPluginManagerAdapter *pluginManager;
     PluginManagerDialog *pluginManagerDialog;
     int m_previousEditorStackIndex;
+    LayoutType m_layoutType = LayoutType::Classic;
+    // Settings → Layout radio group, kept in sync with m_layoutType so the
+    // page stays truthful when the layout changes from the command palette.
+    QButtonGroup *m_layoutButtonGroup = nullptr;
+    // In-flight sidebar collapse animations. Tracked so a rapid re-toggle or a
+    // layout switch can cancel them — a stale end value would otherwise fight
+    // whatever width applyLayout() just decided on.
+    QList<QPointer<QAbstractAnimation>> m_sidebarAnims;
+    // Inspector header pieces, kept so applyPaneMirroring() can swap the close
+    // button and title to the leading edge in the mirrored layout.
+    QHBoxLayout *m_inspectorHeaderLayout = nullptr;
+    QLabel *m_inspectorTitle = nullptr;
+    QPushButton *m_inspectorCloseBtn = nullptr;
+    // The drawer's plugin icon bar, re-aligned when the layout mirrors.
+    QWidget *m_sidebarIconBar = nullptr;
     
     // Debugger
     RustDapClientAdapter *dapClient;
@@ -314,6 +342,11 @@ protected:
     void openFileInTab(const QString &fileName);
     void applyTheme(const Theme &theme);
     void setSidebarCollapsed(bool collapsed);
+    void cancelSidebarAnimations();
+    void applyLayout(LayoutType layout);
+    void setLayoutType(LayoutType layout);
+    void applyPaneMirroring(bool mirrored);
+    LayoutType currentLayoutType() const { return m_layoutType; }
     void toggleInspector();
     void loadRecentProjects();
     void saveRecentProjects();

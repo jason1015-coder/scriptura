@@ -7,6 +7,7 @@
 #include <QPushButton>
 #include <QCheckBox>
 #include <QLabel>
+#include <QHBoxLayout>
 #include <QRegularExpression>
 
 class FindReplaceBar : public QWidget
@@ -19,6 +20,9 @@ public:
     bool isReplaceVisible() const;
     void findNext();
     void findPrev();
+    // Reverse the control row so the bar mirrors with the rest of the window
+    // in the mirrored layout.
+    void setMirrored(bool mirrored);
 
 signals:
     void replaceAllComplete(int count);
@@ -54,6 +58,8 @@ private:
     QCheckBox *m_wholeWord;
     QCheckBox *m_regex;
     QLabel *m_countLabel;
+    QHBoxLayout *m_layout = nullptr;
+    bool m_mirrored = false;
     QPlainTextEdit *m_editor;
     Mode m_mode;
 };

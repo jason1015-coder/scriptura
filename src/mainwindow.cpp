@@ -222,9 +222,6 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
     connect(m_titleBar, &CustomTitleBar::inspectorToggleClicked, this, [uiActions]() {
         uiActions->handle(UiActions::TitlebarInspectorToggle);
     });
-    connect(m_titleBar, &CustomTitleBar::settingsClicked, this, [uiActions]() {
-        uiActions->handle(UiActions::TitlebarSettings);
-    });
     connect(m_titleBar, &CustomTitleBar::searchRequested, this, [uiActions](const QString &query) {
         uiActions->handle(UiActions::TitlebarSearch, {{QStringLiteral("query"), query}});
     });
@@ -334,6 +331,17 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
                     SettingsStore::instance().setValue("theme/selected", themeToLegacyInt(selectedTheme));
                 }
             }, Cat::Theme);
+        }
+
+        // Layout quick-switches
+        struct LayoutCmdEntry { QString name; LayoutType type; };
+        LayoutCmdEntry layoutCmds[] = {
+            {tr("Layout: Classic"),  LayoutType::Classic},
+            {tr("Layout: Mirrored"), LayoutType::Mirrored},
+        };
+        for (const auto &l : layoutCmds) {
+            LayoutType target = l.type;
+            regCmd(l.name, tr("Layout"), [this, target]() { setLayoutType(target); }, Cat::Setting);
         }
     }
 
@@ -470,6 +478,7 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
 
     // Keep an empty iconBar for plugins to add custom buttons via UI API
     QWidget *iconBar = new QWidget(ui->sidebarDrawer);
+    m_sidebarIconBar = iconBar;
     iconBar->setObjectName("sidebarIconBar");
     QHBoxLayout *iconBarLayout = new QHBoxLayout(iconBar);
     iconBarLayout->setContentsMargins(6, 8, 6, 8);
@@ -497,6 +506,7 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
     QHBoxLayout *headerLayout = new QHBoxLayout(inspectorHeader);
     headerLayout->setContentsMargins(12, 8, 8, 8);
     headerLayout->setSpacing(4);
+    m_inspectorHeaderLayout = headerLayout;
 
     QLabel *inspectorTitle = new QLabel(tr("Assistant"), inspectorHeader);
     inspectorTitle->setObjectName("inspectorTitle");
@@ -504,6 +514,7 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
     titleFont.setPointSize(11);
     titleFont.setBold(true);
     inspectorTitle->setFont(titleFont);
+    m_inspectorTitle = inspectorTitle;
 
     QPushButton *inspectorCloseBtn = new QPushButton(inspectorHeader);
     inspectorCloseBtn->setObjectName("inspectorCloseBtn");
@@ -513,6 +524,7 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
     inspectorCloseBtn->setCursor(Qt::ArrowCursor);
     inspectorCloseBtn->setToolTip(tr("Close inspector"));
     connect(inspectorCloseBtn, &QPushButton::clicked, this, &MainWindow::toggleInspector);
+    m_inspectorCloseBtn = inspectorCloseBtn;
 
     headerLayout->addWidget(inspectorTitle);
     headerLayout->addStretch();
@@ -1373,7 +1385,18 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
 
     // Config validator - validate settings on startup (Rust adapter handles this internally)
 
-    setSidebarCollapsed(SettingsStore::instance().value("ui/sidebarCollapsed", true).toBool());
+    // Initialize layout from settings. This also establishes the initial
+    // sidebar width/collapse state, so no separate setSidebarCollapsed() call
+    // is needed here — an animation started now would race the layout below.
+    // Clamp the stored value so a corrupt or out-of-range entry can't produce
+    // an unhandled switch branch.
+    int storedLayout = SettingsStore::instance()
+                           .value("layoutType", static_cast<int>(LayoutType::Classic)).toInt();
+    if (storedLayout < static_cast<int>(LayoutType::Classic) ||
+        storedLayout > static_cast<int>(LayoutType::Mirrored)) {
+        storedLayout = static_cast<int>(LayoutType::Classic);
+    }
+    applyLayout(static_cast<LayoutType>(storedLayout));
 
     // Restore window geometry and state
     if (SettingsStore::instance().contains("mainWindow/geometry")) {
@@ -1387,6 +1410,127 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
 MainWindow::~MainWindow()
 {
     delete ui;
+}
+
+void MainWindow::applyLayout(LayoutType layout)
+{
+    m_layoutType = layout;
+    const bool mirrored = (layout == LayoutType::Mirrored);
+
+    QHBoxLayout *mainLayout = qobject_cast<QHBoxLayout*>(ui->centralwidget->layout());
+    if (!mainLayout) return;
+
+    QWidget *sidebar   = ui->sidebarDrawer;
+    QWidget *editor    = ui->editorContainer;
+    QWidget *inspector = m_inspectorDrawer;
+    if (!sidebar || !editor || !inspector) return;
+
+    // Detach the three top-level panes so they can be re-ordered in place.
+    mainLayout->removeWidget(sidebar);
+    mainLayout->removeWidget(editor);
+    mainLayout->removeWidget(inspector);
+
+    // A collapse animation still in flight would keep writing maximumWidth and
+    // undo the width we are about to choose, so drop it first.
+    cancelSidebarAnimations();
+    {
+        const bool collapsed =
+            SettingsStore::instance().value("ui/sidebarCollapsed", true).toBool();
+        sidebar->setMinimumWidth(collapsed ? 0 : 48);
+        // 240 matches the expand animation's end value in setSidebarCollapsed().
+        sidebar->setMaximumWidth(collapsed ? 0 : 240);
+        if (m_titleBar && m_titleBar->sidebarToggleButton)
+            m_titleBar->sidebarToggleButton->setChecked(!collapsed);
+    }
+
+    if (mirrored) {
+        // Inspector takes the left edge, sidebar the right.
+        mainLayout->addWidget(inspector);
+        mainLayout->addWidget(editor, 1);
+        mainLayout->addWidget(sidebar);
+    } else {
+        mainLayout->addWidget(sidebar);
+        mainLayout->addWidget(editor, 1);
+        mainLayout->addWidget(inspector);
+    }
+
+    sidebar->show();
+    editor->show();
+    inspector->show();
+
+    // ── Mirror every control inside the window ─────────────────────────────
+    // Reversing the panes is only half the job: the chrome around them has to
+    // swap sides too, otherwise the window reads as Classic with a moved panel.
+    if (m_titleBar)
+        m_titleBar->setMirrored(mirrored);
+    if (m_statusBarWidget)
+        m_statusBarWidget->setMirrored(mirrored);
+    if (findReplaceBar)
+        findReplaceBar->setMirrored(mirrored);
+    applyPaneMirroring(mirrored);
+
+    updateTabBarVisibility();
+
+    // Keep the Settings → Layout radios truthful — the layout can also be
+    // switched from the command palette, which bypasses the settings page.
+    if (m_layoutButtonGroup) {
+        QSignalBlocker blocker(m_layoutButtonGroup);
+        if (QAbstractButton *btn = m_layoutButtonGroup->button(static_cast<int>(layout)))
+            btn->setChecked(true);
+    }
+
+    mainLayout->activate();
+    update();
+}
+
+void MainWindow::applyPaneMirroring(bool mirrored)
+{
+    // The inspector header puts its close button on the trailing edge; when the
+    // inspector sits on the left that edge flips to the left too. Clear every
+    // item first — removeWidget() would leave the spacer behind and each switch
+    // would stack another one, growing the header a little every time.
+    if (m_inspectorHeaderLayout) {
+        while (m_inspectorHeaderLayout->count() > 0)
+            delete m_inspectorHeaderLayout->takeAt(0);
+        if (mirrored) {
+            m_inspectorHeaderLayout->addWidget(m_inspectorCloseBtn);
+            m_inspectorHeaderLayout->addStretch();
+            m_inspectorHeaderLayout->addWidget(m_inspectorTitle);
+        } else {
+            m_inspectorHeaderLayout->addWidget(m_inspectorTitle);
+            m_inspectorHeaderLayout->addStretch();
+            m_inspectorHeaderLayout->addWidget(m_inspectorCloseBtn);
+        }
+    }
+
+    // The drawer's bottom bar (file-tree toggle + plugin icon bar) is pinned to
+    // the leading edge; mirror it so it hugs the same side as the drawer. Keep
+    // the two controls in their original order — only the edge they hug changes.
+    const Qt::Alignment barAlign = mirrored ? (Qt::AlignRight | Qt::AlignVCenter)
+                                            : (Qt::AlignLeft | Qt::AlignVCenter);
+    ui->sidebarDrawerLayout->removeWidget(fileTreeToggleButton);
+    ui->sidebarDrawerLayout->addWidget(fileTreeToggleButton, 0, barAlign);
+    if (m_sidebarIconBar) {
+        ui->sidebarDrawerLayout->removeWidget(m_sidebarIconBar);
+        ui->sidebarDrawerLayout->addWidget(m_sidebarIconBar, 0, barAlign);
+    }
+}
+
+void MainWindow::cancelSidebarAnimations()
+{
+    for (const QPointer<QAbstractAnimation> &anim : m_sidebarAnims) {
+        if (anim)
+            anim->stop();
+    }
+    m_sidebarAnims.clear();
+}
+
+void MainWindow::setLayoutType(LayoutType layout)
+{
+    if (layout == m_layoutType)
+        return;
+    SettingsStore::instance().setValue("layoutType", static_cast<int>(layout));
+    applyLayout(layout);
 }
 
 QPlainTextEdit* MainWindow::getCurrentEditor()

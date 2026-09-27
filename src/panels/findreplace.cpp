@@ -63,6 +63,7 @@ FindReplaceBar::FindReplaceBar(QWidget *parent)
     layout->addWidget(m_wholeWord);
     layout->addWidget(m_regex);
     layout->addWidget(m_countLabel);
+    m_layout = layout;
 
     setReplaceVisible(false);
 
@@ -77,6 +78,53 @@ FindReplaceBar::FindReplaceBar(QWidget *parent)
     connect(m_caseSensitive, &QCheckBox::stateChanged, this, [this](int) { updateMatches(); });
     connect(m_wholeWord, &QCheckBox::stateChanged, this, [this](int) { updateMatches(); });
     connect(m_regex, &QCheckBox::stateChanged, this, [this](int) { updateMatches(); });
+}
+
+void FindReplaceBar::setMirrored(bool mirrored)
+{
+    if (m_mirrored == mirrored)
+        return;
+    m_mirrored = mirrored;
+
+    QHBoxLayout *layout = m_layout;
+    if (!layout)
+        return;
+
+    // The two line edits keep stretch 1; everything else is a fixed control.
+    while (layout->count() > 0)
+        delete layout->takeAt(0);
+
+    if (!mirrored) {
+        layout->addWidget(m_findEdit, 1);
+        layout->addWidget(m_replaceEdit, 1);
+        layout->addWidget(m_prevBtn);
+        layout->addWidget(m_nextBtn);
+        layout->addWidget(m_toggleReplaceBtn);
+        layout->addWidget(m_replaceBtn);
+        layout->addWidget(m_replaceAllBtn);
+        layout->addWidget(m_caseSensitive);
+        layout->addWidget(m_wholeWord);
+        layout->addWidget(m_regex);
+        layout->addWidget(m_countLabel);
+    } else {
+        // Exact reverse of the order above.
+        layout->addWidget(m_countLabel);
+        layout->addWidget(m_regex);
+        layout->addWidget(m_wholeWord);
+        layout->addWidget(m_caseSensitive);
+        layout->addWidget(m_replaceAllBtn);
+        layout->addWidget(m_replaceBtn);
+        layout->addWidget(m_toggleReplaceBtn);
+        layout->addWidget(m_nextBtn);
+        layout->addWidget(m_prevBtn);
+        layout->addWidget(m_replaceEdit, 1);
+        layout->addWidget(m_findEdit, 1);
+    }
+
+    // Text inside the fields has to flip along with the row.
+    const Qt::LayoutDirection dir = mirrored ? Qt::RightToLeft : Qt::LeftToRight;
+    m_findEdit->setLayoutDirection(dir);
+    m_replaceEdit->setLayoutDirection(dir);
 }
 
 void FindReplaceBar::setEditor(QPlainTextEdit *editor)

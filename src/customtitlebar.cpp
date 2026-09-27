@@ -34,7 +34,6 @@ CustomTitleBar::CustomTitleBar(QWidget *parent)
     , closeButton(nullptr)
     , titleLabel(nullptr)
     , sidebarToggleButton(nullptr)
-    , settingsButton(nullptr)
     , inspectorToggleButton(nullptr)
     , searchField(nullptr)
     , m_isDragging(false)
@@ -58,6 +57,10 @@ void CustomTitleBar::setupLayout()
     QHBoxLayout *layout = new QHBoxLayout(this);
     layout->setContentsMargins(spacingMd, 0, spacingMd, 0);
     layout->setSpacing(spacingXs);
+    // Remembered so setMirrored() can rebuild the row without re-deriving them.
+    m_layout = layout;
+    m_spacingXs = spacingXs;
+    m_spacingSm = spacingSm;
 
     // -- Leading: sidebar toggle --
     sidebarToggleButton = new QPushButton(this);
@@ -110,16 +113,6 @@ void CustomTitleBar::setupLayout()
     connect(inspectorToggleButton, &QPushButton::clicked, this, &CustomTitleBar::inspectorToggleClicked);
     layout->addWidget(inspectorToggleButton);
 
-    // -- Settings toggle --
-    settingsButton = new QPushButton(this);
-    settingsButton->setObjectName("TitleBarSettings");
-    settingsButton->setFixedSize(36, 36);
-    settingsButton->setToolTip(tr("Editor Settings"));
-    ThemeIcons::instance()->setIcon(settingsButton, ":/icons/settings.svg");
-    settingsButton->setIconSize(QSize(18, 18));
-    connect(settingsButton, &QPushButton::clicked, this, &CustomTitleBar::settingsClicked);
-    layout->addWidget(settingsButton);
-
     layout->addSpacing(spacingSm);
 
     // -- Window controls (traffic lights) --
@@ -154,6 +147,59 @@ void CustomTitleBar::setupLayout()
     closeButton->installEventFilter(this);
 }
 
+void CustomTitleBar::setMirrored(bool mirrored)
+{
+    if (m_mirrored == mirrored)
+        return;
+    m_mirrored = mirrored;
+
+    QHBoxLayout *layout = m_layout;
+    if (!layout)
+        return;
+
+    // Drop every item (widgets survive — only their layout membership goes),
+    // then re-add in the order this mode calls for.
+    while (layout->count() > 0)
+        delete layout->takeAt(0);
+
+    if (!mirrored) {
+        // Leading: sidebar toggle, title, stretch, then the trailing cluster.
+        layout->addWidget(sidebarToggleButton);
+        layout->addSpacing(m_spacingXs);
+        layout->addWidget(titleLabel, 0, Qt::AlignVCenter);
+        layout->addStretch(1);
+        layout->addWidget(searchField, 0, Qt::AlignVCenter);
+        layout->addSpacing(m_spacingXs);
+        layout->addWidget(inspectorToggleButton);
+        layout->addSpacing(m_spacingSm);
+        layout->addWidget(minimizeButton);
+        layout->addWidget(maximizeButton);
+        layout->addWidget(closeButton);
+    } else {
+        // Exact reverse of the order above, so each control sits opposite the
+        // pane it toggles and close ends up on the leading edge.
+        layout->addWidget(closeButton);
+        layout->addWidget(maximizeButton);
+        layout->addWidget(minimizeButton);
+        layout->addSpacing(m_spacingSm);
+        layout->addWidget(inspectorToggleButton);
+        layout->addWidget(searchField, 0, Qt::AlignVCenter);
+        layout->addStretch(1);
+        layout->addWidget(titleLabel, 0, Qt::AlignVCenter);
+        layout->addSpacing(m_spacingXs);
+        layout->addWidget(sidebarToggleButton);
+    }
+
+    // Text inside the search field has to flip too, otherwise it reads left
+    // aligned in a right-anchored field.
+    if (searchField) {
+        searchField->setLayoutDirection(mirrored ? Qt::RightToLeft
+                                                 : Qt::LeftToRight);
+    }
+
+    updateGeometry();
+}
+
 void CustomTitleBar::styleButtons()
 {
     auto tm = qobject_cast<ThemeManager*>(qApp->property("themeManager").value<QObject*>());
@@ -161,22 +207,6 @@ void CustomTitleBar::styleButtons()
     const int spacingSm = tm ? tm->spacingSm() : 8;
     const int spacingXs = tm ? tm->spacingXs() : 4;
     const int spacingMd = tm ? tm->spacingMd() : 12;
-
-    const QString buttonStyle = QString(R"(
-        QPushButton {
-            border: none;
-            background-color: transparent;
-            color: palette(text);
-            border-radius: %1px;
-            padding: 0px;
-        }
-        QPushButton:hover {
-            background-color: rgba(128, 128, 128, 0.10);
-        }
-        QPushButton:pressed {
-            background-color: rgba(128, 128, 128, 0.18);
-        }
-    )").arg(radius);
 
     const QString checkableButtonStyle = QString(R"(
         QPushButton {
@@ -212,7 +242,6 @@ void CustomTitleBar::styleButtons()
     maximizeButton->setStyleSheet(windowButtonStyle);
     closeButton->setStyleSheet(windowButtonStyle);
     sidebarToggleButton->setStyleSheet(checkableButtonStyle);
-    settingsButton->setStyleSheet(buttonStyle);
     inspectorToggleButton->setStyleSheet(checkableButtonStyle);
 
     // Search field styling - use theme-aware colors

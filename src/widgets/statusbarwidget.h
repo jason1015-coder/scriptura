@@ -5,6 +5,7 @@
 #include <QHBoxLayout>
 #include <QPushButton>
 #include <QLabel>
+#include <QFrame>
 
 class ThemeManager;
 class CodeEditor;
@@ -26,6 +27,9 @@ class StatusBarWidget : public QWidget
 public:
     explicit StatusBarWidget(QWidget *parent = nullptr);
     void setThemeManager(ThemeManager *tm);
+    // Reverse the indicator order so the bar mirrors with the rest of the
+    // window in the mirrored layout.
+    void setMirrored(bool mirrored);
 
     void setLanguage(const QString &language);
     void setEncoding(const QString &encoding);
@@ -48,6 +52,11 @@ signals:
 
 private:
     ThemeManager *m_themeManager = nullptr;
+    QHBoxLayout *m_layout = nullptr;
+    // Kept so the separator frames can be re-ordered along with the labels.
+    QFrame *m_sep1 = nullptr;
+    QFrame *m_sep2 = nullptr;
+    bool m_mirrored = false;
     QLabel *m_fileLabel;
     QLabel *m_languageLabel;
     QLabel *m_encodingLabel;

@@ -106,6 +106,62 @@ QWidget* MainWindow::createUnifiedSettingsWidget()
 
     mainLayout->addWidget(themeGroup);
 
+    // ── Layout Section ────────────────────────────────────────────────────
+    // The window chrome arrangement. Applying a layout re-parents the panes
+    // live, so the preview is immediate.
+    QGroupBox *layoutGroup = new QGroupBox(tr("Layout"), content);
+    QVBoxLayout *layoutGroupLayout = new QVBoxLayout(layoutGroup);
+    QLabel *layoutHint = new QLabel(
+        tr("Choose how the sidebar, editor, inspector, and bars are arranged."), layoutGroup);
+    layoutHint->setWordWrap(true);
+    layoutGroupLayout->addWidget(layoutHint);
+
+    struct LayoutEntry {
+        LayoutType type;
+        QString name;
+        QString description;
+    };
+    const LayoutEntry layoutEntries[] = {
+        {LayoutType::Classic, tr("Classic"),
+         tr("Sidebar on the left, editor in the middle, inspector on the right.")},
+        {LayoutType::Mirrored, tr("Mirrored"),
+         tr("Fully reversed: the inspector moves left, the sidebar right, and every "
+            "control in the window swaps to the opposite side.")},
+    };
+
+    QButtonGroup *layoutBtnGroup = new QButtonGroup(layoutGroup);
+    m_layoutButtonGroup = layoutBtnGroup;
+    for (int i = 0; i < 2; ++i) {
+        const LayoutEntry &entry = layoutEntries[i];
+        QWidget *row = new QWidget(layoutGroup);
+        QHBoxLayout *rowLayout = new QHBoxLayout(row);
+        rowLayout->setContentsMargins(0, 2, 0, 2);
+        rowLayout->setSpacing(8);
+
+        QRadioButton *radio = new QRadioButton(entry.name, row);
+        radio->setToolTip(entry.description);
+        QLabel *desc = new QLabel(entry.description, row);
+        desc->setWordWrap(true);
+        desc->setEnabled(false); // static explanatory text, not a control
+        rowLayout->addWidget(radio, 0, Qt::AlignTop);
+        rowLayout->addWidget(desc, 1);
+
+        layoutGroupLayout->addWidget(row);
+        layoutBtnGroup->addButton(radio, static_cast<int>(entry.type));
+        if (entry.type == currentLayoutType())
+            radio->setChecked(true);
+    }
+    mainLayout->addWidget(layoutGroup);
+
+    connect(layoutBtnGroup, static_cast<void (QButtonGroup::*)(QAbstractButton*)>(&QButtonGroup::buttonClicked),
+            this, [this, layoutBtnGroup](QAbstractButton *button) {
+        const int id = layoutBtnGroup->id(button);
+        if (id < 0)
+            return;
+        // Persist + re-apply; setLayoutType is a no-op for the active layout.
+        setLayoutType(static_cast<LayoutType>(id));
+    });
+
     connect(themeBtnGroup, static_cast<void (QButtonGroup::*)(QAbstractButton*)>(&QButtonGroup::buttonClicked),
             this, [this, themeButtons](QAbstractButton *button) {
         QPushButton *btn = qobject_cast<QPushButton*>(button);
@@ -393,6 +449,9 @@ QWidget* MainWindow::createUnifiedSettingsWidget()
         if (QScrollArea *oldScroll = qobject_cast<QScrollArea*>(unifiedSettingsWidget)) {
             editorStack->removeWidget(oldScroll);
             oldScroll->deleteLater();
+            // The Layout radios die with the old page; drop the pointer so
+            // applyLayout() can't touch it before the new page is built.
+            m_layoutButtonGroup = nullptr;
         }
         unifiedSettingsWidget = createUnifiedSettingsWidget();
         editorStack->addWidget(unifiedSettingsWidget);
@@ -539,42 +598,40 @@ void MainWindow::on_action_license_triggered()
   }
 
   void MainWindow::setSidebarCollapsed(bool collapsed)
-{
+  {
     SettingsStore::instance().setValue("ui/sidebarCollapsed", collapsed);
 
+    // Keep the title bar toggle in sync with the actual drawer state.
+    if (m_titleBar && m_titleBar->sidebarToggleButton)
+        m_titleBar->sidebarToggleButton->setChecked(!collapsed);
+
+    // Cancel any in-flight collapse first: two animations driving the same
+    // property fight each other, and the loser writes a stale end value.
+    cancelSidebarAnimations();
+
+    auto startWidthAnim = [this](const char *property, int endValue,
+                                 const std::function<void()> &onDone) {
+        QPropertyAnimation *anim = new QPropertyAnimation(ui->sidebarDrawer, property, this);
+        anim->setDuration(200);
+        anim->setStartValue(ui->sidebarDrawer->property(property).toInt());
+        anim->setEndValue(endValue);
+        anim->setEasingCurve(QEasingCurve::InOutCubic);
+        if (onDone)
+            connect(anim, &QPropertyAnimation::finished, this, onDone);
+        m_sidebarAnims << QPointer<QAbstractAnimation>(anim);
+        anim->start(QAbstractAnimation::DeleteWhenStopped);
+    };
+
     if (collapsed) {
-        // Keep the title bar toggle in sync with the actual drawer state.
-        if (m_titleBar)
-            m_titleBar->sidebarToggleButton->setChecked(false);
-        QPropertyAnimation *animation = new QPropertyAnimation(ui->sidebarDrawer, "maximumWidth");
-        animation->setDuration(200);
-        animation->setStartValue(ui->sidebarDrawer->width());
-        animation->setEndValue(0);
-        animation->setEasingCurve(QEasingCurve::InOutCubic);
-        connect(animation, &QPropertyAnimation::finished, this, [this]() {
+        startWidthAnim("maximumWidth", 0, [this]() {
             ui->sidebarDrawer->setMinimumWidth(0);
             ui->sidebarDrawer->setMaximumWidth(0);
         });
-        animation->start(QAbstractAnimation::DeleteWhenStopped);
     } else {
-        if (m_titleBar)
-            m_titleBar->sidebarToggleButton->setChecked(true);
-        QPropertyAnimation *animation = new QPropertyAnimation(ui->sidebarDrawer, "maximumWidth");
-        animation->setDuration(200);
-        animation->setStartValue(ui->sidebarDrawer->width());
-        animation->setEndValue(240);
-        animation->setEasingCurve(QEasingCurve::InOutCubic);
-        connect(animation, &QPropertyAnimation::finished, this, [this]() {
+        startWidthAnim("minimumWidth", 48, nullptr);
+        startWidthAnim("maximumWidth", 240, [this]() {
             ui->sidebarDrawer->setMinimumWidth(48);
         });
-        animation->start(QAbstractAnimation::DeleteWhenStopped);
-
-        QPropertyAnimation *minAnim = new QPropertyAnimation(ui->sidebarDrawer, "minimumWidth");
-        minAnim->setDuration(200);
-        minAnim->setStartValue(0);
-        minAnim->setEndValue(48);
-        minAnim->setEasingCurve(QEasingCurve::InOutCubic);
-        minAnim->start(QAbstractAnimation::DeleteWhenStopped);
     }
 }
 

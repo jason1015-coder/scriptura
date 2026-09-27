@@ -14,6 +14,7 @@ StatusBarWidget::StatusBarWidget(QWidget *parent)
     QHBoxLayout *mainLayout = new QHBoxLayout(this);
     mainLayout->setContentsMargins(12, 0, 12, 0);
     mainLayout->setSpacing(16);
+    m_layout = mainLayout;
 
     // File name
     m_fileLabel = new QLabel(this);
@@ -66,6 +67,7 @@ StatusBarWidget::StatusBarWidget(QWidget *parent)
     sep1->setFrameShadow(QFrame::Sunken);
     sep1->setObjectName("statusSeparator");
     mainLayout->addWidget(sep1);
+    m_sep1 = sep1;
 
     // Git branch
     m_gitBranchLabel = new QLabel("main", this);
@@ -82,6 +84,7 @@ StatusBarWidget::StatusBarWidget(QWidget *parent)
     sep2->setFrameShadow(QFrame::Sunken);
     sep2->setObjectName("statusSeparator");
     mainLayout->addWidget(sep2);
+    m_sep2 = sep2;
 
     // Error/warning count
     m_errorLabel = new QLabel("0 ⚠ 0 ✗", this);
@@ -98,6 +101,56 @@ StatusBarWidget::StatusBarWidget(QWidget *parent)
     mainLayout->addWidget(m_lineCountLabel);
 
     applyStyle();
+}
+
+void StatusBarWidget::setMirrored(bool mirrored)
+{
+    if (m_mirrored == mirrored)
+        return;
+    m_mirrored = mirrored;
+
+    QHBoxLayout *layout = m_layout;
+    if (!layout)
+        return;
+
+    // Labels survive; only their slot in the row changes.
+    while (layout->count() > 0)
+        delete layout->takeAt(0);
+
+    if (!mirrored) {
+        layout->addWidget(m_fileLabel);
+        layout->addStretch(1);
+        layout->addWidget(m_languageLabel);
+        layout->addWidget(m_encodingLabel);
+        layout->addWidget(m_lineEndingLabel);
+        layout->addWidget(m_indentLabel);
+        layout->addWidget(m_sep1);
+        layout->addWidget(m_gitBranchLabel);
+        layout->addWidget(m_sep2);
+        layout->addWidget(m_errorLabel);
+        layout->addWidget(m_lineCountLabel);
+    } else {
+        // Exact reverse, so the file name lands on the trailing edge and the
+        // cursor position on the leading one, matching the flipped window.
+        layout->addWidget(m_lineCountLabel);
+        layout->addWidget(m_errorLabel);
+        layout->addWidget(m_sep2);
+        layout->addWidget(m_gitBranchLabel);
+        layout->addWidget(m_sep1);
+        layout->addWidget(m_indentLabel);
+        layout->addWidget(m_lineEndingLabel);
+        layout->addWidget(m_encodingLabel);
+        layout->addWidget(m_languageLabel);
+        layout->addStretch(1);
+        layout->addWidget(m_fileLabel);
+    }
+
+    // The two end indicators are text-anchored, so their alignment has to flip
+    // with the layout or they render on the wrong side of their own slot.
+    m_fileLabel->setAlignment(mirrored ? (Qt::AlignRight | Qt::AlignVCenter)
+                                       : (Qt::AlignLeft | Qt::AlignVCenter));
+    m_lineCountLabel->setAlignment(mirrored ? (Qt::AlignLeft | Qt::AlignVCenter)
+                                            : (Qt::AlignRight | Qt::AlignVCenter));
 }
 
 void StatusBarWidget::setThemeManager(ThemeManager *tm)
