@@ -114,13 +114,28 @@ QPixmap ThemeIcons::tintPixmap(const QString& path, const QColor& color,
     //
     // 專案內的 SVG 都只宣告 viewBox 而沒有 width/height，所以不能依賴
     // QSvgRenderer::defaultSize()，必須顯式指定渲染範圍。
+    //
+    // QSvgRenderer::render() 會把 viewBox 直接對應到目標矩形、不保持比例，
+    // 因此這裡先依 viewBox 的長寬算出「等比縮放並置中」的目標矩形：
+    // 語言圖示中副檔名較長的檔案（html、scala…）刻意使用較寬的 viewBox，
+    // 若被拉伸就會變形；其餘正方形圖示的 viewBox 比例為 1，結果與舊行為一致。
     QImage image(deviceSize, deviceSize, QImage::Format_ARGB32_Premultiplied);
     image.fill(Qt::transparent);
     {
         QPainter painter(&image);
         painter.setRenderHint(QPainter::Antialiasing, true);
         painter.setRenderHint(QPainter::SmoothPixmapTransform, true);
-        renderer->render(&painter, QRectF(0, 0, deviceSize, deviceSize));
+        QRectF target(0, 0, deviceSize, deviceSize);
+        const QRectF viewBox = renderer->viewBoxF();
+        if (viewBox.width() > 0.0 && viewBox.height() > 0.0) {
+            const qreal scale = qMin(target.width() / viewBox.width(),
+                                    target.height() / viewBox.height());
+            const QSizeF drawn(viewBox.width() * scale, viewBox.height() * scale);
+            target = QRectF((target.width() - drawn.width()) / 2.0,
+                            (target.height() - drawn.height()) / 2.0,
+                            drawn.width(), drawn.height());
+        }
+        renderer->render(&painter, target);
         painter.setCompositionMode(QPainter::CompositionMode_SourceIn);
         painter.fillRect(image.rect(), color);
     }

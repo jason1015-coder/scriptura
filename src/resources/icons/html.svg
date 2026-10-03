@@ -1,3 +1,10 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-  <path d="M6 4l-4 8 4 8M18 4l4 8-4 8M10 4l4 16"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 29 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+  <rect x="2" y="2" width="25" height="20" rx="4" stroke-width="1.5"/>
+  <path stroke-width="1.68" d="M2.69 7.8 L2.69 16.2"/>
+  <path stroke-width="1.68" d="M5.7 7.8 L5.7 16.2"/>
+  <path stroke-width="1.68" d="M2.69 12.17 L5.7 12.17"/>
+  <path stroke-width="1.68" d="M8.72 7.8 L11.52 7.8"/>
+  <path stroke-width="1.68" d="M10.12 7.8 L10.12 16.2"/>
+  <path stroke-width="1.68" d="M14.51 16.2 L14.51 7.8 L16.42 14.02 L18.33 7.8 L18.33 16.2"/>
+  <path stroke-width="1.68" d="M21.4 7.8 L21.4 16.2 L23.53 16.2"/>
 </svg>
