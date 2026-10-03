@@ -21,11 +21,6 @@ void CodeLensManager::requestCodeLens(CodeEditor *editor, RustLspClientAdapter *
 {
     if (!m_enabled || !editor || !lspClient || documentUri.isEmpty()) return;
 
-    // Fire immediately — the caller (onEditorTextChanged) already debounces at 500ms
-    // The Rust LSP client calls textDocument/codeLens via its generic request pipeline.
-    // We use documentSymbol as a data source and convert results to lens items.
-    // When the LSP backend adds dedicated codeLens support, this call will switch to
-    // lspClient->codeLens(documentUri).
     lspClient->documentSymbol(documentUri);
 }
 

@@ -12,7 +12,6 @@
 #include "minimap.h"
 #include "splitmanager.h"
 #include "breadcrumb.h"
-#include "aiinlinecompletion.h"
 #include "codeactionui.h"
 #include "pluginmarketplace.h"
 #include "plugins/api/uiapi.h"
@@ -21,10 +20,10 @@
 #include "windowanimator.h"
 #include "thememanager.h"
 #include "themeicons.h"
+#include "fileicons.h"
 #include "foldmanager.h"
 #include "bookmarkmanager.h"
 #include "snippetmanager.h"
-#include "filewatcher.h"
 #include "rust_adapter.h"
 
 #include <QFileDialog>
@@ -122,11 +121,9 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
     , m_universalSearch(nullptr)
     , m_splitManager(new SplitManager(this))
     , m_breadcrumb(nullptr)
-    , m_aiInline(new AiInlineCompletion(this))
     , m_codeActionCtrl(new CodeActionController(this))
     , m_pluginRegistry(RustBackend::instance()->pluginRegistry())
     , m_zenMode(nullptr)
-    , m_fileWatcher(nullptr)
     , m_sessionManager(nullptr)
     // Note: created in the init list (not lazily below) because
     // RefactoringManager is used as a connect() receiver earlier in the
@@ -155,6 +152,10 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
         if (fileModel) {
             fileModel->refreshDecorationRole();
         }
+        // 分頁列的圖標是已著色的 QIcon，不像 ThemeIcons 追蹤的元件會自動換色，
+        // 因此主題切換後必須重新指定。
+        if (tabBar)
+            updateAllTabIcons();
     });
     m_windowAnimator = new WindowAnimator(this);
     m_titleBar = new CustomTitleBar(this);
@@ -410,6 +411,11 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
     // on one not reflected on the other). The top tabBar is the single
     // source of truth — hide the inner one.
     ui->tabWidget->tabBar()->hide();
+
+    // Pin the tab glyph size instead of inheriting the style's tab icon size:
+    // the icons are pre-tinted at 16 logical px, and QIcon would otherwise be
+    // asked for a size it never rasterised and scale the result.
+    tabBar->setIconSize(QSize(16, 16));
 
     // Wrap the top tab bar in a row with a "+" new-tab button at the end.
     {
@@ -978,20 +984,9 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
     // Updater connections
     connect(updater, &RustUpdaterAdapter::updateAvailable, this, &MainWindow::onUpdateAvailable);
 
-    // TODO: replace with nanocoder- inline completion
-    // m_aiInline->setSettings(
-    //     SettingsStore::instance().value("ai/provider", "ollama").toString(),
-    //     SettingsStore::instance().value("ai/endpoint", "http://localhost:11434/api/chat").toString(),
-    //     SettingsStore::instance().value("ai/model", "codellama").toString(),
-    //     SettingsStore::instance().value("ai/enabled", false).toBool(),
-    //     SettingsStore::instance().value("ai/debounceMs", 400).toInt(),
-    //     SettingsStore::instance().secret("ai/apiKey", {}).toString()
-    // );
-
     connect(ui->tabWidget, &QTabWidget::currentChanged, this, [this](int index) {
         if (index >= 0 && index < ui->tabWidget->count()) {
             if (CodeEditor *ce = qobject_cast<CodeEditor*>(ui->tabWidget->widget(index))) {
-                // m_aiInline->setEditor(ce);
                 m_codeActionCtrl->attach(ce, lspClient, QUrl::fromLocalFile(currentFile).toString());
                 if (m_codeActionCtrl->isVisible())
                     m_codeActionCtrl->showCurrent();
@@ -1244,6 +1239,8 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
         ui->tabWidget->addTab(editor, "*" + displayName);
         int tabBarIndex = tabBar->addTab("*" + displayName);
         tabBar->setTabData(tabBarIndex, hotId);
+        tabBar->setTabIcon(tabBarIndex, ThemeIcons::instance()->statefulIcon(
+                                            FileIcons::forFileName(originalPath), 16));
         tabBar->setTabButton(tabBarIndex, QTabBar::RightSide, createEditorTabCloseButton(editor));
         ui->tabWidget->setCurrentWidget(editor);
         tabBar->setCurrentIndex(tabBarIndex);
@@ -1676,13 +1673,6 @@ int MainWindow::currentBottomPanelIndex() const
             return i;
     }
     return 0;
-}
-
-QString MainWindow::bottomPanelButtonTooltip(int index) const
-{
-    if (index >= 0 && index < m_panelButtons.size())
-        return m_panelButtons[index].button->toolTip();
-    return QString();
 }
 
 int MainWindow::findPanelTabIndex(int panelIndex) const

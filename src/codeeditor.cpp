@@ -480,14 +480,6 @@ void CodeHighlighter::rebuildRules()
         addRule(numberPattern("(?:px|em|rem|%|vh|vw|s|ms)?"), m_numberFormat);
         addRule("\"(?:\\\\.|[^\"\\\\])*\"", m_stringFormat);
         addRule("'(?:\\\\.|[^'\\\\])*'", m_stringFormat);
-    } else if (lang == "script") {
-        addRule("\\b(print|let|var|true|false)\\b", m_keywordFormat);
-        addRule(functionCallPattern(), m_functionFormat, 1);
-        addRule("\\b(let|var)\\s+([A-Za-z_]\\w*)", m_variableFormat, 2);
-        addRule("\\b([A-Za-z_]\\w*)\\b", m_variableFormat);
-        addRule(numberPattern(), m_numberFormat);
-        addRule("\"(?:\\\\.|[^\"\\\\])*\"", m_stringFormat);
-        addRule("#[^\\n]*", m_commentFormat);
     }
 
     // Cache the built rules

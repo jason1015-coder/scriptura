@@ -14,32 +14,23 @@
 #include "test_codelensmanager.h"
 #include "test_crashhandler.h"
 #include "test_codeeditor_multicursor.h"
-#include "test_dataformatter.h"
 #include "test_debugconfiguration.h"
-#include "test_debuggergutter.h"
 #include "test_dependencyresolver.h"
 #include "test_encodingmanager.h"
-#include "test_filewatcher.h"
+#include "test_fileicons.h"
 #include "test_findreplace.h"
 #include "test_foldmanager.h"
 #include "test_gitblame.h"
-#include "test_gitbranchwidget.h"
-#include "test_gitdiffwidget.h"
-#include "test_gitmergewidget.h"
-#include "test_httpclientpanel.h"
-#include "test_largefilehandler.h"
 #include "test_mainwindow_editing.h"
 #include "test_mainwindow_sidebar.h"
 #include "test_minimap.h"
 #include "test_multicursor.h"
 #include "test_plugincontext.h"
-#include "test_pluginregistry.h"
 #include "test_projectsearch.h"
 #include "test_rundialog.h"
 #include "test_sessionmanager.h"
 #include "test_snippetmanager.h"
 #include "test_splitmanager.h"
-#include "test_sqliteviewer.h"
 #include "test_themeicons.h"
 #include "test_thememanager.h"
 #include "test_ui_action_bridge.h"
@@ -81,33 +72,24 @@ int main(int argc, char *argv[])
     status |= QTest::qExec(new TestCodeActionUI, argc, argv);
     status |= QTest::qExec(new TestCodeLensManager, argc, argv);
     status |= QTest::qExec(new TestCrashHandler, argc, argv);
-    status |= QTest::qExec(new TestDataFormatter, argc, argv);
     status |= QTest::qExec(new TestDebugConfiguration, argc, argv);
-    status |= QTest::qExec(new TestDebuggerGutter, argc, argv);
     status |= QTest::qExec(new TestDependencyResolver, argc, argv);
     status |= QTest::qExec(new TestEncodingManager, argc, argv);
-    status |= QTest::qExec(new TestFileWatcher, argc, argv);
+    status |= QTest::qExec(new TestFileIcons, argc, argv);
     status |= QTest::qExec(new TestFindReplace, argc, argv);
     status |= QTest::qExec(new TestFoldManager, argc, argv);
     status |= QTest::qExec(new TestGitBlame, argc, argv);
-    status |= QTest::qExec(new TestGitBranchWidget, argc, argv);
-    status |= QTest::qExec(new TestGitDiffWidget, argc, argv);
-    status |= QTest::qExec(new TestGitMergeWidget, argc, argv);
-    status |= QTest::qExec(new TestHttpClientPanel, argc, argv);
-    status |= QTest::qExec(new TestLargeFileHandler, argc, argv);
     status |= QTest::qExec(new TestMainWindowEditing, argc, argv);
     status |= QTest::qExec(new TestMainWindowSidebar, argc, argv);
     status |= QTest::qExec(new TestMinimap, argc, argv);
     status |= QTest::qExec(new TestMultiCursor, argc, argv);
     status |= QTest::qExec(new TestCodeEditorMultiCursor, argc, argv);
     status |= QTest::qExec(new TestPluginContext, argc, argv);
-    status |= QTest::qExec(new TestPluginRegistry, argc, argv);
     status |= QTest::qExec(new TestProjectSearch, argc, argv);
     status |= QTest::qExec(new TestRunDialog, argc, argv);
     status |= QTest::qExec(new TestSessionManager, argc, argv);
     status |= QTest::qExec(new TestSnippetManager, argc, argv);
     status |= QTest::qExec(new TestSplitManager, argc, argv);
-    status |= QTest::qExec(new TestSqliteViewer, argc, argv);
     status |= QTest::qExec(new TestThemeIcons, argc, argv);
     status |= QTest::qExec(new TestThemeManager, argc, argv);
     status |= QTest::qExec(new TestUiActionBridge, argc, argv);

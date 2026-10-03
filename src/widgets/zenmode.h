@@ -41,11 +41,8 @@ public:
     
     void setAutoHideCursor(bool enabled);
     bool isAutoHideCursor() const { return m_autoHideCursor; }
-    
-    void setMaxLineWidth(int width);  // in characters
-    int maxLineWidth() const { return m_maxLineWidth; }
 
-signals:
+    signals:
     void zenModeChanged(bool active);
 
 private slots:
@@ -56,7 +53,6 @@ private:
     void saveNormalState();
     void restoreNormalState();
     void applyZenState();
-    void updateLineFocus();
     
     QMainWindow *m_mainWindow;
     QPlainTextEdit *m_editor;
@@ -66,7 +62,6 @@ private:
     bool m_lineFocus;
     bool m_autoHideCursor;
     int m_dimOpacity;
-    int m_maxLineWidth;
     
     // Saved state before entering zen mode
     bool m_wasMaximized;

@@ -11,5 +11,57 @@
     <file alias="icons/inspector.svg">resources/icons/inspector.svg</file>
     <file alias="icons/search.svg">resources/icons/search.svg</file>
     <file alias="icons/settings.svg">resources/icons/settings.svg</file>
+
+    <!-- Folder shells with an emblem: reserved directories. -->
+    <file alias="icons/folder-code.svg">resources/icons/folder-code.svg</file>
+    <file alias="icons/folder-git.svg">resources/icons/folder-git.svg</file>
+    <file alias="icons/folder-image.svg">resources/icons/folder-image.svg</file>
+    <file alias="icons/folder-test.svg">resources/icons/folder-test.svg</file>
+    <file alias="icons/github.svg">resources/icons/github.svg</file>
+
+    <!-- One icon per language in LanguageRegistry. Every name registered there
+         has a matching entry in FileIcons (enforced by TestFileIcons). -->
+    <file alias="icons/python.svg">resources/icons/python.svg</file>
+    <file alias="icons/cpp.svg">resources/icons/cpp.svg</file>
+    <file alias="icons/java.svg">resources/icons/java.svg</file>
+    <file alias="icons/javascript.svg">resources/icons/javascript.svg</file>
+    <file alias="icons/typescript.svg">resources/icons/typescript.svg</file>
+    <file alias="icons/rust.svg">resources/icons/rust.svg</file>
+    <file alias="icons/go.svg">resources/icons/go.svg</file>
+    <file alias="icons/shell.svg">resources/icons/shell.svg</file>
+    <file alias="icons/html.svg">resources/icons/html.svg</file>
+    <file alias="icons/css.svg">resources/icons/css.svg</file>
+    <file alias="icons/swift.svg">resources/icons/swift.svg</file>
+    <file alias="icons/kotlin.svg">resources/icons/kotlin.svg</file>
+    <file alias="icons/ruby.svg">resources/icons/ruby.svg</file>
+    <file alias="icons/php.svg">resources/icons/php.svg</file>
+    <file alias="icons/csharp.svg">resources/icons/csharp.svg</file>
+    <file alias="icons/dart.svg">resources/icons/dart.svg</file>
+    <file alias="icons/lua.svg">resources/icons/lua.svg</file>
+    <file alias="icons/r.svg">resources/icons/r.svg</file>
+    <file alias="icons/scala.svg">resources/icons/scala.svg</file>
+    <file alias="icons/objectivec.svg">resources/icons/objectivec.svg</file>
+    <file alias="icons/yaml.svg">resources/icons/yaml.svg</file>
+    <file alias="icons/toml.svg">resources/icons/toml.svg</file>
+    <file alias="icons/json.svg">resources/icons/json.svg</file>
+    <file alias="icons/markdown.svg">resources/icons/markdown.svg</file>
+    <file alias="icons/sql.svg">resources/icons/sql.svg</file>
+    <file alias="icons/perl.svg">resources/icons/perl.svg</file>
+    <file alias="icons/haskell.svg">resources/icons/haskell.svg</file>
+    <file alias="icons/elixir.svg">resources/icons/elixir.svg</file>
+
+    <!-- Special-purpose files that are not tied to a single language. -->
+    <file alias="icons/gitignore.svg">resources/icons/gitignore.svg</file>
+    <file alias="icons/git-file.svg">resources/icons/git-file.svg</file>
+    <file alias="icons/image.svg">resources/icons/image.svg</file>
+    <file alias="icons/svg-image.svg">resources/icons/svg-image.svg</file>
+    <file alias="icons/console.svg">resources/icons/console.svg</file>
+    <file alias="icons/config.svg">resources/icons/config.svg</file>
+    <file alias="icons/archive.svg">resources/icons/archive.svg</file>
+    <file alias="icons/lock.svg">resources/icons/lock.svg</file>
+    <file alias="icons/license.svg">resources/icons/license.svg</file>
+    <file alias="icons/xml.svg">resources/icons/xml.svg</file>
+    <file alias="icons/build.svg">resources/icons/build.svg</file>
+    <file alias="icons/text.svg">resources/icons/text.svg</file>
 </qresource>
 </RCC>

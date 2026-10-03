@@ -15,7 +15,6 @@ ZenMode::ZenMode(QMainWindow *mainWindow, QPlainTextEdit *editor, QObject *paren
     , m_lineFocus(true)
     , m_autoHideCursor(true)
     , m_dimOpacity(60)
-    , m_maxLineWidth(80)
     , m_wasMaximized(false)
     , m_savedSidebar(nullptr)
     , m_savedBottomPanel(nullptr)
@@ -70,17 +69,11 @@ void ZenMode::setCentered(bool centered)
 void ZenMode::setLineFocus(bool enabled)
 {
     m_lineFocus = enabled;
-    if (m_active) {
-        updateLineFocus();
-    }
 }
 
 void ZenMode::setDimOpacity(int opacity)
 {
     m_dimOpacity = qBound(0, opacity, 255);
-    if (m_active && m_lineFocus) {
-        updateLineFocus();
-    }
 }
 
 void ZenMode::setAutoHideCursor(bool enabled)
@@ -92,14 +85,6 @@ void ZenMode::setAutoHideCursor(bool enabled)
             m_mainWindow->setCursor(Qt::ArrowCursor);
             m_cursorHidden = false;
         }
-    }
-}
-
-void ZenMode::setMaxLineWidth(int width)
-{
-    m_maxLineWidth = width;
-    if (m_active) {
-        applyZenState();
     }
 }
 
@@ -186,25 +171,4 @@ void ZenMode::applyZenState()
     if (m_autoHideCursor) {
         m_cursorTimer->start();
     }
-    
-    // Apply centered text if editor is available
-    if (m_editor) {
-        Q_UNUSED(m_editor);
-        // In a real implementation, you'd set the editor's maximum width
-        // and center it within the viewport
-    }
-    
-    // Update line focus
-    if (m_lineFocus) {
-        updateLineFocus();
-    }
-}
-
-void ZenMode::updateLineFocus()
-{
-    if (!m_lineFocus || !m_editor) return;
-    
-    // This would integrate with the CodeEditor to dim non-current lines
-    // Implementation depends on CodeEditor's paint event
-    // For now, emit a signal that can be connected to the editor
 }

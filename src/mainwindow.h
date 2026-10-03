@@ -35,7 +35,6 @@
 #include "codeeditor.h"
 #include "findreplace.h"
 #include "zenmode.h"
-#include "filewatcher.h"
 #include "snippetmanager.h"
 #include "sessionmanager.h"
 #include "refactoringmanager.h"
@@ -49,13 +48,11 @@
 #include "taskrunnerui.h"
 #include "bookmarkpanel.h"
 #include "cssbreadcrumb.h"
-#include "testrunner.h"
 #include "snippeteditordialog.h"
 #include "projectsearch.h"
 #include "minimap.h"
 #include "splitmanager.h"
 #include "breadcrumb.h"
-#include "aiinlinecompletion.h"
 #include "universalsearch.h"
 #include "codeactionui.h"
 #include "customtitlebar.h"
@@ -152,7 +149,6 @@ public:
     int addBottomPanelButton(const QString &iconPath, const QString &tooltip, const QString &title, bool builtin = false, QWidget *panelWidget = nullptr);
     void showBottomPanelIndex(int index);
     int currentBottomPanelIndex() const;
-    QString bottomPanelButtonTooltip(int index) const;
     int findPanelTabIndex(int panelIndex) const;
     void closePanelTab(int panelIndex);
     void removePanelTab(int panelIndex);
@@ -191,8 +187,6 @@ protected:
     void onTopTabChanged(int index);
 
  private:
-    void on_action_new_window_triggered();
-    void on_action_clone_window_triggered();
     void on_action_git_commit_triggered();
     void on_action_git_push_triggered();
     void on_action_git_pull_triggered();
@@ -223,6 +217,25 @@ protected:
     void on_action_toggle_breakpoint_triggered();
     void on_fileTreeView_contextMenu(const QPoint &pos);
 
+    /**
+     * @brief Re-derive the type icon for a top-bar tab from its stable id.
+     *
+     * tabData() is the single source of truth for what a tab represents: a file
+     * path, "untitled:N" for an unsaved buffer, or a panel/settings marker. All
+     * three pass through here so an untitled tab shows the plain-text glyph and
+     * starts showing its real type the moment it is saved.
+     */
+    void updateTabIcon(const QString &tabId);
+
+    /**
+     * @brief Re-apply every top-bar tab icon, used after a theme change.
+     *
+     * The icons handed to QTabBar are already-tinted QIcons, so unlike the
+     * ThemeIcons-tracked widgets they do not recolour themselves when the
+     * palette flips.
+     */
+    void updateAllTabIcons();
+
     enum class TabType {
         File = 0,
         Settings = 1,
@@ -236,7 +249,10 @@ protected:
     QList<OpenFile> openFiles;
     FileTreeModel *fileModel = nullptr;
     ThemeFileIconProvider *m_fileIconProvider = nullptr;
-    QTabBar *tabBar;
+    // Assigned from ui->tabBar after setupUi(). Null until then, and the
+    // themeChanged handler below runs before that point, so it must stay
+    // initialised rather than be left indeterminate.
+    QTabBar *tabBar = nullptr;
     QToolButton *m_newTabButton = nullptr;
     int m_untitledCounter = 0;
     // Stable per-tab id for file tabs: the file path, or "untitled:N" for
@@ -344,7 +360,6 @@ protected:
 
     // Plugin Developer API instances (owned by PluginContext)
     void setupPluginApis();
-    AiInlineCompletion *m_aiInline;
     CodeActionController *m_codeActionCtrl;
     RustPluginRegistryAdapter *m_pluginRegistry;
     BreadcrumbBarWidget *m_breadcrumbBar;
@@ -352,7 +367,6 @@ protected:
 
     // P0/P1/P2/P3 Feature Modules
     ZenMode *m_zenMode;
-    FileWatcher *m_fileWatcher;
     SessionManager *m_sessionManager;
     RefactoringManager *m_refactoringManager;
     CodeLensManager *m_codeLensManager;

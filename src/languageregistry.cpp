@@ -73,7 +73,6 @@ void LanguageRegistry::registerBuiltinLanguages()
     registerShell();
     registerHtml();
     registerCss();
-    registerScript();
     registerSwift();
     registerKotlin();
     registerRuby();
@@ -275,16 +274,6 @@ void LanguageRegistry::registerCss()
     def.blockCommentStart = "/*";
     def.blockCommentEnd = "*/";
     def.hasCStyleComments = true;
-    registerLanguage(def);
-}
-
-void LanguageRegistry::registerScript()
-{
-    LanguageDefinition def;
-    def.name = "script";
-    def.extensions = {"scr"};
-    def.keywords = {"print", "let", "var", "true", "false"};
-    def.lineComment = "#";
     registerLanguage(def);
 }
 

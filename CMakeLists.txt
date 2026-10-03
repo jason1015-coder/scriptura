@@ -230,7 +230,6 @@ endif()
 
 target_include_directories(scriptura_core PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/src
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/services/lsp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/services/dap
     ${CMAKE_CURRENT_SOURCE_DIR}/src/panels
     ${CMAKE_CURRENT_SOURCE_DIR}/src/widgets

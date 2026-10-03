@@ -5,6 +5,7 @@
 #include "breadcrumb.h"
 #include "rust_adapter.h"
 #include "themeicons.h"
+#include "fileicons.h"
 #include "foldmanager.h"
 #include "bookmarkmanager.h"
 #include "snippetmanager.h"
@@ -25,6 +26,12 @@
 #include <QStringConverter>
 #include "encodingmanager.h"
 #include "pluginmarketplace.h"
+
+namespace {
+// Logical edge of a tab's type icon. Matches the file tree's glyph size so the
+// two read at the same visual weight.
+constexpr int kTabIconSize = 16;
+} // namespace
 
 void MainWindow::showEditorInterface()
 {
@@ -162,6 +169,9 @@ void MainWindow::on_action_save_triggered()
                 tabBar->setTabData(barIdx, targetFile);
                 tabBar->setTabToolTip(barIdx, targetFile);
             }
+            // The buffer now has a path, so it can show a real type icon
+            // instead of the unsaved plain-text glyph.
+            updateTabIcon(targetFile);
             addRecentFile(targetFile);
         } else {
             for (OpenFile &f : openFiles) {
@@ -225,6 +235,9 @@ void MainWindow::on_action_save_as_triggered()
                 tabBar->setTabToolTip(barIdx, fileName);
                 tabBar->setTabText(barIdx, openFiles[i].fileName);
             }
+            // Save As can retarget a tab at a different file type entirely
+            // (untitled -> main.py), so the icon has to be re-derived.
+            updateTabIcon(fileName);
             if (editorIndex >= 0)
                 updateTabModified(editorIndex, false);
             else
@@ -357,6 +370,8 @@ void MainWindow::openFileInTab(const QString &fileName)
     ui->tabWidget->addTab(editor, QFileInfo(fileName).fileName());
     int tabBarIndex = tabBar->addTab(QFileInfo(fileName).fileName());
     tabBar->setTabData(tabBarIndex, fileName);
+    tabBar->setTabIcon(tabBarIndex, ThemeIcons::instance()->statefulIcon(
+                                        FileIcons::forFileName(fileName), kTabIconSize));
     tabBar->setTabToolTip(tabBarIndex, fileName);
     tabBar->setTabButton(tabBarIndex, QTabBar::RightSide, createEditorTabCloseButton(editor));
     m_tabIds[editor] = fileName;
@@ -459,6 +474,8 @@ void MainWindow::on_fileTreeView_clicked(const QModelIndex &index)
         ui->tabWidget->addTab(editor, openFile.fileName);
         int tabBarIndex = tabBar->addTab(openFile.fileName);
         tabBar->setTabData(tabBarIndex, path);
+        tabBar->setTabIcon(tabBarIndex, ThemeIcons::instance()->statefulIcon(
+                                            FileIcons::forFileName(path), kTabIconSize));
         tabBar->setTabButton(tabBarIndex, QTabBar::RightSide, createEditorTabCloseButton(editor));
         m_tabIds[editor] = path;
         ui->tabWidget->setCurrentWidget(editor);
@@ -633,21 +650,6 @@ void MainWindow::on_fileTreeView_contextMenu(const QPoint &pos)
     }
 }
 
-void MainWindow::on_action_new_window_triggered()
-{
-    QProcess::startDetached(QApplication::applicationFilePath(), QStringList());
-}
-
-void MainWindow::on_action_clone_window_triggered()
-{
-    QStringList args;
-    if (!projectDir.isEmpty())
-        args << "--project" << projectDir;
-    for (const OpenFile &f : openFiles)
-        args << f.filePath;
-    QProcess::startDetached(QApplication::applicationFilePath(), args);
-}
-
 
 void MainWindow::onTopTabChanged(int index)
 {
@@ -767,6 +769,40 @@ int MainWindow::findTabBarIndexForId(const QString &id) const
     return -1;
 }
 
+void MainWindow::updateTabIcon(const QString &tabId)
+{
+    // Bottom-panel tabs carry a "panel:N" id and settings is stored as a plain
+    // int. Neither names a file, so neither gets a file-type glyph.
+    if (tabId.startsWith(QLatin1String("panel:")))
+        return;
+
+    const int index = findTabBarIndexForId(tabId);
+    if (index < 0)
+        return;
+
+    // "untitled:N" buffers have no file yet, so FileIcons reports the plain
+    // text glyph. Once the buffer is saved the id becomes a real path and this
+    // is called again, which is when the language icon appears.
+    const bool isUnsavedBuffer = tabId.startsWith(QLatin1String("untitled:"));
+    const QString path = isUnsavedBuffer ? QString() : tabId;
+
+    tabBar->setTabIcon(index, ThemeIcons::instance()->statefulIcon(
+                                   FileIcons::forFileName(path), kTabIconSize));
+}
+
+void MainWindow::updateAllTabIcons()
+{
+    // Reachable from the themeChanged handler during construction, before
+    // setupUi() has handed us the tab bar.
+    if (!tabBar)
+        return;
+    for (int i = 0; i < tabBar->count(); ++i) {
+        const QVariant data = tabBar->tabData(i);
+        if (data.typeId() == QMetaType::QString)
+            updateTabIcon(data.toString());
+    }
+}
+
 void MainWindow::syncTopBarToCurrentFile()
 {
     QWidget *cur = ui->tabWidget->currentWidget();
@@ -861,6 +897,8 @@ void MainWindow::newUntitledFile()
     ui->tabWidget->addTab(editor, displayName);
     int tabBarIndex = tabBar->addTab(displayName);
     tabBar->setTabData(tabBarIndex, id);
+    tabBar->setTabIcon(tabBarIndex, ThemeIcons::instance()->statefulIcon(
+                                        FileIcons::textIcon(), kTabIconSize));
     tabBar->setTabToolTip(tabBarIndex, displayName);
     tabBar->setTabButton(tabBarIndex, QTabBar::RightSide, createEditorTabCloseButton(editor));
     ui->tabWidget->setCurrentWidget(editor);

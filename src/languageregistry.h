@@ -60,7 +60,6 @@ private:
     void registerShell();
     void registerHtml();
     void registerCss();
-    void registerScript();
 
     // Additional languages
     void registerSwift();

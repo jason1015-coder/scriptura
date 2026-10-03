@@ -1,5 +1,6 @@
 #include "themeicons.h"
 #include "thememanager.h"
+#include "fileicons.h"
 
 #include <QApplication>
 #include <QAbstractButton>
@@ -161,6 +162,21 @@ QPixmap ThemeIcons::pixmap(const QString& path, const QColor& color, int size) c
     return tintPixmap(path, color, size);
 }
 
+QIcon ThemeIcons::statefulIcon(const QString& path, int size) const
+{
+    QIcon result;
+    const QPixmap normal = tintPixmap(path, colorForRole(Role::Normal), size);
+    const QPixmap selected = tintPixmap(path, colorForRole(Role::Selected), size);
+    if (normal.isNull())
+        return QIcon(path);
+    result.addPixmap(normal, QIcon::Normal);
+    // QIcon::Selected is the mode QTabBar and QTreeView ask for on a
+    // :selected row, so the glyph stays readable on the highlight fill.
+    if (!selected.isNull())
+        result.addPixmap(selected, QIcon::Selected);
+    return result;
+}
+
 void ThemeIcons::setIcon(QAbstractButton* button, const QString& path, Role role, int size)
 {
     if (!button) return;
@@ -237,7 +253,9 @@ QIcon ThemeFileIconProvider::memoized(const QString& path) const
     if (cached != m_cache.constEnd())
         return cached.value();
 
-    const QIcon result = ti->icon(path);
+    // statefulIcon, not icon: rows drawn on the highlight fill need the
+    // highlighted-text colour or the glyph disappears into the background.
+    const QIcon result = ti->statefulIcon(path);
     m_cache.insert(path, result);
     return result;
 }
@@ -252,8 +270,12 @@ QIcon ThemeFileIconProvider::icon(QFileIconProvider::IconType type) const
 
 QIcon ThemeFileIconProvider::icon(const QFileInfo& info) const
 {
-    if (info.isDir()) {
-        return memoized(":/icons/folder.svg");
-    }
-    return memoized(":/icons/file.svg");
+    // FileIcons owns the type decision so the tree, the tabs and any future view
+    // cannot drift apart on which glyph a path gets. Reuse the QFileInfo we were
+    // handed rather than letting forPath() stat the path again: the file-system
+    // model already knows whether this row is a directory. It is a lookup in a
+    // handful of static QHashes, so this stays cheap for every painted row.
+    const QString baseName = info.fileName();
+    return memoized(info.isDir() ? FileIcons::forDirectoryName(baseName)
+                                 : FileIcons::forFileName(baseName));
 }

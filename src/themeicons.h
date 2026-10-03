@@ -95,6 +95,18 @@ public:
                    int size = DefaultSize) const;
 
     /**
+     * @brief 建立「隨選取狀態自動換色」的圖標。
+     *
+     * 回傳的 QIcon 同時帶有 Normal 與 Selected 兩種樣式，Qt 的樣式引擎會依
+     * 目前的 :selected 狀態自行挑選。檔案樹的高亮列與分頁列的被選取分頁都是
+     * 畫在 highlight 底色上，若只有一般狀態的顏色，深色主題下會變成
+     * 淺字淺底而看不見。
+     *
+     * 兩種樣式都走同一份著色快取，成本只比 icon() 多一次光柵化。
+     */
+    QIcon statefulIcon(const QString& path, int size = DefaultSize) const;
+
+    /**
      * @brief 設定並追蹤按鈕圖標，主題切換時自動重新著色
      * @param size 邏輯像素邊長，應與按鈕的 iconSize 一致
      */
@@ -222,8 +234,11 @@ inline size_t qHash(const ThemeIcons::TintKey& key, uint seed)
  * 而難以辨識。此提供者改為回傳 ThemeIcons 重新著色過的 SVG，
  * 確保在 light / dark / high-contrast 下都能清楚可見。
  *
- * 整個提供者只有「資料夾」與「檔案」兩種結果，因此另加一層記憶化：
- * 檔案樹的資料列數再多，也只需建立一次 QIcon。
+ * 具體選哪一個 SVG 由 FileIcons 決定：它依副檔名、檔名與目錄名回傳語言圖標
+ * 或專用圖標，與分頁列共用同一份對應規則。
+ *
+ * 因為對應結果數量有限（每種語言與檔案類別一個），這一層記憶化仍然划算：
+ * 檔案樹的資料列數再多，同一類型也只需建立一次 QIcon。
  */
 class ThemeFileIconProvider : public QFileIconProvider
 {

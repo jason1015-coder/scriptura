@@ -75,7 +75,6 @@ signals:
 private:
     void parseTabStops(const QString &body, QList<QPair<int, QString>> &stops) const;
     QString substituteVariables(const QString &text) const;
-    int findTabStop(const QString &body, int startPos = 0) const;
     
     QList<Snippet> m_snippets;
     

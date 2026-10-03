@@ -372,24 +372,5 @@ QString SnippetManager::substituteVariables(const QString &text) const
     result.replace("$CURRENT_MONTH", now.toString("MM"));
     result.replace("$CURRENT_DAY", now.toString("dd"));
     
-    // File variables (would need context from editor)
-    // result.replace("$FILENAME", currentFileName);
-    // result.replace("$BASENAME", baseName);
-    
-    // Selection placeholder (would need editor context)
-    // result.replace("$TM_SELECTED_TEXT", selectedText);
-    
     return result;
-}
-
-int SnippetManager::findTabStop(const QString &body, int startPos) const
-{
-    QRegularExpression re("\\$\\d+|\\$\\{\\d+[^}]*\\}");
-    QRegularExpressionMatch match = re.match(body, startPos);
-    
-    if (match.hasMatch()) {
-        return match.capturedStart();
-    }
-    
-    return -1;
 }
