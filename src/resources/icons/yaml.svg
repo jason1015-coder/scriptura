@@ -1,9 +1,4 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 29 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
   <rect x="2" y="2" width="25" height="20" rx="4" stroke-width="1.5"/>
-  <path stroke-width="1.68" d="M2.57 7.8 L4.04 12 L5.51 7.8"/>
-  <path stroke-width="1.68" d="M4.04 12 L4.04 16.2"/>
-  <path stroke-width="1.68" d="M8.33 16.2 L10.08 7.8 L11.84 16.2"/>
-  <path stroke-width="1.68" d="M8.92 13.01 L11.24 13.01"/>
-  <path stroke-width="1.68" d="M14.73 16.2 L14.73 7.8 L16.59 14.02 L18.45 7.8 L18.45 16.2"/>
-  <path stroke-width="1.68" d="M21.51 7.8 L21.51 16.2 L23.57 16.2"/>
+  <text x="14.5" y="14.56" text-anchor="middle" font-family="'Helvetica Neue', Helvetica, Arial, 'Liberation Sans', 'DejaVu Sans', sans-serif" font-weight="700" font-size="7.01" fill="currentColor" stroke="none">YAML</text>
 </svg>

@@ -1,9 +1,4 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 29 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
   <rect x="2" y="2" width="25" height="20" rx="4" stroke-width="1.5"/>
-  <path stroke-width="1.68" d="M2.72 7.8 L2.72 16.2 L6.19 16.2"/>
-  <path stroke-width="1.68" d="M9.5 7.8 L9.5 13.51"/>
-  <path stroke-width="1.68" d="M14.18 7.8 L14.18 13.51"/>
-  <path stroke-width="1.68" d="M9.5 13.51 C9.5 12.03 10.54 10.82 11.84 10.82 C13.13 10.82 14.18 12.03 14.18 13.51"/>
-  <path stroke-width="1.68" d="M17.25 16.2 L20.04 7.8 L22.83 16.2"/>
-  <path stroke-width="1.68" d="M18.2 13.01 L21.88 13.01"/>
+  <text x="14.5" y="15.67" text-anchor="middle" font-family="'Helvetica Neue', Helvetica, Arial, 'Liberation Sans', 'DejaVu Sans', sans-serif" font-weight="700" font-size="10.25" fill="currentColor" stroke="none">LUA</text>
 </svg>

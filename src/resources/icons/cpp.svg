@@ -1,8 +1,4 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 29 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
   <rect x="2" y="2" width="25" height="20" rx="4" stroke-width="1.5"/>
-  <path stroke-width="1.68" d="M6.85 15.31 C5.77 16.66 4.23 16.45 3.3 14.85 C2.38 13.24 2.38 10.76 3.3 9.15 C4.23 7.55 5.77 7.34 6.85 8.69"/>
-  <path stroke-width="1.68" d="M13.06 8.98 L13.06 15.02"/>
-  <path stroke-width="1.68" d="M11.37 12 L14.75 12"/>
-  <path stroke-width="1.68" d="M20.45 8.98 L20.45 15.02"/>
-  <path stroke-width="1.68" d="M18.76 12 L22.14 12"/>
+  <text x="14.5" y="15.41" text-anchor="middle" font-family="'Helvetica Neue', Helvetica, Arial, 'Liberation Sans', 'DejaVu Sans', sans-serif" font-weight="700" font-size="9.37" fill="currentColor" stroke="none">C++</text>
 </svg>

@@ -632,9 +632,9 @@ void MainWindow::on_action_license_triggered()
             ui->sidebarDrawer->setMaximumWidth(0);
         });
     } else {
-        startWidthAnim("minimumWidth", 48, nullptr);
-        startWidthAnim("maximumWidth", 240, [this]() {
-            ui->sidebarDrawer->setMinimumWidth(48);
+        startWidthAnim("minimumWidth", DrawerMetrics::ExpandedWidth, nullptr);
+        startWidthAnim("maximumWidth", DrawerMetrics::ExpandedWidth, [this]() {
+            ui->sidebarDrawer->setMinimumWidth(DrawerMetrics::ExpandedWidth);
         });
     }
 }

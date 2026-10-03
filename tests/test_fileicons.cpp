@@ -6,8 +6,28 @@
 
 #include <QFile>
 #include <QFileInfo>
+#include <QImage>
+#include <QPixmap>
 #include <QTemporaryDir>
 #include <QTest>
+
+namespace {
+// Any pixel at least this opaque counts as ink; the tint step uses the SVG's
+// alpha as a mask, so "drew something" is exactly "alpha is not ~zero".
+constexpr int kInkAlpha = 8;
+
+bool hasInk(const QImage &image, const QRect &region)
+{
+    const QRect r = region.intersected(image.rect());
+    for (int y = r.top(); y <= r.bottom(); ++y) {
+        for (int x = r.left(); x <= r.right(); ++x) {
+            if (qAlpha(image.pixel(x, y)) > kInkAlpha)
+                return true;
+        }
+    }
+    return false;
+}
+} // namespace
 
 void TestFileIcons::testEveryRegisteredLanguageHasAnIcon()
 {
@@ -55,6 +75,51 @@ void TestFileIcons::testAllReferencedIconsExistInResources()
         QVERIFY2(QFileInfo(path).size() > 0,
                  qPrintable(QStringLiteral("icon resource is empty: %1").arg(path)));
     }
+}
+
+void TestFileIcons::testEveryIconRendersVisibleInk()
+{
+    // A resource that exists but draws nothing tints to an invisible pixmap, and
+    // no lookup test would ever notice. Rasterising each icon and demanding ink
+    // turns "the file is there" into "the glyph is actually visible".
+    ThemeIcons *icons = ThemeIcons::instance();
+    for (const QString &path : FileIcons::allIconPaths()) {
+        const QImage image = icons->pixmap(path, ThemeIcons::Role::Normal, 32)
+                                 .toImage().convertToFormat(QImage::Format_ARGB32);
+        QVERIFY2(!image.isNull(),
+                 qPrintable(QStringLiteral("no pixmap rendered for %1").arg(path)));
+        QVERIFY2(hasInk(image, image.rect()),
+                 qPrintable(QStringLiteral("icon rendered blank: %1").arg(path)));
+    }
+}
+
+void TestFileIcons::testLetterformIconsDrawTheirLabel()
+{
+    // The language badges spell their label with <text>. The badge frame alone
+    // would still put ink in the tile's corners, so require ink in the central
+    // band too: for these icons the frame sits near the tile edge and only the
+    // label can reach the middle. That is what distinguishes "the text rendered"
+    // from "the badge drew but the label silently vanished".
+    ThemeIcons *icons = ThemeIcons::instance();
+    int letterformIcons = 0;
+    for (const QString &path : FileIcons::allIconPaths()) {
+        QFile file(path);
+        if (!file.open(QIODevice::ReadOnly) || !file.readAll().contains("<text"))
+            continue; // pictorial icon (folder, close, git…): nothing to assert
+        ++letterformIcons;
+
+        const QImage image = icons->pixmap(path, ThemeIcons::Role::Normal, 48)
+                                 .toImage().convertToFormat(QImage::Format_ARGB32);
+        const int inset = image.width() / 4; // central half of the tile
+        const QRect middle(inset, inset, image.width() - 2 * inset,
+                           image.height() - 2 * inset);
+        QVERIFY2(hasInk(image, middle),
+                 qPrintable(QStringLiteral("label did not render for %1").arg(path)));
+    }
+    // Guard against the loop silently skipping everything and passing anyway:
+    // the letterform set is a known, fixed size.
+    QVERIFY2(letterformIcons >= 28,
+             qPrintable(QStringLiteral("only %1 letterform icons found").arg(letterformIcons)));
 }
 
 void TestFileIcons::testResolvesEachLanguageByExtension()

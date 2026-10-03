@@ -1,9 +1,4 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 29 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
   <rect x="2" y="2" width="25" height="20" rx="4" stroke-width="1.5"/>
-  <path stroke-width="1.68" d="M4.82 7.8 L4.82 13.85"/>
-  <path stroke-width="1.68" d="M4.82 13.85 C4.82 15.15 4.27 16.2 3.6 16.2 C2.93 16.2 2.39 15.15 2.39 13.85"/>
-  <path stroke-width="1.68" d="M9.93 8.08 C10.46 8.56 10.72 9.53 10.56 10.44 C10.4 11.36 9.86 12 9.25 12"/>
-  <path stroke-width="1.68" d="M9.25 12 C9.93 12 10.51 12.78 10.6 13.83 C10.69 14.88 10.26 15.86 9.59 16.13 C8.93 16.4 8.24 15.87 7.98 14.89"/>
-  <path stroke-width="1.68" d="M15.43 7.8 C16.43 7.8 17.23 9.68 17.23 12 C17.23 14.32 16.43 16.2 15.43 16.2 C14.44 16.2 13.64 14.32 13.64 12 C13.64 9.68 14.44 7.8 15.43 7.8"/>
-  <path stroke-width="1.68" d="M20.29 16.2 L20.29 7.8 L23.39 16.2 L23.39 7.8"/>
+  <text x="14.5" y="14.09" text-anchor="middle" font-family="'Helvetica Neue', Helvetica, Arial, 'Liberation Sans', 'DejaVu Sans', sans-serif" font-weight="700" font-size="7.7" fill="currentColor" stroke="none">JSON</text>
 </svg>

@@ -71,6 +71,14 @@ enum class LayoutType {
     Mirrored
 };
 
+// Drawn-out width of the file-tree drawer, pinned on both edges so the layout
+// cannot settle on the file tree's smaller size hint. applyLayout() sets it
+// outright at startup and setSidebarCollapsed() animates to it, so the two must
+// not drift; the value also lives in mainwindow.ui as the drawer's maximumWidth.
+namespace DrawerMetrics {
+constexpr int ExpandedWidth = 320;
+} // namespace DrawerMetrics
+
 class FindReplaceBar;
 class ProjectSearchPanel;
 class PluginMarketplaceWidget;

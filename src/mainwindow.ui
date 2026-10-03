@@ -44,7 +44,7 @@
      <widget class="QWidget" name="sidebarDrawer">
       <property name="minimumWidth">
        <number>
-        48
+        320
        </number>
       </property>
       <property name="maximumWidth">

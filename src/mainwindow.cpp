@@ -392,6 +392,12 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
     ui->fileTreeView->setColumnHidden(1, true);
     ui->fileTreeView->setColumnHidden(2, true);
     ui->fileTreeView->setColumnHidden(3, true);
+    // Row height: the global sheet pads items by 5px, so a 13px-font row with
+    // 16px glyphs comes out at 18 + 10 = 28px. Padding the tree's own items to
+    // 12px takes that to 42px — half as thick again — and the id selector keeps
+    // this override ahead of the app-level QTreeView::item rule.
+    ui->fileTreeView->setStyleSheet(QStringLiteral(
+        "QTreeView#fileTreeView::item { padding: 12px 6px; }"));
     // Enable right-click context menu on the file tree
     ui->fileTreeView->setContextMenuPolicy(Qt::CustomContextMenu);
     connect(ui->fileTreeView, &QTreeView::customContextMenuRequested,
@@ -1416,9 +1422,12 @@ void MainWindow::applyLayout(LayoutType layout)
     {
         const bool collapsed =
             SettingsStore::instance().value("ui/sidebarCollapsed", true).toBool();
-        sidebar->setMinimumWidth(collapsed ? 0 : 48);
-        // 240 matches the expand animation's end value in setSidebarCollapsed().
-        sidebar->setMaximumWidth(collapsed ? 0 : 240);
+        // Both edges, not just maximumWidth: the layout hands the drawer its
+        // size hint (the file tree's, ~256px) whenever the maximum does not
+        // bite, so capping alone would leave the drawer narrower than asked.
+        const int width = collapsed ? 0 : DrawerMetrics::ExpandedWidth;
+        sidebar->setMinimumWidth(width);
+        sidebar->setMaximumWidth(width);
         if (m_titleBar && m_titleBar->sidebarToggleButton)
             m_titleBar->sidebarToggleButton->setChecked(!collapsed);
         // applyLayout() is also the startup path for the drawer state, so the

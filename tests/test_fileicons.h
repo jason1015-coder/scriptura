@@ -17,6 +17,14 @@ private slots:
     // a typo in a table entry cannot ship as a silently blank glyph.
     void testAllReferencedIconsExistInResources();
 
+    // The language badges spell their label with <text> rather than hand-drawn
+    // paths, so something has to prove the SVG text pipeline still rasterises to
+    // pixels. This is the only pair of tests that fails if <text> ever stops
+    // rendering (a renderer without text support, a font-less environment):
+    // every other test here would keep passing over 28 blank badges.
+    void testEveryIconRendersVisibleInk();
+    void testLetterformIconsDrawTheirLabel();
+
     void testResolvesEachLanguageByExtension();
     void testExactFilenamesBeatExtensionLookup();
     void testDotfilesResolveWithoutAKnownExtension();
