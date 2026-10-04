@@ -421,23 +421,25 @@ bool TerminalSession::startPty(const QString &program, const QStringList &args,
     // Allocate the master/slave pair directly rather than through forkpty(), so
     // the child is created with plain fork()/exec() and the parent keeps full
     // control over the file descriptors.
-    m_masterFd = ::open("/dev/ptmx", O_RDWR | O_NOCTTY);
+    m_masterFd = ::posix_openpt(O_RDWR | O_NOCTTY);
     if (m_masterFd < 0) {
         if (error)
-            *error = tr("Could not open /dev/ptmx: %1").arg(QString::fromLocal8Bit(strerror(errno)));
+            *error = tr("Could not allocate a pseudo terminal: %1")
+                         .arg(QString::fromLocal8Bit(strerror(errno)));
         return false;
     }
 
-#ifdef Q_OS_LINUX
-    // Linux hands out a locked slave pair; TIOCSPTLCK is a Linux-only ioctl.
-    int unlock = 0;
-    if (::ioctl(m_masterFd, TIOCSPTLCK, &unlock) < 0) {
+    // grantpt() hands the slave device to this user; without it the slave stays
+    // owned by root with group-write-only permissions and opening it read/write
+    // fails with EACCES (which is what macOS does on its own). unlockpt() is
+    // the portable way to release the Linux-side slave lock, replacing the
+    // Linux-only TIOCSPTLCK ioctl.
+    if (::grantpt(m_masterFd) < 0 || ::unlockpt(m_masterFd) < 0) {
         if (error)
             *error = tr("Could not unlock the pseudo terminal: %1")
                          .arg(QString::fromLocal8Bit(strerror(errno)));
         return false;
     }
-#endif
 
     const char *slaveName = ::ptsname(m_masterFd);
     if (!slaveName) {
