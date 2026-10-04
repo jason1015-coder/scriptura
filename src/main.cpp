@@ -874,7 +874,8 @@ QDialogButtonBox > QPushButton {
             const QString cmd =
                 QStringLiteral("gdb -p %1 -batch -ex \"thread apply all bt\" > %2 2>&1")
                     .arg(QString::number(QCoreApplication::applicationPid()), freezeLog);
-            (void)std::system(cmd.toUtf8().constData());
+            const int gdbRc = std::system(cmd.toUtf8().constData());
+            (void)gdbRc; // best-effort watchdog dump; failures are ignored
         }
     }).detach();
 #endif

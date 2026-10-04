@@ -377,7 +377,7 @@ void TerminalView::paintEvent(QPaintEvent *event)
             if (cell.ch != U' ' && cell.ch != U'\0') {
                 painter.setPen(m_defaultBackground);
                 painter.drawText(cursorRect, Qt::AlignLeft | Qt::AlignVCenter,
-                                 QString(QChar::fromUcs4(cell.ch)));
+                                 QString::fromUcs4(&cell.ch, 1));
             }
         }
     }
