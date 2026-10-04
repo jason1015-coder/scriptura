@@ -66,12 +66,10 @@ void TermLine::assign(int columns, const TermCell &fill)
 {
     if (columns < 0)
         columns = 0;
-    if (cells.size() == columns) {
-        for (int i = 0; i < columns; ++i)
-            cells[i] = fill;
-    } else {
-        cells.assign(columns, fill);
-    }
+    // NOTE: Qt6 unified QVector with QList and removed std::vector-style
+    // assign(). resize() + fill() is the Qt6-compatible equivalent.
+    cells.resize(columns);
+    cells.fill(fill);
     wrapped = false;
 }
 
@@ -106,7 +104,8 @@ TermCell TerminalBuffer::blankCell()
 
 void TerminalBuffer::rebuildTabStops()
 {
-    m_tabs.assign(m_columns, false);
+    m_tabs.resize(m_columns);
+    m_tabs.fill(false);
     for (int i = 0; i < m_columns; i += 8)
         m_tabs[i] = true;
 }
@@ -503,7 +502,7 @@ void TerminalBuffer::clearTabStop(int col)
 
 void TerminalBuffer::clearAllTabStops()
 {
-    m_tabs.assign(m_tabs.size(), false);
+    m_tabs.fill(false);
 }
 
 void TerminalBuffer::tabToNextStop(int count)
