@@ -86,7 +86,7 @@ The conventions that actually matter:
 - **UI lives in C++/Qt.** Visual components, panels, dialogs, and menus belong in the Qt layer. Do not move UI into the Rust backend.
 - **The Rust backend does not link Qt.** It is pure Rust reached through `extern "C"` in `src/rust_backend/src/ffi.rs`, with JSON strings for structured payloads. Keep the FFI boundary narrow — a new export needs a matching declaration in `include/scriptura/rust_backend.h` and, where the UI needs it, a wrapper in `src/rust_adapter.cpp`.
 - **Network access is declared, not assumed.** A plugin that reaches the network declares `network.access` in its manifest. Do not add a code path that opens a socket without one.
-- **New panels need wiring.** A panel class that is never `new`'d in `MainWindow` and never added to `bottomPanelStack` is dormant code, however complete it is. Wire yours, or say in the PR that it is a staged extraction.
+- **New panels need wiring.** A panel class that is never `new`'d in `MainWindow` and never handed to `MainWindow::registerPanel()` is dormant code, however complete it is. `registerPanel()` is what gives the panel its tab in the tab bar (and its entry in the tab bar's "+" menu) and makes it a page of the content area. Wire yours, or say in the PR that it is a staged extraction.
 - **Third-party dependencies need an issue first.** Scriptura is a desktop application; every dependency is a build requirement imposed on every user and every CI runner.
 
 ## Commit messages

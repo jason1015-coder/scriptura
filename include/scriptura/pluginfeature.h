@@ -35,7 +35,7 @@ enum class PluginFeature {
     ToolbarButton,          ///< Toolbar button
     StatusBarWidget,        ///< Status bar widget
     SidePanel,              ///< Side panel
-    BottomPanel,            ///< Bottom panel
+    BottomPanel,            ///< Deprecated alias of SidePanel: panels are tabs
     SidebarButton,          ///< Sidebar button
 
     // ── Tool Features ────────────────────────────────────────────

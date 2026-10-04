@@ -150,6 +150,8 @@ QLabel* PluginUIApi::addStatusBarWidget(const QString &text, bool permanent)
 void PluginUIApi::registerPanel(const QString &id, const QString &title,
                                  QWidget *widget, PanelLocation location)
 {
+    Q_UNUSED(location);   // every panel is a tab now; both locations land in one place
+
     if (!m_mainWindow || !widget)
         return;
 
@@ -163,24 +165,13 @@ void PluginUIApi::registerPanel(const QString &id, const QString &title,
     entry.widget = widget;
     entry.location = location;
 
-    if (location == PanelLocation::BottomPanel) {
-        // Add to the bottom panel button bar & stack
-        QStackedWidget *stack = m_mainWindow->findChild<QStackedWidget*>(QStringLiteral("bottomPanelStack"));
-
-        if (stack) {
-            entry.tabIndex = m_mainWindow->addBottomPanelButton(":/icons/settings.svg", title, title, false);
-            widget->setParent(stack);
-            stack->addWidget(widget);
-            widget->hide();
-        }
-    } else {
-        // SidePanel — add to editor stack
-        QStackedWidget *editorStack = m_mainWindow->findChild<QStackedWidget*>(QStringLiteral("editorStack"));
-        if (editorStack) {
-            editorStack->addWidget(widget);
-            widget->hide();
-        }
-    }
+    // registerPanel() creates the tab and makes the widget a page of the
+    // content area, so the plugin's panel is reachable exactly like a built-in
+    // one. builtin=false: the widget stays the plugin's to destroy.
+    entry.tabIndex = m_mainWindow->registerPanel(":/icons/settings.svg", title, title,
+                                                 false, widget);
+    if (entry.tabIndex < 0)
+        return;
 
     m_panels[id] = entry;
 }
@@ -191,13 +182,8 @@ void PluginUIApi::showPanel(const QString &id)
         return;
 
     PanelEntry &entry = m_panels[id];
-    if (entry.widget)
-        entry.widget->show();
-
-    // Switch to the right panel if in bottom panel
-    if (entry.location == PanelLocation::BottomPanel && entry.tabIndex >= 0) {
-        m_mainWindow->showBottomPanelIndex(entry.tabIndex);
-    }
+    if (entry.tabIndex >= 0)
+        m_mainWindow->showPanelIndex(entry.tabIndex);
 }
 
 void PluginUIApi::hidePanel(const QString &id)
@@ -216,13 +202,14 @@ void PluginUIApi::unregisterPanel(const QString &id)
         return;
 
     PanelEntry entry = m_panels.take(id);
+    if (entry.tabIndex >= 0) {
+        // removePanelTab() drops the tab and the widget, which the plugin owns.
+        m_mainWindow->removePanelTab(entry.tabIndex);
+        return;
+    }
     if (entry.widget) {
         entry.widget->hide();
         entry.widget->deleteLater();
-    }
-    // Also remove the corresponding tab in the main window
-    if (entry.location == PanelLocation::BottomPanel && entry.tabIndex >= 0) {
-        m_mainWindow->removePanelTab(entry.tabIndex);
     }
 }
 

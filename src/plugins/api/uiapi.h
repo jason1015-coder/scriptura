@@ -18,9 +18,12 @@ class PluginUIApi : public QObject
     Q_OBJECT
 
 public:
+    /** Where a custom panel goes. There is only one place now: every panel is
+     *  a tab in the editor area that fills the content area. Both values behave
+     *  the same and are kept so existing plugins keep compiling. */
     enum class PanelLocation {
-        BottomPanel,
-        SidePanel,
+        BottomPanel,   ///< deprecated: panels are tabs
+        SidePanel,     ///< deprecated: panels are tabs
     };
 
     explicit PluginUIApi(MainWindow *mainWindow, QObject *parent = nullptr);

@@ -4,6 +4,7 @@
 #include "version.h"
 #include "thememanager.h"
 #include "themeicons.h"
+#include "terminal/terminalpanel.h"
 #include "rust_adapter.h"
 #include "rust_adapter.h"
 #include "pluginmanagerdialog.h"
@@ -557,6 +558,11 @@ void MainWindow::applyTheme(const Theme &theme)
                                    def.synEscape, trailingBg);
         }
     }
+
+    // Terminal: text and background follow the editor theme so the panel does
+    // not look like a bright box inside a dark window.
+    if (m_terminalPanel)
+        m_terminalPanel->setTerminalColors(def.textColor, def.baseColor);
 
     SettingsStore::instance().setValue("theme/selected", themeToLegacyInt(theme));
 }

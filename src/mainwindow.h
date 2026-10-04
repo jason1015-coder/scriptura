@@ -82,6 +82,7 @@ constexpr int ExpandedWidth = 320;
 class FindReplaceBar;
 class ProjectSearchPanel;
 class PluginMarketplaceWidget;
+class TerminalPanel;
 
 #include "themedefs.h"
 #include "breadcrumbbar.h"
@@ -153,13 +154,18 @@ public:
 
     bool isDarkModeEnabled() const { return selectedTheme.mode == ThemeMode::Dark; }
 
-    // Bottom panel button helpers (used by plugin API and dock)
-    int addBottomPanelButton(const QString &iconPath, const QString &tooltip, const QString &title, bool builtin = false, QWidget *panelWidget = nullptr);
-    void showBottomPanelIndex(int index);
-    int currentBottomPanelIndex() const;
+    // Panels are tabs, not a separate area: every registered panel gets a tab
+    // in the top tab bar and fills the whole content area when it is selected.
+    // registerPanel() is also what the plugin API calls.
+    int registerPanel(const QString &iconPath, const QString &tooltip, const QString &title, bool builtin = false, QWidget *panelWidget = nullptr);
+    void showPanelIndex(int index);
     int findPanelTabIndex(int panelIndex) const;
+    int findPanelIndex(const QString &title) const;
     void closePanelTab(int panelIndex);
     void removePanelTab(int panelIndex);
+
+    int addPanelTab(int panelIndex);
+    void openPanelAsTab(int panelIndex);
 
 #ifdef Q_OS_WIN
     void enableMicaEffect(HWND hwnd, bool darkMode);
@@ -191,8 +197,8 @@ protected:
     void showKeyboardShortcuts();
     void onEditorTextChanged();
     void requestHover();
-    void onBottomTabChanged(int index);
     void onTopTabChanged(int index);
+    void rebuildNewTabMenu();
 
  private:
     void on_action_git_commit_triggered();
@@ -268,15 +274,20 @@ protected:
     // found even after Save As renames the path (the old code captured the
     // path string in lambdas/buttons and went stale).
     QMap<QWidget*, QString> m_tabIds;
-    QWidget *bottomPanelButtons;
-    struct PanelButtonEntry {
-        QToolButton *button = nullptr;
+    // Every panel that can be opened as a tab. "builtin" panels are owned by
+    // MainWindow and only hidden when their tab is closed; a plugin's widget
+    // belongs to the plugin, which also removes its entry (removePanelTab).
+    struct PanelEntry {
         int panelIndex = -1;
         QString title;
+        QString tooltip;
         bool builtin = false;
         QWidget *panelWidget = nullptr;
     };
-    QList<PanelButtonEntry> m_panelButtons;
+    QList<PanelEntry> m_panels;
+    // Panel icon resource per panel index, so a tab can be re-aimed after the
+    // entries below it are removed and so theme changes can recolour it.
+    QMap<int, QString> m_panelIcons;
     // Menus are built once and kept, rather than rebuilt per right-click: each
     // rebuild re-registers every action with ThemeIcons and re-rasterises its
     // icon. Only the enabled/disabled state depends on the clicked row.
@@ -287,7 +298,6 @@ protected:
     QAction *m_ctxDelete = nullptr;
     QMenu *m_newTabMenu = nullptr;
     int m_newTabMenuPanelCount = -1;
-    QStackedWidget *bottomPanelStack;
     FindReplaceBar *findReplaceBar;
     ProjectSearchPanel *projectSearchPanel;
     QStackedWidget *editorStack;
@@ -388,12 +398,13 @@ protected:
     CssBreadcrumbParser *m_cssBreadcrumbParser;
     SnippetEditorDialog *m_snippetEditorDialog;
     PluginMarketplaceWidget *m_pluginMarketplace = nullptr;
+    TerminalPanel *m_terminalPanel = nullptr;
+    int m_terminalPanelIndex = -1; ///< index into m_panels, for shortcuts
 
     void updateCursorPosition();
     void updateStatusBar();
     void updateTabModified(int index, bool modified);
     void updateTopTabBar();
-    void updateBottomTabBar();
     void updateTabBarVisibility();
     QIcon createSymbolIcon(QChar symbol) const;
     QPushButton* createTabCloseButton();

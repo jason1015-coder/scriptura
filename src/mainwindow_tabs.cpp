@@ -26,6 +26,7 @@
 #include <QStringConverter>
 #include "encodingmanager.h"
 #include "pluginmarketplace.h"
+#include "terminal/terminalpanel.h"
 
 namespace {
 // Logical edge of a tab's type icon. Matches the file tree's glyph size so the
@@ -69,6 +70,10 @@ void MainWindow::loadProjectDirectory(const QString &dirName)
     rootIndex = fileModel->index(projectDir);
     ui->fileTreeView->setRootIndex(rootIndex);
     ui->fileTreeView->hideColumn(1);
+
+    // New terminals open in the project folder rather than the home directory.
+    if (m_terminalPanel)
+        m_terminalPanel->setWorkingDirectory(projectDir);
     
     // Update the universal search file model to the current project
     if (m_universalSearch) {
@@ -668,13 +673,11 @@ void MainWindow::onTopTabChanged(int index)
     } else if (data.typeId() == QMetaType::QString) {
         QString strData = data.toString();
         if (strData.startsWith("panel:")) {
-            // Panel tab - extract panel index and show bottom panel
+            // Panel tab: the panel is the page on screen, filling the content area.
             bool ok = false;
             int panelIndex = strData.mid(6).toInt(&ok);
-            if (ok && panelIndex >= 0 && panelIndex < m_panelButtons.size()) {
-                showBottomPanelIndex(panelIndex);
-            }
-            // Keep editor stack showing the current file (don't switch editorStack)
+            if (ok)
+                openPanelAsTab(panelIndex);
         } else {
             // File tab — resolve by stable id (file path, or "untitled:N").
             // The old code matched openFiles by path positionally, which
@@ -734,29 +737,16 @@ QPushButton* MainWindow::createSettingsTabCloseButton(int tabIndex)
                 break;
             }
         }
-        // After removal, ensure editorStack shows the editor if the new
-        // current tab is not a settings tab.
+        // After removal, show whatever the newly selected tab holds: a file, the
+        // settings page, or a panel — assuming "editor" would blank a panel tab.
         int cur = tabBar->currentIndex();
-        if (cur < 0) {
+        if (cur < 0)
             showEditorInterface();
-        } else {
-            QVariant data = tabBar->tabData(cur);
-            bool isSettings = (data.typeId() == QMetaType::Int
-                               && static_cast<TabType>(data.toInt()) == TabType::Settings);
-            if (!isSettings)
-                showEditorInterface();
-        }
+        else
+            onTopTabChanged(cur);
         updateTabBarVisibility();
     });
     return closeBtn;
-}
-
-void MainWindow::onBottomTabChanged(int index)
-{
-    // This slot is now called from showBottomPanelIndex() after state is updated.
-    // The stack index and panel visibility are already handled there.
-    // This slot is kept for external notification purposes (e.g., plugin API).
-    Q_UNUSED(index);
 }
 
 int MainWindow::findTabBarIndexForId(const QString &id) const
@@ -771,10 +761,21 @@ int MainWindow::findTabBarIndexForId(const QString &id) const
 
 void MainWindow::updateTabIcon(const QString &tabId)
 {
-    // Bottom-panel tabs carry a "panel:N" id and settings is stored as a plain
-    // int. Neither names a file, so neither gets a file-type glyph.
-    if (tabId.startsWith(QLatin1String("panel:")))
+    // A panel tab carries "panel:<index>"; its glyph is the panel's own icon,
+    // not a file type.
+    if (tabId.startsWith(QLatin1String("panel:"))) {
+        bool ok = false;
+        const int panelIndex = tabId.mid(6).toInt(&ok);
+        const QString iconPath = ok ? m_panelIcons.value(panelIndex) : QString();
+        if (!iconPath.isEmpty()) {
+            const int index = findTabBarIndexForId(tabId);
+            if (index >= 0) {
+                tabBar->setTabIcon(index, ThemeIcons::instance()->statefulIcon(
+                                                iconPath, kTabIconSize));
+            }
+        }
         return;
+    }
 
     const int index = findTabBarIndexForId(tabId);
     if (index < 0)
@@ -909,6 +910,48 @@ void MainWindow::newUntitledFile()
     editor->setFocus();
 }
 
+void MainWindow::rebuildNewTabMenu()
+{
+    // The "+" menu is the one place that lists every kind of tab this window
+    // can open: an empty buffer, an existing file, the settings page, and every
+    // registered panel. It is rebuilt only when the panel list changes, because
+    // each rebuild re-rasterises every icon.
+    if (!m_newTabMenu)
+        return;
+    m_newTabMenu->clear();
+    ThemeIcons *icons = ThemeIcons::instance();
+
+    QAction *emptyAction = m_newTabMenu->addAction(tr("New Empty File"));
+    icons->setIcon(emptyAction, ":/icons/file.svg");
+    connect(emptyAction, &QAction::triggered, this, &MainWindow::newUntitledFile);
+
+    QAction *openAction = m_newTabMenu->addAction(tr("Open File..."));
+    icons->setIcon(openAction, ":/icons/folder.svg");
+    connect(openAction, &QAction::triggered, this, &MainWindow::on_action_open_file_triggered);
+
+    QAction *settingsAction = m_newTabMenu->addAction(tr("Settings"));
+    icons->setIcon(settingsAction, ":/icons/settings.svg");
+    connect(settingsAction, &QAction::triggered, this, &MainWindow::on_action_editor_settings_triggered);
+
+    if (m_panels.isEmpty())
+        return;
+
+    // Every registered panel, in one list: picking one opens its tab, picking an
+    // open one brings that tab back to the front.
+    m_newTabMenu->addSeparator();
+    for (int i = 0; i < m_panels.size(); ++i) {
+        QAction *panelAction = m_newTabMenu->addAction(m_panels.at(i).title);
+        const QString iconPath = m_panelIcons.value(i);
+        if (!iconPath.isEmpty())
+            icons->setIcon(panelAction, iconPath, ThemeIcons::Role::Normal, 16);
+        panelAction->setCheckable(true);
+        panelAction->setChecked(findPanelTabIndex(i) >= 0);
+        connect(panelAction, &QAction::triggered, this, [this, i]() {
+            openPanelAsTab(i);
+        });
+    }
+}
+
 void MainWindow::showNewTabPanel()
 {
     // Floating panel listing every available tab type, anchored under the
@@ -929,34 +972,10 @@ void MainWindow::showNewTabPanel()
         m_newTabMenuPanelCount = -1;
     }
 
-    // Plugin panels can be registered after the menu was first built, so the
-    // body is rebuilt only when the panel list has actually changed.
-    const int panelCount = m_panelButtons.size();
+    // Panels can be registered after the menu was first built.
+    const int panelCount = m_panels.size();
     if (m_newTabMenuPanelCount != panelCount) {
-        m_newTabMenu->clear();
-        ThemeIcons *icons = ThemeIcons::instance();
-
-        QAction *emptyAction = m_newTabMenu->addAction(tr("New Empty File"));
-        icons->setIcon(emptyAction, ":/icons/file.svg");
-        connect(emptyAction, &QAction::triggered, this, &MainWindow::newUntitledFile);
-
-        QAction *openAction = m_newTabMenu->addAction(tr("Open File..."));
-        icons->setIcon(openAction, ":/icons/folder.svg");
-        connect(openAction, &QAction::triggered, this, &MainWindow::on_action_open_file_triggered);
-
-        QAction *settingsAction = m_newTabMenu->addAction(tr("Settings"));
-        icons->setIcon(settingsAction, ":/icons/settings.svg");
-        connect(settingsAction, &QAction::triggered, this, &MainWindow::on_action_editor_settings_triggered);
-
-        if (panelCount > 0) {
-            m_newTabMenu->addSeparator();
-            for (int i = 0; i < panelCount; ++i) {
-                QAction *panelAction = m_newTabMenu->addAction(m_panelButtons[i].title);
-                connect(panelAction, &QAction::triggered, this, [this, i]() {
-                    showBottomPanelIndex(i);
-                });
-            }
-        }
+        rebuildNewTabMenu();
         m_newTabMenuPanelCount = panelCount;
     }
 
@@ -965,6 +984,6 @@ void MainWindow::showNewTabPanel()
         pos = m_newTabButton->mapToGlobal(QPoint(0, m_newTabButton->height() + 4));
     else
         pos = tabBar->mapToGlobal(QPoint(tabBar->width(), tabBar->height()));
-    m_newTabMenu->exec(pos);
+    m_newTabMenu->popup(pos);
 }
 

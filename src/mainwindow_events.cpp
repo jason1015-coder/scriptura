@@ -220,8 +220,6 @@ void MainWindow::closeEvent(QCloseEvent *event)
         // Save window geometry and state
         SettingsStore::instance().setValue("mainWindow/geometry", saveGeometry());
         SettingsStore::instance().setValue("mainWindow/state", saveState());
-        SettingsStore::instance().setValue("mainWindow/bottomPanelVisible", ui->bottomPanelContainer->isVisible());
-        SettingsStore::instance().setValue("mainWindow/bottomPanelIndex", currentBottomPanelIndex());
         // The drawer is collapsed by zeroing its width, never by hiding it, so
         // isHidden() is always false here and used to persist "expanded" on
         // every quit — a collapsed drawer came back open. m_sidebarCollapsed is

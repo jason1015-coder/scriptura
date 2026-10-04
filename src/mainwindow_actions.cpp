@@ -299,14 +299,6 @@ void MainWindow::updateTopTabBar()
     tabBar->setCurrentIndex(-1);
 }
 
-void MainWindow::updateBottomTabBar()
-{
-    int idx = bottomPanelStack->currentIndex();
-    if (idx >= 0 && idx < m_panelButtons.size()) {
-        showBottomPanelIndex(idx);
-    }
-}
-
 void MainWindow::loadRecentProjects()
 {
     recentProjects = SettingsStore::instance().value("recentProjects", QStringList()).toStringList();
@@ -428,18 +420,13 @@ void MainWindow::on_action_project_search_triggered()
 {
     QString root = projectDir.isEmpty() ? QDir::homePath() : projectDir;
     findReplaceBar->setVisible(false);
-    // Find the search panel's index in m_panelButtons
-    int idx = 0;
-    for (int i = 0; i < m_panelButtons.size(); ++i) {
-        if (m_panelButtons[i].title == tr("Search")) {
-            idx = i;
-            break;
-        }
-    }
-    showBottomPanelIndex(idx);
-    ui->bottomPanelContainer->show();
+    // The results panel is a tab like any other; search just fills it in.
+    const int idx = findPanelIndex(tr("Search"));
+    if (idx < 0)
+        return;
     projectSearchPanel->setRootPath(root);
     projectSearchPanel->search(QString(), root);
+    openPanelAsTab(idx);
 }
 
 void MainWindow::on_action_command_palette_triggered()

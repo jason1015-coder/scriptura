@@ -61,7 +61,7 @@ The backend services are compiled into a static library (`libscriptura_backend.a
 ### Partially implemented (code + tests exist, not wired)
 
 - `plugins/aiinlinecompletion.*`: OpenAI-compatible + Ollama `chat` / `generate` + debounce + `CodeEditor::setGhostText`, has `tests/test_aiinlinecompletion.*` — `setSettings / setEditor` commented out in `mainwindow.cpp:909-927`
-- `panels/testpanel.*` + `widgets/testrunner.*` + Rust `test_engine.rs`: pytest / jest / cargo / go / ctest detect + parse — `TestPanel` never added to `bottomPanelStack`
+- `panels/testpanel.*` + `widgets/testrunner.*` + Rust `test_engine.rs`: pytest / jest / cargo / go / ctest detect + parse — `TestPanel` never passed to `MainWindow::registerPanel()`
 - `panels/markdownpreview.*`, `dataformatter.*`, `regextester.*`, `globalreplacepreview.*`, `gitbranchwidget.*`, `gitdiffwidget.*`, `gitmergewidget.*`: complete classes, never `new`'d in `MainWindow` — dormant
 - `plugins/httpclientpanel.*`, `plugins/sqliteviewer.*`: complete + tested, only reachable as installable `ApplicationManager` Apps, not built-in panels
 - `rust_backend/src/plugin_updater.rs:30`: `check()` is `TODO: Query the plugin registry` no-op (callbacks wired, never fire)

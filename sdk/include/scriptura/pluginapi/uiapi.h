@@ -25,10 +25,13 @@ class PluginUIApi : public QObject
     Q_OBJECT
 
 public:
-    /** Location where a custom panel can be registered. */
+    /** Location where a custom panel can be registered. There is no bottom
+     *  panel any more: every panel is a tab in the editor area that fills the
+     *  content area. Both values behave the same and are kept so existing
+     *  plugins keep compiling. */
     enum class PanelLocation {
-        BottomPanel,   ///< Register in the bottom panel stack
-        SidePanel,     ///< Register in the side panel stack (editor area)
+        BottomPanel,   ///< deprecated: panels are tabs
+        SidePanel,     ///< deprecated: panels are tabs
     };
 
     explicit PluginUIApi(MainWindow *mainWindow, QObject *parent = nullptr);
