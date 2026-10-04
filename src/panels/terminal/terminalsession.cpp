@@ -428,6 +428,8 @@ bool TerminalSession::startPty(const QString &program, const QStringList &args,
         return false;
     }
 
+#ifdef Q_OS_LINUX
+    // Linux hands out a locked slave pair; TIOCSPTLCK is a Linux-only ioctl.
     int unlock = 0;
     if (::ioctl(m_masterFd, TIOCSPTLCK, &unlock) < 0) {
         if (error)
@@ -435,6 +437,7 @@ bool TerminalSession::startPty(const QString &program, const QStringList &args,
                          .arg(QString::fromLocal8Bit(strerror(errno)));
         return false;
     }
+#endif
 
     const char *slaveName = ::ptsname(m_masterFd);
     if (!slaveName) {
@@ -457,10 +460,15 @@ bool TerminalSession::startPty(const QString &program, const QStringList &args,
     ::fcntl(m_masterFd, F_SETFL, (flags < 0 ? 0 : flags) | O_NONBLOCK);
 
     // Block every signal across the fork so the child inherits a clean mask and
-    // no handler can run between fork() and exec().
+    // no handler can run between fork() and exec(). sigfillset() is a macro on
+    // some platforms (macOS), so it cannot be namespace-qualified here.
     sigset_t blockAll;
     sigset_t previous;
-    ::sigfillset(&blockAll);
+    sigemptyset(&blockAll);
+    for (int signo = 1; signo < NSIG; ++signo) {
+        if (signo != SIGKILL && signo != SIGSTOP)
+            sigaddset(&blockAll, signo);
+    }
     ::sigprocmask(SIG_BLOCK, &blockAll, &previous);
 
     const pid_t pid = ::fork();
