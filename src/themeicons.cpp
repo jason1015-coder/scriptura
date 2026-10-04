@@ -270,7 +270,10 @@ QIcon ThemeFileIconProvider::memoized(const QString& path) const
 
     // statefulIcon, not icon: rows drawn on the highlight fill need the
     // highlighted-text colour or the glyph disappears into the background.
-    const QIcon result = ti->statefulIcon(path);
+    // FileTreeSize, not DefaultSize: the view's iconSize is pinned to the same
+    // constant, so the size requested at paint time is an exact cache hit and
+    // the SVG is never scaled up from a 16px rasterisation.
+    const QIcon result = ti->statefulIcon(path, ThemeIcons::FileTreeSize);
     m_cache.insert(path, result);
     return result;
 }

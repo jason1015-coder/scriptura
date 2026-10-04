@@ -392,11 +392,19 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
     ui->fileTreeView->setColumnHidden(1, true);
     ui->fileTreeView->setColumnHidden(2, true);
     ui->fileTreeView->setColumnHidden(3, true);
-    // Row height: the global sheet pads items by 5px, so a 13px-font row with
-    // 16px glyphs comes out at 18 + 10 = 28px. Padding the tree's own items to
-    // 12px takes that to 42px — half as thick again — and the id selector keeps
-    // this override ahead of the app-level QTreeView::item rule.
+    // Pin the row glyph size to the size ThemeFileIconProvider rasterises at.
+    // QIcon would otherwise be asked for a size it never produced and scale the
+    // result (same reasoning as the tabBar->setIconSize call below).
+    ui->fileTreeView->setIconSize(
+        QSize(ThemeIcons::FileTreeSize, ThemeIcons::FileTreeSize));
+    // Row height: the global sheet pads items by 5px, so a 14px-font row with
+    // 18px glyphs comes out at 20 + 10 = 30px. Padding the tree's own items to
+    // 12px takes that to 44px — half as thick again — and the id selector keeps
+    // this override ahead of the app-level QTreeView::item rule. The font-size
+    // bumps the tree's text one notch over the 13px app default so it reads at
+    // the same scale as the enlarged glyphs; nothing else inherits it.
     ui->fileTreeView->setStyleSheet(QStringLiteral(
+        "QTreeView#fileTreeView { font-size: 14px; }"
         "QTreeView#fileTreeView::item { padding: 12px 6px; }"));
     // Enable right-click context menu on the file tree
     ui->fileTreeView->setContextMenuPolicy(Qt::CustomContextMenu);

@@ -64,6 +64,16 @@ public:
     static constexpr int DefaultSize = 16;
 
     /**
+     * @brief 檔案樹 (fileTreeView) 列內圖標的邏輯邊長。
+     *
+     * 比 DefaultSize 大一級，配合檔案樹 14px 的字級讓文字與圖標比例協調。
+     * ThemeFileIconProvider 以這個尺寸光柵化，MainWindow 也用同一個常數呼叫
+     * QTreeView::setIconSize()，確保視圖請求的尺寸正好是已光柵化的尺寸，
+     * 不會讓 QIcon 事後自行縮放一個從未產生過的尺寸。
+     */
+    static constexpr int FileTreeSize = 18;
+
+    /**
      * @brief 取得全域單例
      */
     static ThemeIcons* instance();
