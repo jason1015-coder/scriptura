@@ -242,6 +242,12 @@ void TestMainWindowPanels::testPanelTabFillsContentArea()
 
 void TestMainWindowPanels::testPlusMenuOpensPanelAsTab()
 {
+    // Keyboard grabbing is unavailable in offscreen mode, which causes the
+    // plus menu to never receive its activation events and the test to hang.
+    if (QString(qgetenv("QT_QPA_PLATFORM")) == "offscreen") {
+        QSKIP("Keyboard grab not available in offscreen mode");
+    }
+
     Fixture fx;
     QVERIFY(fx.create());
 
