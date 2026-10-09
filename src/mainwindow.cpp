@@ -9,9 +9,7 @@
 #include "projectsearch.h"
 #include "debugconfiguration.h"
 #include "rundialog.h"
-#include "minimap.h"
 #include "splitmanager.h"
-#include "breadcrumb.h"
 #include "codeactionui.h"
 #include "pluginmarketplace.h"
 #include "terminal/terminalpanel.h"
@@ -118,11 +116,9 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
     , debugConfigManager(std::make_unique<DebugConfigurationManager>())
     , m_isDebugging(false)
     , m_workspace(RustBackend::instance()->workspace())
-    , m_minimap(nullptr)
     , m_inspectorDrawer(nullptr)
     , m_universalSearch(nullptr)
     , m_splitManager(new SplitManager(this))
-    , m_breadcrumb(nullptr)
     , m_codeActionCtrl(new CodeActionController(this))
     , m_pluginRegistry(RustBackend::instance()->pluginRegistry())
     , m_zenMode(nullptr)
@@ -456,8 +452,11 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
     // Welcome page is now a standalone pre-launch window (WelcomeMenuScreen)
     // shown in main.cpp before MainWindow is created.
 
-    // Panels are pages of the content area, opened from their own tab
+    // Panels are pages of the content area, opened from their own tab. They are
+    // created hidden — otherwise they float, unmanaged, at the window's top-left
+    // (a bare 100x30 box over the title bar) until their tab is picked.
     projectSearchPanel = new ProjectSearchPanel(this);
+    projectSearchPanel->hide();
 
     findReplaceBar = new FindReplaceBar(this);
     findReplaceBar->setVisible(false);
@@ -1014,9 +1013,11 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
 
     // ── P1/P2 Feature Modules (infrastructure, not standalone apps) ───
     m_gitRebase = new GitRebaseWidget(this);
+    m_gitRebase->hide();
     registerPanel(":/icons/git.svg", tr("Git Rebase"), tr("Rebase"), true, m_gitRebase);
 
     m_taskRunnerUI = new TaskRunnerUI(this);
+    m_taskRunnerUI->hide();
     registerPanel(":/icons/check.svg", tr("Task Runner"), tr("Tasks"), true, m_taskRunnerUI);
 
     // ── Terminal ─────────────────────────────────────────────────────
@@ -1025,6 +1026,7 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
     m_terminalPanel = new TerminalPanel(this);
     if (!projectDir.isEmpty())
         m_terminalPanel->setWorkingDirectory(projectDir);
+    m_terminalPanel->hide();
     m_terminalPanelIndex = registerPanel(":/icons/console.svg", tr("Terminal"),
                                         tr("Terminal"), true, m_terminalPanel);
 
@@ -1048,6 +1050,7 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
     CodeEditor *currentEditor = getCurrentCodeEditor();
     BookmarkManager *bm = currentEditor ? currentEditor->bookmarkManager() : nullptr;
     m_bookmarkPanel = new BookmarkPanelWidget(bm, this);
+    m_bookmarkPanel->hide();
     registerPanel(":/icons/file.svg", tr("Bookmarks"), tr("Bookmarks"), true, m_bookmarkPanel);
 
     // Connect bookmark panel to active editor (per-tab sync)
@@ -1099,6 +1102,7 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
 
     // P3: Plugin Marketplace — kept as built-in (no app wrapper yet)
     m_pluginMarketplace = new PluginMarketplaceWidget(m_pluginRegistry, this);
+    m_pluginMarketplace->hide();
     registerPanel(":/icons/settings.svg", tr("Plugin Marketplace"), tr("Marketplace"), true, m_pluginMarketplace);
 
     // Connect marketplace signals

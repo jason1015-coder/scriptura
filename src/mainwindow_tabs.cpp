@@ -1,8 +1,6 @@
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
 #include "codeeditor.h"
-#include "minimap.h"
-#include "breadcrumb.h"
 #include "rust_adapter.h"
 #include "themeicons.h"
 #include "fileicons.h"
@@ -327,25 +325,6 @@ void MainWindow::openFileInTab(const QString &fileName)
     if (w > 0) editor->setMinimumWidth(w);
     editor->setPlainText(content);
 
-    // Create minimap for this editor
-    Minimap *minimap = new Minimap(editor, this);
-    minimap->setDocument(editor->document());
-    connect(minimap, &Minimap::viewportRequested, editor, [editor](int position) {
-        QTextCursor cursor(editor->document());
-        cursor.movePosition(QTextCursor::Start);
-        cursor.movePosition(QTextCursor::Down, QTextCursor::MoveAnchor, position);
-        editor->setTextCursor(cursor);
-        editor->centerCursor();
-    });
-
-    // Create breadcrumb for this editor
-    Breadcrumb *breadcrumb = new Breadcrumb(editor, this);
-    breadcrumb->setFilePath(fileName);
-    connect(breadcrumb, &Breadcrumb::breadcrumbClicked, this, [this](const QString &path) {
-        // Handle breadcrumb navigation
-    });
-    connect(editor, &QPlainTextEdit::cursorPositionChanged, breadcrumb, &Breadcrumb::updateFromCursor);
-
     int tabIndex = openFiles.size();
     Q_UNUSED(tabIndex);
     // Look the tab index up dynamically: a captured index goes stale as soon
@@ -429,25 +408,6 @@ void MainWindow::on_fileTreeView_clicked(const QModelIndex &index)
         if (savedEditorWidth > 0)
             editor->setMinimumWidth(savedEditorWidth);
         editor->setPlainText(content);
-
-        // Create minimap for this editor
-        Minimap *minimap = new Minimap(editor, this);
-        minimap->setDocument(editor->document());
-        connect(minimap, &Minimap::viewportRequested, editor, [editor](int position) {
-            QTextCursor cursor(editor->document());
-            cursor.movePosition(QTextCursor::Start);
-            cursor.movePosition(QTextCursor::Down, QTextCursor::MoveAnchor, position);
-            editor->setTextCursor(cursor);
-            editor->centerCursor();
-        });
-
-        // Create breadcrumb for this editor
-        Breadcrumb *breadcrumb = new Breadcrumb(editor, this);
-        breadcrumb->setFilePath(path);
-        connect(breadcrumb, &Breadcrumb::breadcrumbClicked, this, [this](const QString &path) {
-            // Handle breadcrumb navigation
-        });
-        connect(editor, &QPlainTextEdit::cursorPositionChanged, breadcrumb, &Breadcrumb::updateFromCursor);
 
         int tabIndex = openFiles.size();
         Q_UNUSED(tabIndex);
@@ -848,25 +808,6 @@ void MainWindow::newUntitledFile()
     editor->setFont(savedFont);
     editor->setTabWidth(SettingsStore::instance().value("editor/tabWidth", editor->tabWidth()).toInt());
     editor->setPlainText(QString());
-
-    // Create minimap for this editor
-    Minimap *minimap = new Minimap(editor, this);
-    minimap->setDocument(editor->document());
-    connect(minimap, &Minimap::viewportRequested, editor, [editor](int position) {
-        QTextCursor cursor(editor->document());
-        cursor.movePosition(QTextCursor::Start);
-        cursor.movePosition(QTextCursor::Down, QTextCursor::MoveAnchor, position);
-        editor->setTextCursor(cursor);
-        editor->centerCursor();
-    });
-
-    // Create breadcrumb for this editor
-    Breadcrumb *breadcrumb = new Breadcrumb(editor, this);
-    breadcrumb->setFilePath(QString());
-    connect(breadcrumb, &Breadcrumb::breadcrumbClicked, this, [this](const QString & /*path*/) {
-        // Untitled file has no path to navigate to
-    });
-    connect(editor, &QPlainTextEdit::cursorPositionChanged, breadcrumb, &Breadcrumb::updateFromCursor);
 
     // Dynamic index lookup — a captured index goes stale when other tabs close.
     QPointer<CodeEditor> edGuard(editor);

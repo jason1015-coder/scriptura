@@ -14,7 +14,7 @@ Scriptura is pre-1.0 and its AI layer is an integration into the Qt shell rather
 - **Anything that changes architecture, the plugin surface, the FFI boundary, or the AI layer's position in the shell**: open an issue describing what you want to change and why before you write it. This includes new third-party dependencies, new panels, and new FFI exports.
 - **Claim the issue** by commenting on it, so two people do not write the same patch.
 
-Every NC project tags `good first issue` and `help wanted`. The dormant panels listed under "Partially implemented" in the [README](README.md) are a reasonable place to start: they are complete, tested classes that were never wired in, which makes them small, self-contained, and genuinely useful.
+Every NC project tags `good first issue` and `help wanted`. The dormant classes listed under "Partially implemented" in the [README](README.md) — currently the `AiInlineCompletion` plugin and the legacy `Minimap` / `Breadcrumb` widgets — are a reasonable place to start: they are complete, tested classes that were never wired in, which makes them small, self-contained, and genuinely useful.
 
 ## Prerequisites
 

@@ -8,6 +8,7 @@
 #include <QMouseEvent>
 #include <QHBoxLayout>
 #include <QPainter>
+#include <QPainterPath>
 #include <QStyleOption>
 
 class CustomTitleBar : public QWidget
@@ -58,6 +59,10 @@ private:
 
     void styleButtons();
     void setupLayout();
+    // Paints the bar's opaque background with top corners rounded to match the
+    // editor container, so its square edges don't poke out over the rounded
+    // frame (or let the window's mid-coloured ring show through the corners).
+    void paintTitleBarBackground(QPainter &p);
     void paintWindowControls(QPainter &p, QPushButton *button, const QString &glyph);
     // Theme text colour when it contrasts with the title bar background,
     // otherwise black/white — guarantees the glyphs are always visible.

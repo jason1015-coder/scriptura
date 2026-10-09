@@ -50,9 +50,7 @@
 #include "cssbreadcrumb.h"
 #include "snippeteditordialog.h"
 #include "projectsearch.h"
-#include "minimap.h"
 #include "splitmanager.h"
-#include "breadcrumb.h"
 #include "universalsearch.h"
 #include "codeactionui.h"
 #include "customtitlebar.h"
@@ -370,9 +368,7 @@ protected:
     ThemeManager *m_themeManager;
     
     // UI/UX Polish
-    Minimap *m_minimap;
     SplitManager *m_splitManager;
-    Breadcrumb *m_breadcrumb;
     QWidget *m_inspectorDrawer;
     UniversalSearchPopup *m_universalSearch;
 

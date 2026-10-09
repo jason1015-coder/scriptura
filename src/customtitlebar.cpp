@@ -292,11 +292,41 @@ void CustomTitleBar::paintEvent(QPaintEvent *event)
     QPainter p(this);
     p.setRenderHint(QPainter::Antialiasing, true);
 
+    paintTitleBarBackground(p);
+
     // Window control glyphs and their hover/pressed backgrounds are drawn here
     // with theme-aware colours so the − / □ / ✕ stay visible in every theme.
     paintWindowControls(p, minimizeButton, QStringLiteral("\u2014"));
     paintWindowControls(p, maximizeButton, QStringLiteral("\u25a1"));
     paintWindowControls(p, closeButton, QStringLiteral("\u2715"));
+}
+
+void CustomTitleBar::paintTitleBarBackground(QPainter &p)
+{
+    // The editor container this bar lives in is rendered with rounded corners
+    // (border-radius: 14px). Paint the bar's own background with the same top
+    // corners so its square edges don't poke out over the rounded frame, and
+    // no mid-coloured sliver from the window's margin ring shows through the
+    // previously transparent corner pixels.
+    constexpr int kContainerCornerRadius = 14;
+
+    const QColor bg = palette().color(QPalette::Window);
+
+    const qreal w = rect().width();
+    const qreal h = rect().height();
+
+    QPainterPath path;
+    path.moveTo(0, h);
+    path.lineTo(0, kContainerCornerRadius);
+    path.quadTo(QPointF(0, 0), QPointF(kContainerCornerRadius, 0));
+    path.lineTo(w - kContainerCornerRadius, 0);
+    path.quadTo(QPointF(w, 0), QPointF(w, kContainerCornerRadius));
+    path.lineTo(w, h);
+    path.closeSubpath();
+
+    p.setPen(Qt::NoPen);
+    p.setBrush(bg);
+    p.drawPath(path);
 }
 
 void CustomTitleBar::paintWindowControls(QPainter &p, QPushButton *button, const QString &glyph)

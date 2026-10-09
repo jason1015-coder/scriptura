@@ -34,7 +34,7 @@ The backend services are compiled into a static library (`libscriptura_backend.a
 **Editor core (`src/codeeditor.*`, `src/mainwindow_tabs.cpp`)**
 - Project workflow: open project / file-tree (`QFileSystemModel`) / expand-collapse / tabbed editing / save / save-as / recent projects-files / auto-save
 - Syntax highlighting (`CodeHighlighter` + `languageregistry.*`), line numbers, current-line, indent guides, `LargeFileHandler`, `EncodingManager` (detect / BOM / LF-CRLF), smart-indent + bracket auto-close
-- Per-tab `Minimap` + `Breadcrumb` + `BreadcrumbBarWidget` + `CssBreadcrumbParser` (html / css / scss / xml / svg)
+- `BreadcrumbBarWidget` + `CssBreadcrumbParser` (html / css / scss / xml / svg)
 - `FoldManager`, `BracketColorizer`, `MultiCursorManager` (`Ctrl+D`, above / below), `ColumnSelection`, `SnippetManager` + editor dialog, `BookmarkManager` + `BookmarkPanelWidget`, inlay-hints, ghost-text infra, `CodeLensManager`, `RefactoringManager`, `CodeActionController`
 
 **Search / navigate**
@@ -56,32 +56,27 @@ The backend services are compiled into a static library (`libscriptura_backend.a
 **Plugins / themes / shell**
 - `ScripturaPlugin` SDK (`sdk/`, `include/scriptura/plugininterface.h`), `PluginManagerDialog`, `PluginContext` + Editor / Ui / Notification / Theme APIs, `ApplicationManager` + `FirstRunInstallDialog`
 - `PluginMarketplaceWidget` bottom panel, registry-URL setting, `ThemeManager` (8 families × Light / Dark) + `ThemeIcons`, `CustomTitleBar`, `WindowAnimator`, `WelcomeMenuScreen`, `StatusBarWidget`, `NotificationCenter`, `ZenMode`, `SplitManager`
-- Tests: `cargo test` + 32 `tests/test_*.cpp` (`ctest`), CI `build.yml` / `test.yml` on Linux / macOS / Windows
+- Tests: `cargo test` + 34 `tests/test_*.cpp` (`ctest`), CI `build.yml` / `test.yml` on Linux / macOS / Windows
 
-### Partially implemented (code + tests exist, not wired)
+### Partially implemented (present but incomplete or unwired)
 
-- `plugins/aiinlinecompletion.*`: OpenAI-compatible + Ollama `chat` / `generate` + debounce + `CodeEditor::setGhostText`, has `tests/test_aiinlinecompletion.*` — `setSettings / setEditor` commented out in `mainwindow.cpp:909-927`
-- `panels/testpanel.*` + `widgets/testrunner.*` + Rust `test_engine.rs`: pytest / jest / cargo / go / ctest detect + parse — `TestPanel` never passed to `MainWindow::registerPanel()`
-- `panels/markdownpreview.*`, `dataformatter.*`, `regextester.*`, `globalreplacepreview.*`, `gitbranchwidget.*`, `gitdiffwidget.*`, `gitmergewidget.*`: complete classes, never `new`'d in `MainWindow` — dormant
-- `plugins/httpclientpanel.*`, `plugins/sqliteviewer.*`: complete + tested, only reachable as installable `ApplicationManager` Apps, not built-in panels
-- `rust_backend/src/plugin_updater.rs:30`: `check()` is `TODO: Query the plugin registry` no-op (callbacks wired, never fire)
-- `rust_backend/src/emmet_engine.rs` + `rust_emmet_expand`: FFI exists, no editor shortcut wired
-- `config_validator.rs`: only JSON well-formedness, no schema enforcement
-- `src/mainwindow_ui.cpp`: `Placeholder - setup methods will be extracted`
+- `plugins/aiinlinecompletion.*`: OpenAI-compatible + Ollama `chat` / `generate` + debounce + `CodeEditor::setGhostText`, with `tests/test_aiinlinecompletion.*` — the class is complete but is never instantiated in `MainWindow`, so no shortcut or settings UI reaches it
+- `widgets/minimap.*` and `widgets/breadcrumb.*`: legacy per-tab minimap and path-breadcrumb widgets, with `tests/test_minimap.*` / `tests/test_breadcrumb.*`. Neither is wired into the editor today (the breadcrumb strip is `BreadcrumbBarWidget`)
+- `rust_backend/src/plugin_updater.rs:30`: `check()` is a `TODO: Query the plugin registry` no-op (callbacks wired, never fire)
+- `rust_backend/src/config_validator.rs`: only JSON well-formedness, no schema enforcement
 
 ### Planned (explicit placeholders / TODOs)
 
-- Inspector drawer (`mainwindow.cpp:508-524`): sparkle placeholder + `AI Assistant is in development` + `Coming soon — intelligent code assistance, refactoring suggestions`
-- `TODO: nanocoder assistant in here`, `TODO: replace with nanocoder- inline completion`, `TODO: nanocoder settings UI (AI & Completions section goes here)` (`mainwindow.cpp:514,909`, `mainwindow_theme.cpp:294`)
+- Inspector drawer (`mainwindow.cpp:485-578`): sparkle placeholder + `AI Assistant is in development` + `Coming soon — intelligent code assistance, refactoring suggestions`
+- `TODO: nanocoder assistant in here` (`mainwindow.cpp:551`); `TODO: nanocoder settings UI (AI & Completions section goes here)` (`mainwindow_theme.cpp:347`)
 
 ### Roadmap
 
 1. `nanocoder` AI assistant (inspector) + inline completion + `AI & Completions` settings
-2. Wire up dormant panels: Test panel, Markdown preview, DataFormatter, RegexTester, Git Branch / Diff / Merge, GlobalReplacePreview
-3. Graduate `HTTP / SQLite` Apps vs built-ins decision
-4. Real plugin / theme registry (current default `https://example.com/plugin-registry.json`), implement `PluginUpdater::check()`
-5. Schema-aware `ConfigValidator`, Emmet keybinding, `TestPanel::jumpToTest` file / line extraction (`testpanel.cpp:208 TODO`)
-6. Prod hardening toward `v1`: macOS sign / notarize, `pluginhost` sandbox stays removed (`CMakeLists.txt:260`)
+2. Wire in or remove the dormant `AiInlineCompletion` plugin and the legacy `Minimap` / `Breadcrumb` widgets
+3. Real plugin / theme registry and a working `PluginUpdater::check()` (the default registry URL points at the project's GitHub-hosted `plugin-registry.json`)
+4. Schema-aware `ConfigValidator`
+5. Prod hardening toward `v1`: macOS sign / notarize, `pluginhost` sandbox stays removed (`CMakeLists.txt:270`)
 
 ---
 
