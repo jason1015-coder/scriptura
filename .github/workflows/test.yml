@@ -82,6 +82,8 @@ jobs:
           QT_QPA_PLATFORM=offscreen build/tests/scriptura_tests 2>&1 || echo "Exit code: $?"
       
       - name: Run C++ unit tests
+        env:
+          QT_QPA_PLATFORM: offscreen
         run: cd build && ctest --output-on-failure --timeout 300
 
   test-windows:

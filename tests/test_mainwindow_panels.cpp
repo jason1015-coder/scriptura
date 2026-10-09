@@ -11,6 +11,7 @@
 #include <QWidget>
 
 #include "mainwindow.h"
+#include "terminal/terminalpanel.h"
 #include "test_mainwindow_panels.h"
 
 namespace {
@@ -92,6 +93,17 @@ struct Fixture {
         win->show();
         QTest::qWait(50);
         QCoreApplication::processEvents();
+
+        // A panel test is about tabs, not the shell that fills the terminal tab:
+        // pin it to a plain, fast shell so the test never forks the user's
+        // default interactive shell (zsh on the macOS CI runners) or waits on
+        // whatever prompt that shell prints. test_terminal.cpp makes the same
+        // choice for its session tests.
+#ifndef Q_OS_WIN
+        if (auto *terminal = win->findChild<TerminalPanel*>())
+            terminal->setShellProgram(QStringLiteral("/bin/sh"));
+#endif
+
         tabBar = win->findChild<QTabBar*>(QStringLiteral("tabBar"));
         editorStack = win->findChild<QStackedWidget*>(QStringLiteral("editorStack"));
         return tabBar && editorStack;
@@ -108,13 +120,17 @@ struct Fixture {
     int panelIndex(const QString &title) const { return win->findPanelIndex(title); }
 };
 
-// Opens the "+" menu the way a click does and hands back the menu.
+// Opens the "+" menu the way a click does and hands back the menu. The button is
+// activated through QToolButton::click() rather than a synthetic pointer event:
+// popup menus are native widgets on macOS, and QTest::mouseClick() on a button
+// that opens one can stall until the platform's menu tracking loop ends. click()
+// emits the same clicked() signal deterministically on every platform.
 QMenu *openPlusMenu(MainWindow *win)
 {
     QToolButton *plus = win->findChild<QToolButton*>(QStringLiteral("newTabButton"));
     if (!plus)
         return nullptr;
-    QTest::mouseClick(plus, Qt::LeftButton);
+    plus->click();
     QCoreApplication::processEvents();
     return win->findChild<QMenu*>(QStringLiteral("newTabPanel"));
 }
