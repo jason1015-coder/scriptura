@@ -4,7 +4,6 @@
 #include "customtitlebar.h"
 #include "windowanimator.h"
 #include "thememanager.h"
-// pluginContext removed - plugins managed via RustPluginManagerAdapter
 #include "themeicons.h"
 #include "rust_adapter.h"
 
@@ -200,16 +199,6 @@ bool MainWindow::eventFilter(QObject *watched, QEvent *event)
     }
 
     return QMainWindow::eventFilter(watched, event);
-}
-
-void MainWindow::setupPluginApis()
-{
-    // When the active editor tab changes, notify the plugin editor API
-    // so it can re-apply decorations, markers, and annotations.
-    connect(ui->tabWidget, &QTabWidget::currentChanged, this, [this](int index) {
-        Q_UNUSED(index);
-        // Plugin editor API notification removed - managed by Rust backend
-    });
 }
 
 void MainWindow::closeEvent(QCloseEvent *event)

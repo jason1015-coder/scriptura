@@ -3,20 +3,14 @@
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
 #include "codeeditor.h"
-#include "pluginmanagerdialog.h"
 #include "version.h"
 #include "findreplace.h"
 #include "projectsearch.h"
 #include "debugconfiguration.h"
 #include "rundialog.h"
 #include "splitmanager.h"
-#include "codeactionui.h"
-#include "pluginmarketplace.h"
 #include "terminal/terminalpanel.h"
 #include "terminal/terminalwidget.h"
-#include "plugins/api/uiapi.h"
-#include "plugins/api/editorapi.h"
-#include "plugins/api/notificationapi.h"
 #include "windowanimator.h"
 #include "thememanager.h"
 #include "themeicons.h"
@@ -108,8 +102,6 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
     , updater(RustBackend::instance()->updater())
     , configValidator(RustBackend::instance()->configValidator())
     , lspClient(RustBackend::instance()->lspClient())
-    , pluginManager(RustBackend::instance()->pluginManager())
-    , pluginManagerDialog(new PluginManagerDialog(pluginManager, nullptr, this))
     , m_previousEditorStackIndex(0)
     , dapClient(RustBackend::instance()->dapClient())
 
@@ -119,8 +111,6 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
     , m_inspectorDrawer(nullptr)
     , m_universalSearch(nullptr)
     , m_splitManager(new SplitManager(this))
-    , m_codeActionCtrl(new CodeActionController(this))
-    , m_pluginRegistry(RustBackend::instance()->pluginRegistry())
     , m_zenMode(nullptr)
     , m_sessionManager(nullptr)
     // Note: created in the init list (not lazily below) because
@@ -288,7 +278,6 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
         regCmd(tr("Step Into"),               tr("F11"),         [this]() { on_action_step_into_triggered(); });
         regCmd(tr("Step Out"),                tr("Shift+F11"),   [this]() { on_action_step_out_triggered(); });
         regCmd(tr("Continue"),                tr("Ctrl+F5"),     [this]() { on_action_continue_debug_triggered(); });
-        regCmd(tr("Manage Plugins..."),       QString(),          [this]() { on_action_manage_plugins_triggered(); });
         regCmd(tr("Check for Updates..."),    QString(),          [this]() { on_action_check_updates_triggered(); });
         regCmd(tr("Keyboard Shortcuts"),      tr("Ctrl+K"),      [this]() { showKeyboardShortcuts(); });
         regCmd(tr("About Scriptura"),         QString(),          [this]() { on_action_about_triggered(); });
@@ -353,9 +342,6 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
         ThemeManager::Features(static_cast<ThemeManager::Feature>(static_cast<int>(selectedTheme.features)))
     );
     m_themeManager->applyTheme(initialTheme);
-
-    pluginManager->loadPlugins(QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + "/plugins");
-    pluginManager->loadPlugins(QCoreApplication::applicationDirPath() + "/plugins");
 
     loadRecentProjects();
 
@@ -442,9 +428,6 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
     connect(shortcutNewTab, &QShortcut::activated, this, &MainWindow::showNewTabPanel);
     editorStack->addWidget(ui->tabWidget);
 
-    // Plugin registry - load user-configured URL
-    registryUrl = SettingsStore::instance().value("plugin/registryUrl", "https://raw.githubusercontent.com/jason1015-coder/scriptura/main/plugin-registry.json").toString();
-
     // Create unified scrollable settings page (tab added when user opens settings)
     unifiedSettingsWidget = createUnifiedSettingsWidget();
     editorStack->addWidget(unifiedSettingsWidget);
@@ -470,7 +453,7 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
 
     registerPanel(":/icons/search.svg", tr("Search Results"), tr("Search"), true, projectSearchPanel);
 
-    // Keep an empty iconBar for plugins to add custom buttons via UI API
+    // Keep an empty icon bar at the drawer's foot for future quick actions
     QWidget *iconBar = new QWidget(ui->sidebarDrawer);
     m_sidebarIconBar = iconBar;
     iconBar->setObjectName("sidebarIconBar");
@@ -965,22 +948,6 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
     // Updater connections
     connect(updater, &RustUpdaterAdapter::updateAvailable, this, &MainWindow::onUpdateAvailable);
 
-    connect(ui->tabWidget, &QTabWidget::currentChanged, this, [this](int index) {
-        if (index >= 0 && index < ui->tabWidget->count()) {
-            if (CodeEditor *ce = qobject_cast<CodeEditor*>(ui->tabWidget->widget(index))) {
-                m_codeActionCtrl->attach(ce, lspClient, QUrl::fromLocalFile(currentFile).toString());
-                if (m_codeActionCtrl->isVisible())
-                    m_codeActionCtrl->showCurrent();
-            }
-        }
-    });
-
-    // CodeAction controller
-    connect(lspClient, &RustLspClientAdapter::diagnosticsReceived, m_codeActionCtrl, &CodeActionController::onDiagnosticsReceived);
-    connect(m_codeActionCtrl, &CodeActionController::actionTriggered, this, [](const QString &title, const QString &kind, int) {
-        qDebug() << "CodeAction triggered:" << title << kind;
-    });
-
     // ── P0/P1/P2 Feature Modules ──────────────────────────────────────
     m_sessionManager = new SessionManager(this, ui->tabWidget, this);
     m_codeLensManager = new CodeLensManager(this);
@@ -1099,19 +1066,6 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
     // Breadcrumb bar below tab bar
     m_breadcrumbBar = new BreadcrumbBarWidget(ui->editorContainer);
     ui->editorContainerLayout->insertWidget(1, m_breadcrumbBar);
-
-    // P3: Plugin Marketplace — kept as built-in (no app wrapper yet)
-    m_pluginMarketplace = new PluginMarketplaceWidget(m_pluginRegistry, this);
-    m_pluginMarketplace->hide();
-    registerPanel(":/icons/settings.svg", tr("Plugin Marketplace"), tr("Marketplace"), true, m_pluginMarketplace);
-
-    // Connect marketplace signals
-    connect(m_pluginMarketplace, &PluginMarketplaceWidget::pluginInstalled, this, [this](const QString &pluginId) {
-        qDebug() << "Plugin installed:" << pluginId;
-    });
-    connect(m_pluginMarketplace, &PluginMarketplaceWidget::pluginUninstalled, this, [this](const QString &pluginId) {
-        qDebug() << "Plugin uninstalled:" << pluginId;
-    });
 
     // Task Runner shortcuts
     QShortcut *shortcutTaskRun = new QShortcut(QKeySequence("Ctrl+Shift+B"), this);
@@ -1342,21 +1296,6 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
             m_refactoringManager->extractVariable(editor, lspClient, currentFile);
         }
     });
-    // Plugin registry (uses Rust adapter)
-    m_pluginRegistry->setRegistryUrl(registryUrl);
-    // The timer context MUST be `this` (MainWindow), not m_pluginRegistry:
-    // m_pluginRegistry is owned by the RustBackend singleton and outlives this
-    // window, so a timer keyed to it would keep firing after MainWindow is
-    // destroyed and dereference a dangling `this` (heap corruption). Keying it
-    // to the window cancels the check when the window closes. The registry
-    // pointer itself is captured by value — it stays valid for the process
-    // lifetime via the singleton.
-    QTimer::singleShot(5000, this, [registry = m_pluginRegistry]() {
-        registry->checkForUpdates();
-    });
-
-    // Init plugin developer API wiring
-    setupPluginApis();
 
     // Config validator - validate settings on startup (Rust adapter handles this internally)
 
@@ -1485,7 +1424,7 @@ void MainWindow::applyPaneMirroring(bool mirrored)
         }
     }
 
-    // The drawer's bottom bar (plugin icon bar) is pinned to
+    // The drawer's bottom bar (icon bar) is pinned to
     // the leading edge; mirror it so it hugs the same side as the drawer.
     const Qt::Alignment barAlign = mirrored ? (Qt::AlignRight | Qt::AlignVCenter)
                                             : (Qt::AlignLeft | Qt::AlignVCenter);
@@ -1712,8 +1651,8 @@ void MainWindow::closePanelTab(int panelIndex)
 
 void MainWindow::removePanelTab(int panelIndex)
 {
-    // A plugin's widget is the plugin's to destroy; built-ins are MainWindow's
-    // and stay alive (hidden) until the window goes away.
+    // A dynamic panel's widget is its owner's to destroy; built-ins are
+    // MainWindow's and stay alive (hidden) until the window goes away.
     if (panelIndex >= 0 && panelIndex < m_panels.size() && !m_panels[panelIndex].builtin) {
         QWidget *widget = m_panels[panelIndex].panelWidget;
         if (widget) {

@@ -20,7 +20,7 @@ namespace {
 // this list is what the menu has to offer.
 const QStringList kBuiltInPanels = {
     QStringLiteral("Search"),      QStringLiteral("Rebase"),    QStringLiteral("Tasks"),
-    QStringLiteral("Terminal"),    QStringLiteral("Bookmarks"), QStringLiteral("Marketplace"),
+    QStringLiteral("Terminal"),    QStringLiteral("Bookmarks"),
 };
 
 QString writeTempFile(QTemporaryDir &dir, const QString &name, const QString &contents)

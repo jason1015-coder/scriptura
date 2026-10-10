@@ -4,18 +4,15 @@
 #include <QStandardPaths>
 #include <QTemporaryDir>
 #include "internals/settings_store.h"
-#include "test_aiinlinecompletion.h"
 #include "test_bookmarkmanager.h"
 #include "test_bookmarkpanel.h"
 #include "test_bracketcolorizer.h"
 #include "test_breadcrumb.h"
 #include "test_taskrunnerui.h"
-#include "test_codeactionui.h"
 #include "test_codelensmanager.h"
 #include "test_crashhandler.h"
 #include "test_codeeditor_multicursor.h"
 #include "test_debugconfiguration.h"
-#include "test_dependencyresolver.h"
 #include "test_encodingmanager.h"
 #include "test_fileicons.h"
 #include "test_findreplace.h"
@@ -26,7 +23,6 @@
 #include "test_mainwindow_sidebar.h"
 #include "test_minimap.h"
 #include "test_multicursor.h"
-#include "test_plugincontext.h"
 #include "test_projectsearch.h"
 #include "test_rundialog.h"
 #include "test_sessionmanager.h"
@@ -50,7 +46,7 @@ int main(int argc, char *argv[])
 
     // Isolate the Rust settings store so unit tests never touch the
     // developer's real Scriptura configuration (SnippetManager/
-    // BookmarkManager/PluginContext constructors load from SettingsStore).
+    // BookmarkManager constructors load from SettingsStore).
     // A dedicated app/org identity keeps the store in a test-only profile
     // directory; SCRIPTURA_SETTINGS_DIR wins when set by CI.
     QCoreApplication::setOrganizationName(QStringLiteral("ScripturaTests"));
@@ -65,17 +61,14 @@ int main(int argc, char *argv[])
     SettingsStore::instance().clear(); // start from a clean slate every run
 
     int status = 0;
-    status |= QTest::qExec(new TestAiInlineCompletion, argc, argv);
     status |= QTest::qExec(new TestBookmarkManager, argc, argv);
     status |= QTest::qExec(new TestBookmarkPanel, argc, argv);
     status |= QTest::qExec(new TestBracketColorizer, argc, argv);
     status |= QTest::qExec(new TestBreadcrumb, argc, argv);
     status |= QTest::qExec(new TestTaskRunnerUI, argc, argv);
-    status |= QTest::qExec(new TestCodeActionUI, argc, argv);
     status |= QTest::qExec(new TestCodeLensManager, argc, argv);
     status |= QTest::qExec(new TestCrashHandler, argc, argv);
     status |= QTest::qExec(new TestDebugConfiguration, argc, argv);
-    status |= QTest::qExec(new TestDependencyResolver, argc, argv);
     status |= QTest::qExec(new TestEncodingManager, argc, argv);
     status |= QTest::qExec(new TestFileIcons, argc, argv);
     status |= QTest::qExec(new TestFindReplace, argc, argv);
@@ -87,7 +80,6 @@ int main(int argc, char *argv[])
     status |= QTest::qExec(new TestMinimap, argc, argv);
     status |= QTest::qExec(new TestMultiCursor, argc, argv);
     status |= QTest::qExec(new TestCodeEditorMultiCursor, argc, argv);
-    status |= QTest::qExec(new TestPluginContext, argc, argv);
     status |= QTest::qExec(new TestProjectSearch, argc, argv);
     status |= QTest::qExec(new TestRunDialog, argc, argv);
     status |= QTest::qExec(new TestSessionManager, argc, argv);

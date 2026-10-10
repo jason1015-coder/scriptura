@@ -47,7 +47,7 @@ void focusEditor(MainWindow &win, CodeEditor *editor)
 // openFileInTab) — the integration path these tests guard. We deliberately
 // avoid QTest::keyClick/keyClicks here: on the Windows offscreen platform they
 // spin inside qWaitForWindowActive for the complex MainWindow, keeping it alive
-// long enough for MainWindow's delayed plugin-registry check (5s) to fire
+// long enough for a long-delayed startup timer in MainWindow to fire
 // mid-test, which crashes the test process.
 void sendKey(CodeEditor *editor, Qt::Key key, const QString &text = QString())
 {

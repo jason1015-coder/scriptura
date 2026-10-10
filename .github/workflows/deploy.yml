@@ -177,7 +177,6 @@ jobs:
           Copy-Item -Recurse -Force build/Release/platforms deploy/Release/
           Copy-Item -Recurse -Force build/Release/styles deploy/Release/
           Copy-Item -Recurse -Force build/Release/imageformats deploy/Release/
-          if (Test-Path build/Release/plugins) { Copy-Item -Recurse -Force build/Release/plugins deploy/Release/plugins }
           if (Test-Path src/resources) { Copy-Item -Recurse -Force src/resources deploy/Release/resources }
           Copy-Item icon.ico deploy/Release/
           Copy-Item LICENSE deploy/Release/

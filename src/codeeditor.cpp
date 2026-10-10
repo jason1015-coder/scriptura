@@ -933,10 +933,9 @@ void CodeEditor::updateLineNumberArea(const QRect &rect, int dy)
 
 void CodeEditor::highlightCurrentLine()
 {
-    // Preserve existing selections (diagnostics + plugin decorations + bracket colors) and add/update current line highlight
+    // Preserve existing selections (diagnostics + bracket colors) and add/update current line highlight
     QList<QTextEdit::ExtraSelection> extraSelections;
     extraSelections.append(m_diagnosticSelections);
-    extraSelections.append(m_pluginExtraSelections);
 
     // Add bracket colorization selections
     if (m_bracketColorizer && m_bracketColorEnabled) {
@@ -1521,18 +1520,6 @@ void CodeEditor::setDiagnostics(const QList<QTextEdit::ExtraSelection> &diags)
     updateAllSelections();
 }
 
-void CodeEditor::setPluginExtraSelections(const QList<QTextEdit::ExtraSelection> &selections)
-{
-    m_pluginExtraSelections = selections;
-    updateAllSelections();
-}
-
-void CodeEditor::clearPluginExtraSelections()
-{
-    m_pluginExtraSelections.clear();
-    updateAllSelections();
-}
-
 void CodeEditor::setDiagnosticTooltips(const QList<QPair<QTextCursor, QString>> &tips)
 {
     m_diagnosticTooltips = tips;
@@ -1653,7 +1640,6 @@ void CodeEditor::highlightCurrentLine(int line)
     QList<QTextEdit::ExtraSelection> extraSelections;
     extraSelections.append(selection);
     extraSelections.append(m_diagnosticSelections);
-    extraSelections.append(m_pluginExtraSelections);
     if (m_bracketColorizer && m_bracketColorEnabled) {
         extraSelections.append(m_bracketColorizer->extraSelections());
     }

@@ -7,8 +7,6 @@
 #include "terminal/terminalpanel.h"
 #include "rust_adapter.h"
 #include "rust_adapter.h"
-#include "pluginmanagerdialog.h"
-#include "rust_adapter.h"
 
 #include <QScrollArea>
 #include <QMessageBox>
@@ -359,21 +357,6 @@ QWidget* MainWindow::createUnifiedSettingsWidget()
 
     mainLayout->addWidget(updateGroup);
 
-    // Plugin Registry
-    QGroupBox *registryGroup = new QGroupBox(tr("Plugin Registry"), content);
-    QVBoxLayout *registryLayout = new QVBoxLayout(registryGroup);
-    QLabel *registryUrlLabel = new QLabel(tr("Registry URL:"), registryGroup);
-    QLineEdit *registryUrlEdit = new QLineEdit(registryGroup);
-    registryUrlEdit->setPlaceholderText(tr("https://example.com/plugin-registry.json"));
-    registryUrlEdit->setText(registryUrl);
-    connect(registryUrlEdit, &QLineEdit::textChanged, this, [this](const QString &url) {
-        m_pluginRegistry->setRegistryUrl(url);
-        SettingsStore::instance().setValue("plugin/registryUrl", url);
-    });
-    registryLayout->addWidget(registryUrlLabel);
-    registryLayout->addWidget(registryUrlEdit);
-    mainLayout->addWidget(registryGroup);
-
     // Connect update buttons
     connect(checkStableButton, &QPushButton::clicked, this, [this]() {
         updater->checkForUpdates(QCoreApplication::applicationVersion(), SettingsStore::instance().value("updates/url", "https://api.github.com/repos/jason1015-coder/scriptura/releases/latest").toString());
@@ -396,7 +379,7 @@ QWidget* MainWindow::createUnifiedSettingsWidget()
     QLabel *dangerLabel = new QLabel(tr(
         "Reset Scriptura to its factory state. This permanently deletes all stored "
         "preferences: theme, editor options, keyboard shortcuts, code snippets, "
-        "bookmarks, recent files, session data, and plugin settings."), dangerGroup);
+        "bookmarks, recent files, and session data."), dangerGroup);
     dangerLabel->setWordWrap(true);
     dangerLayout->addWidget(dangerLabel);
 
@@ -420,7 +403,7 @@ QWidget* MainWindow::createUnifiedSettingsWidget()
                "\u2022 Theme, fonts, and editor preferences\n"
                "\u2022 Keyboard shortcuts and code snippets\n"
                "\u2022 Bookmarks, recent files, and sessions\n"
-               "\u2022 Plugin registry URL and other stored data\n\n"
+               "\u2022 Other stored data\n\n"
                "This action cannot be undone.\n\n"
                "Continue?"),
             QMessageBox::Yes | QMessageBox::Cancel, QMessageBox::Cancel);
@@ -436,7 +419,7 @@ QWidget* MainWindow::createUnifiedSettingsWidget()
         if (second != QMessageBox::Yes)
             return;
 
-        // Wipe the entire settings store (encrypted Rust store covers app + plugins)
+        // Wipe the entire settings store (the encrypted Rust store covers all settings)
         SettingsStore::instance().clear();
 
         // Clear in-memory caches so stale data isn't re-persisted before a restart
@@ -593,14 +576,6 @@ void MainWindow::on_action_license_triggered()
         "LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\n"
         "OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\n"
         "SOFTWARE."));
-  }
-
-  void MainWindow::on_action_manage_plugins_triggered()
-  {
-      if (pluginManagerDialog) {
-          pluginManagerDialog->refresh();
-          pluginManagerDialog->show();
-      }
   }
 
   void MainWindow::setSidebarCollapsed(bool collapsed)

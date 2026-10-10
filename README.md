@@ -2,7 +2,7 @@
 
 Built by the [Nano Collective](https://nanocollective.org) — a community collective building AI tooling not for profit, but for the community.
 
-A hybrid Qt and Rust code editor — Qt for the UI, Rust for safe backend services — shipping LSP, DAP, git, and a plugin SDK today, with a local-first AI assistant built on [Nanocoder](https://github.com/Nano-Collective/nanocoder) still to come.
+A hybrid Qt and Rust code editor — Qt for the UI, Rust for safe backend services — shipping LSP, DAP, and git today, with a local-first AI assistant built on [Nanocoder](https://github.com/Nano-Collective/nanocoder) still to come.
 
 [![Build & Deploy Scriptura](https://github.com/jason1015-coder/scriptura/actions/workflows/build.yml/badge.svg)](https://github.com/jason1015-coder/scriptura/actions/workflows/build.yml)
 [![Run Unit Tests](https://github.com/jason1015-coder/scriptura/actions/workflows/test.yml/badge.svg)](https://github.com/jason1015-coder/scriptura/actions/workflows/test.yml)
@@ -21,7 +21,7 @@ Scriptura uses a **dual-language architecture**:
 |-------|----------|-----------|----------------|
 | **UI Layer** | C++ | Qt 6 Widgets | All visual components (editor, panels, menus, dialogs) |
 | **Adapter Layer** | C++ | Qt + C FFI | Thin wrappers bridging Qt signals/slots to Rust callbacks |
-| **Backend Layer** | Rust | Pure Rust (no Qt) | LSP/DAP protocol, event bus, plugin manager, task runner, updater, workspace, config, permissions |
+| **Backend Layer** | Rust | Pure Rust (no Qt) | LSP/DAP protocol, event bus, task runner, updater, workspace, config |
 
 The backend services are compiled into a static library (`libscriptura_backend.a`) via **Cargo** and linked into the C++ executable. Cross-language communication uses **C FFI** (`extern "C"`) with JSON strings for complex data. All state management and protocol handling runs in safe Rust.
 
@@ -35,7 +35,7 @@ The backend services are compiled into a static library (`libscriptura_backend.a
 - Project workflow: open project / file-tree (`QFileSystemModel`) / expand-collapse / tabbed editing / save / save-as / recent projects-files / auto-save
 - Syntax highlighting (`CodeHighlighter` + `languageregistry.*`), line numbers, current-line, indent guides, `LargeFileHandler`, `EncodingManager` (detect / BOM / LF-CRLF), smart-indent + bracket auto-close
 - `BreadcrumbBarWidget` + `CssBreadcrumbParser` (html / css / scss / xml / svg)
-- `FoldManager`, `BracketColorizer`, `MultiCursorManager` (`Ctrl+D`, above / below), `ColumnSelection`, `SnippetManager` + editor dialog, `BookmarkManager` + `BookmarkPanelWidget`, inlay-hints, ghost-text infra, `CodeLensManager`, `RefactoringManager`, `CodeActionController`
+- `FoldManager`, `BracketColorizer`, `MultiCursorManager` (`Ctrl+D`, above / below), `ColumnSelection`, `SnippetManager` + editor dialog, `BookmarkManager` + `BookmarkPanelWidget`, inlay-hints, ghost-text infra, `CodeLensManager`, `RefactoringManager`
 
 **Search / navigate**
 - `FindReplaceBar`, `ProjectSearchPanel` (bottom panel), `UniversalSearchPopup`, command palette, `ShortcutEditor`
@@ -48,21 +48,18 @@ The backend services are compiled into a static library (`libscriptura_backend.a
 
 **Tasks / Git (basic)**
 - Rust `task_runner.rs` + `TaskRunnerUI` bottom panel + `Ctrl+Shift+B`, detects `package.json` / `Makefile` / `Cargo` tasks
-- Git commit / push / pull / fetch via `QProcess`, `GitPlugin` (`com.scriptura.git`), `GitRebaseWidget` bottom panel, `GitBlame` gutter + Rust `blame_engine` / `diff_engine`, status-bar branch
+- Git commit / push / pull / fetch via `QProcess`, `GitRebaseWidget` bottom panel, `GitBlame` gutter + Rust `blame_engine` / `diff_engine`, status-bar branch
 
-**Rust backend (`src/rust_backend/src/ffi.rs`, 162 `pub extern "C"`)**
-- `eventbus`, `service_locator`, `workspace` (folders / settings / recent), `updater` + `version_fetcher` (Stable / Pre-release check), `config_validator`, `archive_extractor`, `permission`, `plugin/manager` + `crash_handler` + `dependency_resolver`, `registry`, `language_registry` + `language_server_manager`, `session_engine` (restore + hot-exit), `filewatcher`, `diff / encoding / blame / emmet / test / ui_actions`, `framer`
+**Rust backend (`src/rust_backend/src/ffi.rs`, 122 `pub extern "C"`)**
+- `eventbus`, `workspace` (folders / settings / recent), `updater` + `version_fetcher` (Stable / Pre-release check), `config_validator`, `language_registry` + `language_server_manager`, `session_engine` (restore + hot-exit), `filewatcher`, `diff / encoding / blame / emmet / test / ui_actions`, `framer`
 
-**Plugins / themes / shell**
-- `ScripturaPlugin` SDK (`sdk/`, `include/scriptura/plugininterface.h`), `PluginManagerDialog`, `PluginContext` + Editor / Ui / Notification / Theme APIs, `ApplicationManager` + `FirstRunInstallDialog`
-- `PluginMarketplaceWidget` bottom panel, registry-URL setting, `ThemeManager` (8 families × Light / Dark) + `ThemeIcons`, `CustomTitleBar`, `WindowAnimator`, `WelcomeMenuScreen`, `StatusBarWidget`, `NotificationCenter`, `ZenMode`, `SplitManager`
-- Tests: `cargo test` + 34 `tests/test_*.cpp` (`ctest`), CI `build.yml` / `test.yml` on Linux / macOS / Windows
+**Themes / shell**
+- `ThemeManager` (8 families × Light / Dark) + `ThemeIcons`, `CustomTitleBar`, `WindowAnimator`, `WelcomeMenuScreen`, `StatusBarWidget`, `NotificationCenter`, `ZenMode`, `SplitManager`
+- Tests: `cargo test` + 30 `tests/test_*.cpp` (`ctest`), CI `build.yml` / `test.yml` on Linux / macOS / Windows
 
 ### Partially implemented (present but incomplete or unwired)
 
-- `plugins/aiinlinecompletion.*`: OpenAI-compatible + Ollama `chat` / `generate` + debounce + `CodeEditor::setGhostText`, with `tests/test_aiinlinecompletion.*` — the class is complete but is never instantiated in `MainWindow`, so no shortcut or settings UI reaches it
 - `widgets/minimap.*` and `widgets/breadcrumb.*`: legacy per-tab minimap and path-breadcrumb widgets, with `tests/test_minimap.*` / `tests/test_breadcrumb.*`. Neither is wired into the editor today (the breadcrumb strip is `BreadcrumbBarWidget`)
-- `rust_backend/src/plugin_updater.rs:30`: `check()` is a `TODO: Query the plugin registry` no-op (callbacks wired, never fire)
 - `rust_backend/src/config_validator.rs`: only JSON well-formedness, no schema enforcement
 
 ### Planned (explicit placeholders / TODOs)
@@ -73,10 +70,9 @@ The backend services are compiled into a static library (`libscriptura_backend.a
 ### Roadmap
 
 1. `nanocoder` AI assistant (inspector) + inline completion + `AI & Completions` settings
-2. Wire in or remove the dormant `AiInlineCompletion` plugin and the legacy `Minimap` / `Breadcrumb` widgets
-3. Real plugin / theme registry and a working `PluginUpdater::check()` (the default registry URL points at the project's GitHub-hosted `plugin-registry.json`)
-4. Schema-aware `ConfigValidator`
-5. Prod hardening toward `v1`: macOS sign / notarize, `pluginhost` sandbox stays removed (`CMakeLists.txt:270`)
+2. Wire in or remove the legacy `Minimap` / `Breadcrumb` widgets
+3. Schema-aware `ConfigValidator`
+4. Prod hardening toward `v1`: macOS sign / notarize
 
 ---
 
@@ -178,13 +174,12 @@ scriptura/
 │   │   ├── Cargo.toml
 │   │   └── src/
 │   │       ├── lib.rs         # Module tree & helpers
-│   │       ├── ffi.rs         # All C FFI exports (162 functions)
+│   │       ├── ffi.rs         # All C FFI exports (122 functions)
 │   │       ├── eventbus.rs    # Pub/sub event system
 │   │       ├── lsp/           # LSP protocol client
 │   │       ├── dap/           # DAP protocol client
-│   │       ├── plugin/        # Plugin manager & crash handler
-│   │       ├── service_locator.rs, task_runner.rs, updater.rs, ...
-│   │       └── workspace.rs, permission.rs, language_registry.rs, ...
+│   │       ├── task_runner.rs, updater.rs, ...
+│   │       └── workspace.rs, language_registry.rs, ...
 │   ├── rust_adapter.cpp/h     # C++ wrappers bridging Qt ↔ Rust FFI
 │   ├── *.cpp, *.h, *.ui       # Qt UI layer (code editor, panels, etc.)
 │   ├── main.cpp               # Application entry point
@@ -192,8 +187,7 @@ scriptura/
 ├── include/
 │   └── scriptura/
 │       ├── rust_backend.h     # C FFI header for all backend services
-│       └── plugininterface.h  # Plugin SDK interface
-├── sdk/                      # Plugin SDK package
+│       └── scriptura_actions.h # UI action/command names shared with Rust
 ├── tests/                    # ctest suites for the Qt/C++ layer
 ├── translations/             # Qt Linguist sources
 ├── .github/workflows/        # CI/CD workflows

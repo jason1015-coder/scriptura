@@ -577,21 +577,6 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+29"/>
-        <source>Plugin &apos;%1&apos; installed.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+2"/>
-        <source>Failed to install plugin &apos;%1&apos;.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>Plugin install failed for &apos;%1&apos;: %2</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
         <location line="+57"/>
         <source>Welcome to Scriptura</source>
         <translation type="unfinished"></translation>
@@ -728,18 +713,8 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+7"/>
-        <source>Plugin Registry</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
         <location line="+3"/>
         <source>Registry URL:</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+2"/>
-        <source>https://example.com/plugin-registry.json</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -1185,11 +1160,6 @@ SOFTWARE.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+1"/>
-        <source>Manage Plugins...</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
         <location line="+103"/>
         <location line="+7"/>
         <source>Run</source>
@@ -1228,266 +1198,6 @@ SOFTWARE.</source>
     <message>
         <location line="+5"/>
         <source>Failed to start debugger adapter.</source>
-        <translation type="unfinished"></translation>
-    </message>
-</context>
-<context>
-    <name>PluginManagerDialog</name>
-    <message>
-        <location filename="../src/internals/pluginmanagerdialog.cpp" line="+14"/>
-        <source>Install Plugin...</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <location line="+287"/>
-        <source>Remove Plugin</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="-286"/>
-        <location line="+336"/>
-        <location line="+82"/>
-        <source>Disable</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="-417"/>
-        <source>Refresh</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>Close</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+2"/>
-        <source>Plugin Manager</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+4"/>
-        <location line="+386"/>
-        <source>Select a plugin to view details.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="-377"/>
-        <source>Installed Plugins:</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+10"/>
-        <source>Plugin Details:</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+40"/>
-        <source> (Disabled)</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source> (Loaded)</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source> (Not Loaded)</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+113"/>
-        <source>Select Plugin Directory</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+10"/>
-        <location line="+6"/>
-        <location line="+6"/>
-        <source>Invalid Plugin</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="-12"/>
-        <source>The selected directory does not contain a plugin.json file.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+6"/>
-        <source>Could not parse plugin.json.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+6"/>
-        <source>Plugin metadata is missing an &apos;id&apos; field.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+10"/>
-        <source>Plugin Already Exists</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>A plugin with ID &apos;%1&apos; is already installed. Do you want to replace it?</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+9"/>
-        <source>Installation Failed</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+0"/>
-        <source>Failed to copy plugin files to the installation directory.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+8"/>
-        <source>Plugin Installed</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+0"/>
-        <source>Plugin &apos;%1&apos; has been installed successfully. Restart Scriptura to load it.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+42"/>
-        <source>Plugin In Use</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>Plugin &apos;%1&apos; is currently loaded. Restart Scriptura without this plugin to remove it, or disable it first.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+8"/>
-        <source>Are you sure you want to remove plugin &apos;%1&apos;?</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+12"/>
-        <source>Plugin Removed</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+0"/>
-        <source>Plugin &apos;%1&apos; has been removed.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>Removal Failed</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+0"/>
-        <source>Failed to remove plugin directory: %1</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+36"/>
-        <location line="+74"/>
-        <source>Enable</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="-51"/>
-        <source>&lt;b&gt;ID:&lt;/b&gt; %1&lt;br/&gt;</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>&lt;b&gt;Name:&lt;/b&gt; %1&lt;br/&gt;</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>&lt;b&gt;Version:&lt;/b&gt; %1&lt;br/&gt;</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>&lt;b&gt;Author:&lt;/b&gt; %1&lt;br/&gt;</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>&lt;b&gt;Library:&lt;/b&gt; %1&lt;br/&gt;</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>&lt;b&gt;Status:&lt;/b&gt; %1&lt;br/&gt;</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+0"/>
-        <source>Loaded</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+0"/>
-        <source>Not Loaded</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>&lt;b&gt;Enabled:&lt;/b&gt; %1&lt;br/&gt;</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+0"/>
-        <source>Yes</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+0"/>
-        <source>No</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>&lt;b&gt;Path:&lt;/b&gt; %1&lt;br/&gt;</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>&lt;br/&gt;&lt;b&gt;Description:&lt;/b&gt;&lt;br/&gt;%1</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+4"/>
-        <source>&lt;br/&gt;&lt;b&gt;Dependencies:&lt;/b&gt;&lt;br/&gt;</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+7"/>
-        <source>&lt;b&gt;Permissions:&lt;/b&gt;&lt;br/&gt;</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+31"/>
-        <source>Plugin Disabled</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+0"/>
-        <source>Plugin &apos;%1&apos; has been disabled. Restart Scriptura to apply the change.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+6"/>
-        <source>Plugin Enabled</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+0"/>
-        <source>Plugin &apos;%1&apos; has been enabled. Restart Scriptura to load it.</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
@@ -1583,31 +1293,6 @@ SOFTWARE.</source>
 <context>
     <name>QObject</name>
     <message>
-        <location filename="../src/internals/pluginmanager.cpp" line="+67"/>
-        <source>Plugin crashed: %1</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+754"/>
-        <source>Plugin: %1
-Version: %2
-Author: %3
-
-Description:
-%4
-
-Declared permissions:
-%5
-
-Plugins run with full access to your files and system. Only install plugins from sources you trust.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+5"/>
-        <source>Install Plugin</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
         <location filename="../src/internals/permission.cpp" line="+9"/>
         <source>File Read</source>
         <translation type="unfinished"></translation>
@@ -1650,13 +1335,6 @@ Plugins run with full access to your files and system. Only install plugins from
     <message>
         <location line="+31"/>
         <source>Permission Request</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>Plugin &quot;%1&quot; is requesting permission: %2.
-
-Grant this permission?</source>
         <translation type="unfinished"></translation>
     </message>
 </context>

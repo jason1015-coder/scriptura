@@ -388,14 +388,14 @@ void MainWindow::on_action_git_pull_triggered()
 {
     QMessageBox::information(this, tr("Git Pull"),
         tr("Git functionality is provided by the Git application.\n"
-           "Install it from the Plugin Marketplace to use Git features."));
+           "Install Git to use Git features."));
 }
 
 void MainWindow::on_action_git_fetch_triggered()
 {
     QMessageBox::information(this, tr("Git Fetch"),
         tr("Git functionality is provided by the Git application.\n"
-           "Install it from the Plugin Marketplace to use Git features."));
+           "Install Git to use Git features."));
 }
 
 void MainWindow::on_action_find_triggered()

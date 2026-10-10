@@ -90,7 +90,7 @@ mod tests {
             "ai/api_key",
             "auth/token",
             "git/password",
-            "plugins/credential",
+            "auth/credential",
             "ssl/privateKey",
             "db/passwd",
         ] {

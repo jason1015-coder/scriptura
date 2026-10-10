@@ -14,23 +14,15 @@ typedef struct RustEventBus               RustEventBus;
 typedef struct RustLspClient              RustLspClient;
 typedef struct RustDapClient              RustDapClient;
 typedef struct RustDebugSession           RustDebugSession;
-typedef struct RustPluginManager          RustPluginManager;
-typedef struct RustPluginRegistry         RustPluginRegistry;
 typedef struct RustTaskRunner             RustTaskRunner;
 typedef struct RustUpdater                RustUpdater;
-typedef struct RustPluginUpdater          RustPluginUpdater;
 typedef struct RustVersionFetcher         RustVersionFetcher;
 typedef struct RustWorkspace              RustWorkspace;
 typedef struct RustConfigValidator        RustConfigValidator;
-typedef struct RustArchiveExtractor       RustArchiveExtractor;
-typedef struct RustPermissionManager      RustPermissionManager;
 typedef struct RustLengthPrefixedFramer   RustLengthPrefixedFramer;
-typedef struct RustDependencyResolver     RustDependencyResolver;
-typedef struct RustServiceLocator         RustServiceLocator;
 typedef struct RustLanguageRegistry       RustLanguageRegistry;
 typedef struct RustLanguageServerManager  RustLanguageServerManager;
 typedef struct RustDebugConfigurationManager RustDebugConfigurationManager;
-typedef struct RustPluginCrashHandler     RustPluginCrashHandler;
 typedef struct RustUiActionHandler        RustUiActionHandler;
 
 /* ── C callback type aliases ───────────────────────────────────── */
@@ -41,12 +33,11 @@ typedef void (*OnStackFrames)(int thread_id, const char* json_frames, void* user
 typedef void (*OnScopes)(int frame_id, const char* json_scopes, void* user_data);
 typedef void (*OnVariables)(int var_ref, const char* json_vars, void* user_data);
 typedef void (*OnDapBreakpoints)(const char* source, const char* json_breakpoints, void* user_data);
-typedef void (*OnPluginEvent)(const char* plugin_id, const char* json_data, void* user_data);
-typedef void (*OnProgress)(const char* task_id, int current, int total, void* user_data);
 
 /* ── Global helpers ────────────────────────────────────────────── */
 char* rust_last_error(void);
 void  rust_free_string(char* s);
+void  rust_free_strings(char** strs, size_t len);
 
 /* ══════════════════════════════════════════════════════════════════
  *  EventBus
@@ -196,89 +187,6 @@ void rust_dap_on_variables(RustDapClient* c, OnVariables cb, void* u);
 void rust_dap_on_evaluation(RustDapClient* c, OnStringMessage cb, void* u);
 
 /* ══════════════════════════════════════════════════════════════════
- *  Plugin Manager
- * ══════════════════════════════════════════════════════════════════ */
-RustPluginManager* rust_plugin_manager_new(void);
-void               rust_plugin_manager_free(RustPluginManager* pm);
-
-bool rust_pm_load_plugins(RustPluginManager* pm, const char* path);
-bool rust_pm_load_plugin(RustPluginManager* pm, const char* file_path);
-void rust_pm_unload_plugin(RustPluginManager* pm, const char* id);
-void rust_pm_unload_all(RustPluginManager* pm);
-bool rust_pm_is_loaded(const RustPluginManager* pm, const char* id);
-char* rust_pm_plugin_version(const RustPluginManager* pm, const char* id);
-char** rust_pm_list_loaded(const RustPluginManager* pm, size_t* out_len);
-void  rust_pm_free_strings(char** strs, size_t len);
-bool  rust_pm_build_dep_graph(RustPluginManager* pm,
-                              const char* const* metadata_jsons, size_t count);
-char** rust_pm_topological_sort(const RustPluginManager* pm, size_t* out_len);
-
-/* ── Plugin Manager callback setters ───────────────────────────── */
-void rust_pm_on_plugin_loaded(RustPluginManager* pm,
-                              OnPluginEvent cb, void* user_data);
-void rust_pm_on_plugin_unloaded(RustPluginManager* pm,
-                                OnPluginEvent cb, void* user_data);
-void rust_pm_on_plugin_error(RustPluginManager* pm,
-                             OnPluginEvent cb, void* user_data);
-
-/* ══════════════════════════════════════════════════════════════════
- *  Plugin Crash Handler
- * ══════════════════════════════════════════════════════════════════ */
-RustPluginCrashHandler* rust_crash_handler_new(void);
-void                    rust_crash_handler_free(RustPluginCrashHandler* h);
-
-void rust_crash_handler_on_crash(RustPluginCrashHandler* h,
-                                 OnPluginEvent cb, void* user_data);
-
-void rust_crash_handler_report_crash(RustPluginCrashHandler* h,
-                                     const char* plugin_id,
-                                     const char* error);
-
-/* ══════════════════════════════════════════════════════════════════
- *  Plugin Registry
- * ══════════════════════════════════════════════════════════════════ */
-RustPluginRegistry* rust_plugin_registry_new(void);
-void                rust_plugin_registry_free(RustPluginRegistry* reg);
-
-void   rust_plugin_registry_set_url(RustPluginRegistry* reg, const char* url);
-char*  rust_plugin_registry_get_url(RustPluginRegistry* reg);
-void   rust_plugin_registry_check_updates(RustPluginRegistry* reg);
-bool   rust_plugin_registry_upgrade_available(RustPluginRegistry* reg,
-                                              const char* id,
-                                              const char* current_ver);
-void   rust_plugin_registry_on_update(RustPluginRegistry* reg,
-                                      OnStringMessage cb, void* user_data);
-void   rust_plugin_registry_on_install_failed(RustPluginRegistry* reg,
-                                              OnPluginEvent cb, void* user_data);
-
-/* ══════════════════════════════════════════════════════════════════
- *  Service Locator
- * ══════════════════════════════════════════════════════════════════ */
-RustServiceLocator* rust_service_locator_new(void);
-void                rust_service_locator_free(RustServiceLocator* sl);
-
-void   rust_service_locator_register(RustServiceLocator* sl,
-                                     const char* id, void* service);
-void*  rust_service_locator_get(RustServiceLocator* sl, const char* id);
-void   rust_service_locator_unregister(RustServiceLocator* sl, const char* id);
-bool   rust_service_locator_has(RustServiceLocator* sl, const char* id);
-char** rust_service_locator_list(RustServiceLocator* sl, size_t* out_len);
-void   rust_service_locator_free_list(char** strs, size_t len);
-
-/* ══════════════════════════════════════════════════════════════════
- *  Dependency Resolver
- * ══════════════════════════════════════════════════════════════════ */
-RustDependencyResolver* rust_dep_resolver_new(void);
-void                    rust_dep_resolver_free(RustDependencyResolver* r);
-
-bool   rust_dep_resolver_add_plugin(RustDependencyResolver* r,
-                                     const char* id,
-                                     const char* metadata_json);
-char** rust_dep_resolver_order(RustDependencyResolver* r, size_t* out_len);
-void   rust_dep_resolver_free_order(char** strs, size_t len);
-void   rust_dep_resolver_clear(RustDependencyResolver* r);
-
-/* ══════════════════════════════════════════════════════════════════
  *  Task Runner
  * ══════════════════════════════════════════════════════════════════ */
 RustTaskRunner* rust_task_runner_new(void);
@@ -307,20 +215,6 @@ bool  rust_updater_is_update_available(const RustUpdater* updater);
 char* rust_updater_latest_version(const RustUpdater* updater);
 void  rust_updater_on_update_available(RustUpdater* u,
                                        OnStringMessage cb, void* user);
-
-/* ══════════════════════════════════════════════════════════════════
- *  Plugin Updater
- * ══════════════════════════════════════════════════════════════════ */
-RustPluginUpdater* rust_plugin_updater_new(void);
-void               rust_plugin_updater_free(RustPluginUpdater* pu);
-
-void rust_plugin_updater_check(RustPluginUpdater* pu,
-                               const char* plugin_id,
-                               const char* current_version);
-void rust_plugin_updater_on_update(RustPluginUpdater* pu,
-                                   OnPluginEvent cb, void* user_data);
-void rust_plugin_updater_on_progress(RustPluginUpdater* pu,
-                                     OnProgress cb, void* user_data);
 
 /* ══════════════════════════════════════════════════════════════════
  *  Version Fetcher
@@ -363,33 +257,6 @@ char* rust_config_validator_validate(RustConfigValidator* cv,
                                      const char* schema_json);
 void  rust_config_validator_on_error(RustConfigValidator* cv,
                                      OnStringMessage cb, void* user_data);
-
-/* ══════════════════════════════════════════════════════════════════
- *  Archive Extractor
- * ══════════════════════════════════════════════════════════════════ */
-RustArchiveExtractor* rust_archive_extractor_new(void);
-void                  rust_archive_extractor_free(RustArchiveExtractor* ae);
-
-bool rust_archive_extractor_extract(RustArchiveExtractor* ae,
-                                    const uint8_t* archive_data,
-                                    size_t data_len, const char* dest_dir);
-void rust_archive_extractor_on_progress(RustArchiveExtractor* ae,
-                                        OnProgress cb, void* user_data);
-
-/* ══════════════════════════════════════════════════════════════════
- *  Permission Manager
- * ══════════════════════════════════════════════════════════════════ */
-RustPermissionManager* rust_permission_manager_new(void);
-void                   rust_permission_manager_free(RustPermissionManager* pm);
-
-bool rust_permission_manager_check(RustPermissionManager* pm,
-                                   const char* plugin_id, int perm);
-void rust_permission_manager_request(RustPermissionManager* pm,
-                                     const char* plugin_id, int perm);
-void rust_permission_manager_grant(RustPermissionManager* pm,
-                                   const char* plugin_id, int perm);
-void rust_permission_manager_revoke(RustPermissionManager* pm,
-                                    const char* plugin_id, int perm);
 
 /* ══════════════════════════════════════════════════════════════════
  *  Debug Session
@@ -536,7 +403,7 @@ char* rust_ui_actions_handle(RustUiActionHandler* h,
                              const char* json_payload);
 
 /* Audit trail of handled actions (most recent last).
- * Free the array with rust_pm_free_strings(). */
+ * Free the array with rust_free_strings(). */
 char** rust_ui_actions_log(RustUiActionHandler* h, size_t* out_len);
 
 #ifdef __cplusplus

@@ -23,7 +23,6 @@
 #include <QSignalBlocker>
 #include <QStringConverter>
 #include "encodingmanager.h"
-#include "pluginmarketplace.h"
 #include "terminal/terminalpanel.h"
 
 namespace {

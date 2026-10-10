@@ -72,11 +72,6 @@ REM Copy additional resources
 echo.
 echo Copying additional resources...
 
-REM Copy plugins directory if it exists
-if exist "%BUILD_DIR%\plugins" (
-    echo Copying plugins...
-    xcopy /E /I /Y "%BUILD_DIR%\plugins" "%DEPLOY_DIR%\plugins"
-)
 
 REM Copy any data files that might be needed
 if exist "resources" (

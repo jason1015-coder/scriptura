@@ -49,7 +49,6 @@ add_dependencies(scriptura_tests rust_backend)
 target_include_directories(scriptura_tests PRIVATE
     ${CMAKE_SOURCE_DIR}/src
     ${CMAKE_SOURCE_DIR}/src/internals
-    ${CMAKE_SOURCE_DIR}/src/plugins
     ${CMAKE_CURRENT_BINARY_DIR}
     ${CMAKE_BINARY_DIR}
 )

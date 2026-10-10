@@ -8,13 +8,13 @@ The most useful work right now is the Rust ↔ Nanocoder seam (an ACP client in 
 
 ## Before you start
 
-Scriptura is pre-1.0 and its AI layer is an integration into the Qt shell rather than a plugin. That boundary is a settled design decision, not an oversight, and changes that cross it need an issue before the code.
+Scriptura is pre-1.0 and its AI layer is an integration into the Qt shell rather than an add-on. That boundary is a settled design decision, not an oversight, and changes that cross it need an issue before the code.
 
 - **Small, self-contained fixes**: open the PR. Bug fixes, typo corrections, dependency bumps, and behaviour-preserving refactors do not need to be discussed first.
-- **Anything that changes architecture, the plugin surface, the FFI boundary, or the AI layer's position in the shell**: open an issue describing what you want to change and why before you write it. This includes new third-party dependencies, new panels, and new FFI exports.
+- **Anything that changes architecture, the FFI boundary, or the AI layer's position in the shell**: open an issue describing what you want to change and why before you write it. This includes new third-party dependencies, new panels, and new FFI exports.
 - **Claim the issue** by commenting on it, so two people do not write the same patch.
 
-Every NC project tags `good first issue` and `help wanted`. The dormant classes listed under "Partially implemented" in the [README](README.md) — currently the `AiInlineCompletion` plugin and the legacy `Minimap` / `Breadcrumb` widgets — are a reasonable place to start: they are complete, tested classes that were never wired in, which makes them small, self-contained, and genuinely useful.
+Every NC project tags `good first issue` and `help wanted`. The dormant classes listed under "Partially implemented" in the [README](README.md) — currently the legacy `Minimap` / `Breadcrumb` widgets — are a reasonable place to start: they are complete, tested classes that were never wired in, which makes them small, self-contained, and genuinely useful.
 
 ## Prerequisites
 
@@ -85,7 +85,7 @@ The conventions that actually matter:
 
 - **UI lives in C++/Qt.** Visual components, panels, dialogs, and menus belong in the Qt layer. Do not move UI into the Rust backend.
 - **The Rust backend does not link Qt.** It is pure Rust reached through `extern "C"` in `src/rust_backend/src/ffi.rs`, with JSON strings for structured payloads. Keep the FFI boundary narrow — a new export needs a matching declaration in `include/scriptura/rust_backend.h` and, where the UI needs it, a wrapper in `src/rust_adapter.cpp`.
-- **Network access is declared, not assumed.** A plugin that reaches the network declares `network.access` in its manifest. Do not add a code path that opens a socket without one.
+- **Network access is declared, not assumed.** State the network access a change needs in the PR before writing it. Do not add a code path that opens a socket silently.
 - **New panels need wiring.** A panel class that is never `new`'d in `MainWindow` and never handed to `MainWindow::registerPanel()` is dormant code, however complete it is. `registerPanel()` is what gives the panel its tab in the tab bar (and its entry in the tab bar's "+" menu) and makes it a page of the content area. Wire yours, or say in the PR that it is a staged extraction.
 - **Third-party dependencies need an issue first.** Scriptura is a desktop application; every dependency is a build requirement imposed on every user and every CI runner.
 

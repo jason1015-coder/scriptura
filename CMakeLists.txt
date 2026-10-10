@@ -35,7 +35,7 @@ if(WIN32 AND MSVC)
     # which links the release MSVC CRT (/MD). A Debug C++ build uses the debug
     # CRT (/MDd) by default; mixing the two runtimes in one process is undefined
     # behavior and crashes at runtime on Windows (e.g. an access violation inside
-    # RustPluginRegistryAdapter::checkForUpdates -> reqwest::blocking::get during
+    # the Rust updater -> reqwest::blocking::get during
     # the C++ tests). Force the release runtime library for every configuration
     # so C++ and Rust share a single CRT.
     set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreadedDLL")
@@ -114,30 +114,19 @@ file(GLOB_RECURSE SCRIPTURA_CORE_SOURCES CONFIGURE_DEPENDS
 list(FILTER SCRIPTURA_CORE_SOURCES EXCLUDE REGEX "src/resources\\.qrc$")
 
 # ── Exclude backend C++ files (replaced by Rust FFI modules) ─────────
-list(FILTER SCRIPTURA_CORE_SOURCES EXCLUDE REGEX "src/plugins/git/")
 list(FILTER SCRIPTURA_CORE_SOURCES EXCLUDE REGEX "src/rust_backend/")
 
 # ── Rust Backend (old C++ backend files deleted) ──────────────────
 #
 # All backend services have been reimplemented in Rust (src/rust_backend/)
-# with complete C FFI exports (133 functions across 21+ modules).
+# with complete C FFI exports (148 functions across 23 modules).
 # Qt adapter classes are in src/rust_adapter.h/.cpp (RustBackend singleton).
 #
-# Adapters exist for: LSP, DAP, EventBus, PluginManager, Workspace,
-# TaskRunner, Updater, ConfigValidator, PluginRegistry, Permission,
-# ServiceLocator, CrashHandler, DependencyResolver.
+# Adapters exist for: LSP, DAP, EventBus, Workspace,
+# TaskRunner, Updater, ConfigValidator.
 #
-# Old C++ backend files have been deleted. Remaining exclusions are for
-# the git plugin (built as a separate shared library) and the Rust backend.
-
-# The plugin SDK interface headers live outside src/ (in include/ and sdk/include/)
-# and contain Q_OBJECT classes (ScripturaPlugin, PluginContext). Their MOC-generated
-# code must be compiled into scriptura_core so that plugins (which link scriptura_core
-# statically) can resolve those symbols on Windows, where a DLL cannot pull symbols
-# from the host executable the way Linux/macOS plugins do at load time.
-list(APPEND SCRIPTURA_CORE_SOURCES
-    "${CMAKE_CURRENT_SOURCE_DIR}/include/scriptura/plugininterface.h"
-)
+# Old C++ backend files have been deleted. The remaining exclusion is for
+# the Rust backend.
 
 if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
     qt_add_executable(scriptura
@@ -207,7 +196,7 @@ if(WIN32)
     target_link_libraries(scriptura_core PRIVATE dwmapi)
     # Windows needs these Rust runtime libraries.
     # bcrypt is required for BCryptGenRandom (getrandom crate) and is inherited
-    # by every consumer of this static lib (scriptura, gitplugin, ...).
+    # by every consumer of this static lib (scriptura, ...).
     target_link_libraries(scriptura_core PRIVATE bcrypt user32 advapi32 ws2_32 crypt32 userenv ntdll)
 endif()
 
@@ -234,11 +223,8 @@ target_include_directories(scriptura_core PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/src/panels
     ${CMAKE_CURRENT_SOURCE_DIR}/src/widgets
     ${CMAKE_CURRENT_SOURCE_DIR}/src/internals
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/plugins
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${CMAKE_CURRENT_SOURCE_DIR}/include/scriptura
-    ${CMAKE_CURRENT_SOURCE_DIR}/sdk/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/sdk/include/scriptura
     ${CMAKE_CURRENT_BINARY_DIR}
 )
 
@@ -258,21 +244,10 @@ if(WIN32)
     set_target_properties(scriptura PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS TRUE)
 endif()
 
-# Plugin system configuration
-set(PLUGIN_INSTALL_DIR "${CMAKE_INSTALL_LIBDIR}/scriptura/plugins")
-set(PLUGIN_OUTPUT_DIR "${CMAKE_BINARY_DIR}/plugins")
-
 set_target_properties(scriptura PROPERTIES
     ENABLE_EXPORTS ON
-    QT_PLUGIN_PATH "${PLUGIN_OUTPUT_DIR}"
 )
 
-# Plugin host executable removed: the sandboxed plugin host (src/pluginhost/,
-# src/plugins/pluginhost/) was unused at runtime — nothing in the codebase
-# ever launched it. Plugins are loaded in-process via scriptura_core.
-
-# Add plugin subdirectories (each has its own CMakeLists.txt)
-add_subdirectory(src/plugins/git)
 add_subdirectory(tests)
 
 # Qt for iOS sets MACOSX_BUNDLE_GUI_IDENTIFIER automatically since Qt 6.1.

@@ -15,22 +15,15 @@
 // via FFI and appear "unused" to Rust's dead code analysis.
 #![allow(dead_code)]
 
-mod archive_extractor;
 mod config_validator;
 mod dap;
 mod debug_config;
 mod debug_session;
-mod dependency_resolver;
 mod eventbus;
 mod framer;
 mod language_registry;
 mod language_server_manager;
 mod lsp;
-mod permission;
-mod plugin;
-mod plugin_updater;
-mod registry;
-mod service_locator;
 mod settings;
 mod task_runner;
 mod updater;
@@ -81,6 +74,24 @@ pub extern "C" fn rust_last_error() -> *mut c_char {
 pub extern "C" fn rust_free_string(s: *mut c_char) {
     if !s.is_null() {
         unsafe { let _ = CString::from_raw(s); }
+    }
+}
+
+/// Free an array of C strings previously returned by Rust (each entry plus the
+/// array buffer itself). Safe to call with a null pointer (no-op).
+#[no_mangle]
+pub extern "C" fn rust_free_strings(strs: *mut *mut c_char, len: usize) {
+    if strs.is_null() { return; }
+    unsafe {
+        // Free each individual CString.
+        for i in 0..len {
+            let ptr = *strs.add(i);
+            if !ptr.is_null() {
+                let _ = CString::from_raw(ptr);
+            }
+        }
+        // Free the outer array buffer (reconstruct the Vec to drop it).
+        let _ = Vec::from_raw_parts(strs, len, len);
     }
 }
 

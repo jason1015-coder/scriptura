@@ -74,7 +74,7 @@ QString rustGet(const QString &key)
 
 // ── QSettings::registerFormat bridge ──────────────────────────────────
 // The custom format routes legacy QSettings access through the Rust store
-// so plugin code keeps compiling without touching plaintext files.
+// so legacy call sites keep compiling without touching plaintext files.
 
 bool rustStoreRead(QIODevice &device, QSettings::SettingsMap &map)
 {

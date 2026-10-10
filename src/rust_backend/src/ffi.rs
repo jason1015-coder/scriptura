@@ -4,7 +4,7 @@
 //! Complex data crosses the boundary as JSON strings.
 //! Callbacks use C function pointers for async notification.
 
-use std::ffi::{c_void, CString};
+use std::ffi::c_void;
 use std::mem;
 use std::os::raw::c_char;
 
@@ -25,29 +25,17 @@ pub type OnScopes = extern "C" fn(i32, *const c_char, *mut c_void);
 pub type OnVariables = extern "C" fn(i32, *const c_char, *mut c_void);
 /// Callback: (const char* source, const char* json_breakpoints, void* user_data)
 pub type OnDapBreakpoints = extern "C" fn(*const c_char, *const c_char, *mut c_void);
-/// Callback: (const char* plugin_id, const char* json_data, void* user_data)
-pub type OnPluginEvent = extern "C" fn(*const c_char, *const c_char, *mut c_void);
-/// Callback: (const char* task_id, int current, int total, void* user_data)
-pub type OnProgress = extern "C" fn(*const c_char, i32, i32, *mut c_void);
 
 use crate::lsp::LspClient;
 use crate::dap::DapClient;
 use crate::debug_session::DebugSession;
 use crate::debug_config::DebugConfigurationManager;
 use crate::eventbus::EventBus;
-use crate::plugin::PluginManager;
-use crate::plugin::PluginCrashHandler;
-use crate::registry::PluginRegistry;
-use crate::service_locator::ServiceLocator;
-use crate::dependency_resolver::DependencyResolver;
 use crate::task_runner::TaskRunner;
 use crate::updater::Updater;
-use crate::plugin_updater::PluginUpdater;
 use crate::version_fetcher::VersionFetcher;
 use crate::workspace::Workspace;
 use crate::config_validator::ConfigValidator;
-use crate::archive_extractor::ArchiveExtractor;
-use crate::permission::PermissionManager;
 use crate::framer::LengthPrefixedFramer;
 use crate::language_registry::LanguageRegistry;
 use crate::language_server_manager::LanguageServerManager;
@@ -61,23 +49,15 @@ pub enum RustEventBus {}
 pub enum RustLspClient {}
 pub enum RustDapClient {}
 pub enum RustDebugSession {}
-pub enum RustPluginManager {}
-pub enum RustPluginRegistry {}
 pub enum RustTaskRunner {}
 pub enum RustUpdater {}
-pub enum RustPluginUpdater {}
 pub enum RustVersionFetcher {}
 pub enum RustWorkspace {}
 pub enum RustConfigValidator {}
-pub enum RustArchiveExtractor {}
-pub enum RustPermissionManager {}
 pub enum RustLengthPrefixedFramer {}
-pub enum RustDependencyResolver {}
-pub enum RustServiceLocator {}
 pub enum RustLanguageRegistry {}
 pub enum RustLanguageServerManager {}
 pub enum RustDebugConfigurationManager {}
-pub enum RustPluginCrashHandler {}
 pub enum RustUiActionHandler {}
 
 // ── Helper macros ────────────────────────────────────────────────────
@@ -585,311 +565,6 @@ pub extern "C" fn rust_dap_on_evaluation(c: *mut RustDapClient, cb: OnStringMess
 }
 
 // ═══════════════════════════════════════════════════════════════════════
-//  Plugin Manager
-// ═══════════════════════════════════════════════════════════════════════
-make_new!(rust_plugin_manager_new, PluginManager, RustPluginManager);
-make_free!(rust_plugin_manager_free, PluginManager, RustPluginManager);
-
-#[no_mangle]
-pub extern "C" fn rust_pm_load_plugins(pm: *mut RustPluginManager, path: *const c_char) -> bool {
-    let pm = unsafe { &mut *(pm as *mut PluginManager) };
-    pm.load_plugins(unsafe { ptr_to_str(path) }).is_ok()
-}
-
-#[no_mangle]
-pub extern "C" fn rust_pm_load_plugin(pm: *mut RustPluginManager, file_path: *const c_char) -> bool {
-    let pm = unsafe { &mut *(pm as *mut PluginManager) };
-    pm.load_plugin(unsafe { ptr_to_str(file_path) }).is_ok()
-}
-
-#[no_mangle]
-pub extern "C" fn rust_pm_unload_plugin(pm: *mut RustPluginManager, id: *const c_char) {
-    let pm = unsafe { &mut *(pm as *mut PluginManager) };
-    pm.unload_plugin(unsafe { ptr_to_str(id) });
-}
-
-#[no_mangle]
-pub extern "C" fn rust_pm_unload_all(pm: *mut RustPluginManager) {
-    let pm = unsafe { &mut *(pm as *mut PluginManager) };
-    pm.unload_all();
-}
-
-#[no_mangle]
-pub extern "C" fn rust_pm_is_loaded(pm: *const RustPluginManager, id: *const c_char) -> bool {
-    let pm = unsafe { &*(pm as *const PluginManager) };
-    pm.is_loaded(unsafe { ptr_to_str(id) })
-}
-
-#[no_mangle]
-pub extern "C" fn rust_pm_plugin_version(pm: *const RustPluginManager, id: *const c_char) -> *mut c_char {
-    let pm = unsafe { &*(pm as *const PluginManager) };
-    pm.plugin_version(unsafe { ptr_to_str(id) })
-        .map(crate::str_to_cstring)
-        .unwrap_or(std::ptr::null_mut())
-}
-
-#[no_mangle]
-pub extern "C" fn rust_pm_list_loaded(pm: *const RustPluginManager, out_len: *mut usize) -> *mut *mut c_char {
-    let pm = unsafe { &*(pm as *const PluginManager) };
-    let list = pm.list_loaded();
-    let len = list.len();
-    unsafe { *out_len = len; }
-    if len == 0 { return std::ptr::null_mut(); }
-    let mut arr = Vec::with_capacity(len);
-    for s in list {
-        arr.push(crate::str_to_cstring(&s));
-    }
-    arr.shrink_to_fit();
-    let ptr = arr.as_mut_ptr();
-    mem::forget(arr);
-    ptr
-}
-
-#[no_mangle]
-pub extern "C" fn rust_pm_free_strings(strs: *mut *mut c_char, len: usize) {
-    if strs.is_null() { return; }
-    unsafe {
-        // Free each individual CString
-        for i in 0..len {
-            let ptr = *strs.add(i);
-            if !ptr.is_null() {
-                let _ = CString::from_raw(ptr);
-            }
-        }
-        // Free the outer array buffer (reconstruct Vec to drop it)
-        let _ = Vec::from_raw_parts(strs, len, len);
-    }
-}
-
-#[no_mangle]
-pub extern "C" fn rust_pm_build_dep_graph(
-    pm: *mut RustPluginManager, metadata_jsons: *const *const c_char, count: usize
-) -> bool {
-    let pm = unsafe { &mut *(pm as *mut PluginManager) };
-    let mut vec: Vec<&str> = Vec::with_capacity(count);
-    for i in 0..count {
-        vec.push(unsafe { ptr_to_str(*metadata_jsons.add(i)) });
-    }
-    pm.build_dependency_graph(&vec).is_ok()
-}
-
-#[no_mangle]
-pub extern "C" fn rust_pm_topological_sort(
-    pm: *const RustPluginManager, out_len: *mut usize
-) -> *mut *mut c_char {
-    let pm = unsafe { &*(pm as *const PluginManager) };
-    let order = pm.topological_sort();
-    unsafe { *out_len = order.len(); }
-    if order.is_empty() { return std::ptr::null_mut(); }
-    let mut arr: Vec<*mut c_char> = order.into_iter()
-        .map(|s| crate::str_to_cstring(&s))
-        .collect();
-    arr.shrink_to_fit();
-    let ptr = arr.as_mut_ptr();
-    mem::forget(arr);
-    ptr
-}
-
-// ── Plugin Manager Callback Setters ──────────────────────────────────
-
-#[no_mangle]
-pub extern "C" fn rust_pm_on_plugin_loaded(pm: *mut RustPluginManager, cb: OnPluginEvent, u: *mut c_void) {
-    unsafe { (&mut *(pm as *mut PluginManager)).set_on_loaded(cb, u); }
-}
-#[no_mangle]
-pub extern "C" fn rust_pm_on_plugin_unloaded(pm: *mut RustPluginManager, cb: OnPluginEvent, u: *mut c_void) {
-    unsafe { (&mut *(pm as *mut PluginManager)).set_on_unloaded(cb, u); }
-}
-#[no_mangle]
-pub extern "C" fn rust_pm_on_plugin_error(pm: *mut RustPluginManager, cb: OnPluginEvent, u: *mut c_void) {
-    unsafe { (&mut *(pm as *mut PluginManager)).set_on_error(cb, u); }
-}
-
-// ═══════════════════════════════════════════════════════════════════════
-//  Plugin Crash Handler
-// ═══════════════════════════════════════════════════════════════════════
-make_new!(rust_crash_handler_new, PluginCrashHandler, RustPluginCrashHandler);
-make_free!(rust_crash_handler_free, PluginCrashHandler, RustPluginCrashHandler);
-
-#[no_mangle]
-pub extern "C" fn rust_crash_handler_on_crash(
-    h: *mut RustPluginCrashHandler, cb: OnPluginEvent, u: *mut c_void
-) {
-    unsafe { (&mut *(h as *mut PluginCrashHandler)).set_on_crash(cb, u); }
-}
-
-#[no_mangle]
-pub extern "C" fn rust_crash_handler_report_crash(
-    h: *mut RustPluginCrashHandler,
-    plugin_id: *const c_char,
-    error: *const c_char,
-) {
-    if h.is_null() || plugin_id.is_null() || error.is_null() {
-        return;
-    }
-    unsafe {
-        let handler = &*(h as *mut PluginCrashHandler);
-        let id = if !plugin_id.is_null() {
-            std::ffi::CStr::from_ptr(plugin_id).to_str().unwrap_or("")
-        } else {
-            ""
-        };
-        let err = if !error.is_null() {
-            std::ffi::CStr::from_ptr(error).to_str().unwrap_or("")
-        } else {
-            ""
-        };
-        handler.report_crash(id, err);
-    }
-}
-
-// ═══════════════════════════════════════════════════════════════════════
-//  Plugin Registry
-// ═══════════════════════════════════════════════════════════════════════
-make_new!(rust_plugin_registry_new, PluginRegistry, RustPluginRegistry);
-make_free!(rust_plugin_registry_free, PluginRegistry, RustPluginRegistry);
-
-#[no_mangle]
-pub extern "C" fn rust_plugin_registry_set_url(reg: *mut RustPluginRegistry, url: *const c_char) {
-    unsafe { (&*(reg as *mut PluginRegistry)).set_url(ptr_to_str(url)); }
-}
-
-#[no_mangle]
-pub extern "C" fn rust_plugin_registry_get_url(reg: *mut RustPluginRegistry) -> *mut c_char {
-    crate::str_to_cstring(&unsafe { &*(reg as *mut PluginRegistry) }.get_url())
-}
-
-#[no_mangle]
-pub extern "C" fn rust_plugin_registry_check_updates(reg: *mut RustPluginRegistry) {
-    unsafe { (&*(reg as *mut PluginRegistry)).check_updates(); }
-}
-
-#[no_mangle]
-pub extern "C" fn rust_plugin_registry_upgrade_available(
-    reg: *mut RustPluginRegistry, id: *const c_char, current_ver: *const c_char
-) -> bool {
-    unsafe { (&*(reg as *mut PluginRegistry)).upgrade_available(ptr_to_str(id), ptr_to_str(current_ver)) }
-}
-
-#[no_mangle]
-pub extern "C" fn rust_plugin_registry_on_update(reg: *mut RustPluginRegistry, cb: OnStringMessage, u: *mut c_void) {
-    unsafe { (&mut *(reg as *mut PluginRegistry)).set_on_update(cb, u); }
-}
-
-#[no_mangle]
-pub extern "C" fn rust_plugin_registry_on_install_failed(reg: *mut RustPluginRegistry, cb: OnPluginEvent, u: *mut c_void) {
-    unsafe { (&mut *(reg as *mut PluginRegistry)).set_on_install_failed(cb, u); }
-}
-
-// ═══════════════════════════════════════════════════════════════════════
-//  Service Locator
-// ═══════════════════════════════════════════════════════════════════════
-make_new!(rust_service_locator_new, ServiceLocator, RustServiceLocator);
-make_free!(rust_service_locator_free, ServiceLocator, RustServiceLocator);
-
-#[no_mangle]
-pub extern "C" fn rust_service_locator_register(
-    sl: *mut RustServiceLocator, id: *const c_char, service: *mut c_void
-) {
-    unsafe { (&*(sl as *mut ServiceLocator)).register(ptr_to_str(id), service); }
-}
-
-#[no_mangle]
-pub extern "C" fn rust_service_locator_get(
-    sl: *mut RustServiceLocator, id: *const c_char
-) -> *mut c_void {
-    unsafe { (&*(sl as *mut ServiceLocator)).get(ptr_to_str(id)).unwrap_or(std::ptr::null_mut()) }
-}
-
-#[no_mangle]
-pub extern "C" fn rust_service_locator_unregister(
-    sl: *mut RustServiceLocator, id: *const c_char
-) {
-    unsafe { (&*(sl as *mut ServiceLocator)).unregister(ptr_to_str(id)); }
-}
-
-#[no_mangle]
-pub extern "C" fn rust_service_locator_has(
-    sl: *mut RustServiceLocator, id: *const c_char
-) -> bool {
-    unsafe { (&*(sl as *mut ServiceLocator)).has(ptr_to_str(id)) }
-}
-
-#[no_mangle]
-pub extern "C" fn rust_service_locator_list(
-    sl: *mut RustServiceLocator, out_len: *mut usize
-) -> *mut *mut c_char {
-    let list = unsafe { (&*(sl as *mut ServiceLocator)).list() };
-    unsafe { *out_len = list.len(); }
-    if list.is_empty() { return std::ptr::null_mut(); }
-    let mut arr: Vec<*mut c_char> = list.into_iter()
-        .map(|s| crate::str_to_cstring(&s))
-        .collect();
-    arr.shrink_to_fit();
-    let ptr = arr.as_mut_ptr();
-    mem::forget(arr);
-    ptr
-}
-
-#[no_mangle]
-pub extern "C" fn rust_service_locator_free_list(strs: *mut *mut c_char, len: usize) {
-    rust_pm_free_strings(strs, len);
-}
-
-// ═══════════════════════════════════════════════════════════════════════
-//  Dependency Resolver
-// ═══════════════════════════════════════════════════════════════════════
-make_new!(rust_dep_resolver_new, DependencyResolver, RustDependencyResolver);
-make_free!(rust_dep_resolver_free, DependencyResolver, RustDependencyResolver);
-
-/// Add a plugin with its metadata JSON to the resolver.
-/// Returns true on success, false on parse failure (check rust_last_error()).
-#[no_mangle]
-pub extern "C" fn rust_dep_resolver_add_plugin(
-    r: *mut RustDependencyResolver,
-    id: *const c_char,
-    metadata_json: *const c_char,
-) -> bool {
-    let r = unsafe { &mut *(r as *mut DependencyResolver) };
-    r.add_plugin(unsafe { ptr_to_str(id) }, unsafe { ptr_to_str(metadata_json) }).is_ok()
-}
-
-/// Resolve all added plugins and return the topological sort order.
-/// Returns an allocated array of C strings (caller must free via
-/// rust_dep_resolver_free_order). Sets out_len to the number of items.
-/// Returns null on error (e.g. circular dependency).
-#[no_mangle]
-pub extern "C" fn rust_dep_resolver_order(
-    r: *mut RustDependencyResolver, out_len: *mut usize
-) -> *mut *mut c_char {
-    let r = unsafe { &*(r as *const DependencyResolver) };
-    let order = r.resolve_order();
-    unsafe { *out_len = order.len(); }
-    if order.is_empty() { return std::ptr::null_mut(); }
-    let mut arr: Vec<*mut c_char> = order.into_iter()
-        .map(|s| crate::str_to_cstring(&s))
-        .collect();
-    arr.shrink_to_fit();
-    let ptr = arr.as_mut_ptr();
-    mem::forget(arr);
-    ptr
-}
-
-#[no_mangle]
-pub extern "C" fn rust_dep_resolver_free_order(strs: *mut *mut c_char, len: usize) {
-    rust_pm_free_strings(strs, len);
-}
-
-/// Clear all registered plugins from the resolver.
-#[no_mangle]
-pub extern "C" fn rust_dep_resolver_clear(r: *mut RustDependencyResolver) {
-    unsafe {
-        let r = &mut *(r as *mut DependencyResolver);
-        *r = DependencyResolver::new();
-    }
-}
-
-// ═══════════════════════════════════════════════════════════════════════
 //  Task Runner
 // ═══════════════════════════════════════════════════════════════════════
 make_new!(rust_task_runner_new, TaskRunner, RustTaskRunner);
@@ -976,29 +651,6 @@ pub extern "C" fn rust_updater_latest_version(updater: *const RustUpdater) -> *m
 #[no_mangle]
 pub extern "C" fn rust_updater_on_update_available(u: *mut RustUpdater, cb: OnStringMessage, user: *mut c_void) {
     unsafe { (&mut *(u as *mut Updater)).set_on_update_available(cb, user); }
-}
-
-// ═══════════════════════════════════════════════════════════════════════
-//  Plugin Updater
-// ═══════════════════════════════════════════════════════════════════════
-make_new!(rust_plugin_updater_new, PluginUpdater, RustPluginUpdater);
-make_free!(rust_plugin_updater_free, PluginUpdater, RustPluginUpdater);
-
-#[no_mangle]
-pub extern "C" fn rust_plugin_updater_check(
-    pu: *mut RustPluginUpdater, plugin_id: *const c_char, current_version: *const c_char
-) {
-    unsafe { (&*(pu as *mut PluginUpdater)).check(ptr_to_str(plugin_id), ptr_to_str(current_version)); }
-}
-
-#[no_mangle]
-pub extern "C" fn rust_plugin_updater_on_update(pu: *mut RustPluginUpdater, cb: OnPluginEvent, u: *mut c_void) {
-    unsafe { (&mut *(pu as *mut PluginUpdater)).set_on_update(cb, u); }
-}
-
-#[no_mangle]
-pub extern "C" fn rust_plugin_updater_on_progress(pu: *mut RustPluginUpdater, cb: OnProgress, u: *mut c_void) {
-    unsafe { (&mut *(pu as *mut PluginUpdater)).set_on_progress(cb, u); }
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -1128,61 +780,6 @@ pub extern "C" fn rust_config_validator_validate(
 #[no_mangle]
 pub extern "C" fn rust_config_validator_on_error(cv: *mut RustConfigValidator, cb: OnStringMessage, u: *mut c_void) {
     unsafe { (&mut *(cv as *mut ConfigValidator)).set_on_error(cb, u); }
-}
-
-// ═══════════════════════════════════════════════════════════════════════
-//  Archive Extractor
-// ═══════════════════════════════════════════════════════════════════════
-make_new!(rust_archive_extractor_new, ArchiveExtractor, RustArchiveExtractor);
-make_free!(rust_archive_extractor_free, ArchiveExtractor, RustArchiveExtractor);
-
-#[no_mangle]
-pub extern "C" fn rust_archive_extractor_extract(
-    ae: *mut RustArchiveExtractor, archive_data: *const u8, data_len: usize, dest_dir: *const c_char
-) -> bool {
-    let data = unsafe { std::slice::from_raw_parts(archive_data, data_len) };
-    unsafe { (&*(ae as *mut ArchiveExtractor)).extract(data, ptr_to_str(dest_dir)).is_ok() }
-}
-
-#[no_mangle]
-pub extern "C" fn rust_archive_extractor_on_progress(
-    ae: *mut RustArchiveExtractor, cb: OnProgress, u: *mut c_void
-) {
-    unsafe { (&mut *(ae as *mut ArchiveExtractor)).set_on_progress(cb, u); }
-}
-
-// ═══════════════════════════════════════════════════════════════════════
-//  Permission Manager
-// ═══════════════════════════════════════════════════════════════════════
-make_new!(rust_permission_manager_new, PermissionManager, RustPermissionManager);
-make_free!(rust_permission_manager_free, PermissionManager, RustPermissionManager);
-
-#[no_mangle]
-pub extern "C" fn rust_permission_manager_check(
-    pm: *mut RustPermissionManager, plugin_id: *const c_char, perm: i32
-) -> bool {
-    unsafe { (&*(pm as *mut PermissionManager)).check(ptr_to_str(plugin_id), perm) }
-}
-
-#[no_mangle]
-pub extern "C" fn rust_permission_manager_request(
-    pm: *mut RustPermissionManager, plugin_id: *const c_char, perm: i32
-) {
-    unsafe { (&*(pm as *mut PermissionManager)).request(ptr_to_str(plugin_id), perm); }
-}
-
-#[no_mangle]
-pub extern "C" fn rust_permission_manager_grant(
-    pm: *mut RustPermissionManager, plugin_id: *const c_char, perm: i32
-) {
-    unsafe { (&*(pm as *mut PermissionManager)).grant(ptr_to_str(plugin_id), perm); }
-}
-
-#[no_mangle]
-pub extern "C" fn rust_permission_manager_revoke(
-    pm: *mut RustPermissionManager, plugin_id: *const c_char, perm: i32
-) {
-    unsafe { (&*(pm as *mut PermissionManager)).revoke(ptr_to_str(plugin_id), perm); }
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -1576,7 +1173,7 @@ pub extern "C" fn rust_ui_actions_handle(
 }
 
 /// Audit trail of handled actions (most recent last). Caller frees the
-/// array with rust_pm_free_strings().
+/// array with rust_free_strings().
 #[no_mangle]
 pub extern "C" fn rust_ui_actions_log(
     h: *mut RustUiActionHandler,

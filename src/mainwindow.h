@@ -52,7 +52,6 @@
 #include "projectsearch.h"
 #include "splitmanager.h"
 #include "universalsearch.h"
-#include "codeactionui.h"
 #include "customtitlebar.h"
 #include "windowanimator.h"
 #include "thememanager.h"
@@ -79,7 +78,6 @@ constexpr int ExpandedWidth = 320;
 
 class FindReplaceBar;
 class ProjectSearchPanel;
-class PluginMarketplaceWidget;
 class TerminalPanel;
 
 #include "themedefs.h"
@@ -97,8 +95,6 @@ struct OpenFile {
     QString fileName;
     bool modified = false;
 };
-
-class PluginManagerDialog;
 
 /**
  * @class FileTreeModel
@@ -154,7 +150,6 @@ public:
 
     // Panels are tabs, not a separate area: every registered panel gets a tab
     // in the top tab bar and fills the whole content area when it is selected.
-    // registerPanel() is also what the plugin API calls.
     int registerPanel(const QString &iconPath, const QString &tooltip, const QString &title, bool builtin = false, QWidget *panelWidget = nullptr);
     void showPanelIndex(int index);
     int findPanelTabIndex(int panelIndex) const;
@@ -207,7 +202,6 @@ protected:
     void on_action_editor_settings_triggered();
     void on_action_theme_triggered();
     void on_action_license_triggered();
-    void on_action_manage_plugins_triggered();
     void on_action_check_updates_triggered();
     void on_action_format_document_triggered();
     void on_action_go_to_definition_triggered();
@@ -273,8 +267,8 @@ protected:
     // path string in lambdas/buttons and went stale).
     QMap<QWidget*, QString> m_tabIds;
     // Every panel that can be opened as a tab. "builtin" panels are owned by
-    // MainWindow and only hidden when their tab is closed; a plugin's widget
-    // belongs to the plugin, which also removes its entry (removePanelTab).
+    // MainWindow and only hidden when their tab is closed; a dynamic panel's
+    // widget is its owner's, which also removes its entry (removePanelTab).
     struct PanelEntry {
         int panelIndex = -1;
         QString title;
@@ -311,12 +305,9 @@ protected:
     QStringList recentProjects;
     int maxRecentProjects = 10;
     QStringList m_languageServers;
-    QString registryUrl;
     RustUpdaterAdapter *updater;
     RustConfigValidatorAdapter *configValidator;
     RustLspClientAdapter *lspClient;
-    RustPluginManagerAdapter *pluginManager;
-    PluginManagerDialog *pluginManagerDialog;
     int m_previousEditorStackIndex;
     LayoutType m_layoutType = LayoutType::Classic;
     // Settings → Layout radio group, kept in sync with m_layoutType so the
@@ -338,7 +329,7 @@ protected:
     QHBoxLayout *m_inspectorHeaderLayout = nullptr;
     QLabel *m_inspectorTitle = nullptr;
     QPushButton *m_inspectorCloseBtn = nullptr;
-    // The drawer's plugin icon bar, re-aligned when the layout mirrors.
+    // The drawer's icon bar, re-aligned when the layout mirrors.
     QWidget *m_sidebarIconBar = nullptr;
     
     // Debugger
@@ -372,10 +363,6 @@ protected:
     QWidget *m_inspectorDrawer;
     UniversalSearchPopup *m_universalSearch;
 
-    // Plugin Developer API instances (owned by PluginContext)
-    void setupPluginApis();
-    CodeActionController *m_codeActionCtrl;
-    RustPluginRegistryAdapter *m_pluginRegistry;
     BreadcrumbBarWidget *m_breadcrumbBar;
     QMetaObject::Connection m_cssBreadcrumbConnection;
 
@@ -393,7 +380,6 @@ protected:
     BookmarkPanelWidget *m_bookmarkPanel;
     CssBreadcrumbParser *m_cssBreadcrumbParser;
     SnippetEditorDialog *m_snippetEditorDialog;
-    PluginMarketplaceWidget *m_pluginMarketplace = nullptr;
     TerminalPanel *m_terminalPanel = nullptr;
     int m_terminalPanelIndex = -1; ///< index into m_panels, for shortcuts
 

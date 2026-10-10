@@ -16,8 +16,6 @@
 
 #include "rust_backend.h"
 #include "scriptura_actions.h"
-#include "permission.h"
-#include "plugincrashhandler.h"
 
 // ─────────────────────────────────────────────────────────────────────
 //  RustLspClientAdapter — bridges LSP protocol to Qt signals
@@ -212,37 +210,6 @@ private:
 };
 
 // ─────────────────────────────────────────────────────────────────────
-//  RustPluginManagerAdapter — bridges PluginManager to Qt signals
-// ─────────────────────────────────────────────────────────────────────
-class RustPluginManagerAdapter : public QObject
-{
-    Q_OBJECT
-public:
-    explicit RustPluginManagerAdapter(QObject *parent = nullptr);
-    ~RustPluginManagerAdapter() override;
-
-    bool loadPlugins(const QString &path);
-    bool loadPlugin(const QString &filePath);
-    void unloadPlugin(const QString &id);
-    void unloadAll();
-    bool isLoaded(const QString &id) const;
-    QString pluginVersion(const QString &id) const;
-    QStringList listLoaded() const;
-
-signals:
-    void pluginLoaded(const QString &id);
-    void pluginUnloaded(const QString &id);
-    void pluginError(const QString &id, const QString &error);
-
-private:
-    static void onPluginLoadedCb(const char *id, const char *data, void *userData);
-    static void onPluginUnloadedCb(const char *id, const char *data, void *userData);
-    static void onPluginErrorCb(const char *id, const char *data, void *userData);
-
-    RustPluginManager *m_manager = nullptr;
-};
-
-// ─────────────────────────────────────────────────────────────────────
 //  RustWorkspaceAdapter — bridges Workspace to Qt
 // ─────────────────────────────────────────────────────────────────────
 class RustWorkspaceAdapter : public QObject
@@ -344,167 +311,6 @@ private:
 };
 
 // ─────────────────────────────────────────────────────────────────────
-//  RustPluginRegistryAdapter — bridges Rust PluginRegistry to Qt signals
-// ─────────────────────────────────────────────────────────────────────
-class RustPluginRegistryAdapter : public QObject
-{
-    Q_OBJECT
-public:
-    explicit RustPluginRegistryAdapter(QObject *parent = nullptr);
-    ~RustPluginRegistryAdapter() override;
-
-    void setRegistryUrl(const QString &url);
-    QString registryUrl() const;
-    void checkForUpdates();
-    bool upgradeAvailable(const QString &pluginId, const QString &currentVersion) const;
-
-signals:
-    void registryUpdated(const QString &manifestJson);
-    void installFailed(const QString &pluginId, const QString &error);
-
-private:
-    static void onRegistryUpdatedCb(const char *data, void *userData);
-    static void onInstallFailedCb(const char *id, const char *error, void *userData);
-
-    RustPluginRegistry *m_registry = nullptr;
-};
-
-// ─────────────────────────────────────────────────────────────────────
-//  RustPermissionManagerAdapter — wraps Rust FFI PermissionManager
-// ─────────────────────────────────────────────────────────────────────
-class RustPermissionManagerAdapter : public QObject
-{
-    Q_OBJECT
-public:
-    explicit RustPermissionManagerAdapter(QObject *parent = nullptr);
-    ~RustPermissionManagerAdapter() override;
-
-    bool checkPermission(const QString &pluginId, Permission permission);
-    void requestPermission(const QString &pluginId, Permission permission);
-    void grantPermission(const QString &pluginId, Permission permission);
-    void revokePermission(const QString &pluginId, Permission permission);
-    QList<Permission> grantedPermissions(const QString &pluginId) const;
-    void setDeclaredPermissions(const QString &pluginId, const QList<Permission> &permissions);
-    QList<Permission> declaredPermissions(const QString &pluginId) const;
-
-private:
-    RustPermissionManager *m_rustPm = nullptr;
-    QHash<QString, QList<Permission>> m_declaredPermissions;
-};
-
-// ─────────────────────────────────────────────────────────────────────
-//  RustServiceLocatorAdapter — wraps Rust FFI ServiceLocator
-// ─────────────────────────────────────────────────────────────────────
-class RustServiceLocatorAdapter : public QObject
-{
-    Q_OBJECT
-public:
-    explicit RustServiceLocatorAdapter(QObject *parent = nullptr);
-    ~RustServiceLocatorAdapter() override;
-
-    template<typename T>
-    void registerService(const QString &id, T *service);
-    template<typename T>
-    T *getService(const QString &id) const;
-    void unregisterService(const QString &id);
-    bool hasService(const QString &id) const;
-    QStringList registeredServices() const;
-
-private:
-    RustServiceLocator *m_rustSl = nullptr;
-    mutable QMutex m_mutex;
-};
-
-template<typename T>
-void RustServiceLocatorAdapter::registerService(const QString &id, T *service)
-{
-    QMutexLocker locker(&m_mutex);
-    QByteArray idBytes = id.toUtf8();
-    rust_service_locator_register(m_rustSl, idBytes.constData(), static_cast<void*>(service));
-}
-
-template<typename T>
-T *RustServiceLocatorAdapter::getService(const QString &id) const
-{
-    QMutexLocker locker(&m_mutex);
-    QByteArray idBytes = id.toUtf8();
-    void *ptr = rust_service_locator_get(m_rustSl, idBytes.constData());
-    if (!ptr) return nullptr;
-    return qobject_cast<T*>(static_cast<QObject*>(ptr));
-}
-
-// ─────────────────────────────────────────────────────────────────────
-//  RustPluginCrashHandlerAdapter — wraps Rust FFI crash handler
-// ─────────────────────────────────────────────────────────────────────
-class RustPluginCrashHandlerAdapter : public QObject
-{
-    Q_OBJECT
-public:
-    explicit RustPluginCrashHandlerAdapter(QObject *parent = nullptr);
-    ~RustPluginCrashHandlerAdapter() override;
-
-    void handleCrash(const QString &pluginId);
-    void disablePlugin(const QString &pluginId);
-    bool isPluginDisabled(const QString &pluginId) const;
-    void enablePlugin(const QString &pluginId);
-    QList<CrashInfo> recentCrashes(int limit = 10) const;
-
-signals:
-    void pluginCrashed(const QString &pluginId, const CrashInfo &info);
-
-private:
-    static void onCrashCb(const char *pluginId, const char *error, void *userData);
-
-    RustPluginCrashHandler *m_rustH = nullptr;
-    QList<CrashInfo> m_crashHistory;
-    QHash<QString, bool> m_disabledPlugins;
-    QString m_crashLogPath;
-};
-
-// ─────────────────────────────────────────────────────────────────────
-//  RustDependencyResolverAdapter — wraps Rust FFI DependencyResolver
-// ─────────────────────────────────────────────────────────────────────
-class RustDependencyResolverAdapter : public QObject
-{
-    Q_OBJECT
-public:
-    struct DependencyError {
-        QString pluginId;
-        QString missingDependency;
-        bool isOptional = false;
-    };
-
-    explicit RustDependencyResolverAdapter(QObject *parent = nullptr);
-    ~RustDependencyResolverAdapter() override;
-
-    QList<DependencyError> validate(
-        const QList<QJsonObject> &plugins, const QSet<QString> &actuallyLoaded);
-    QStringList topologicalSort(const QList<QJsonObject> &plugins);
-    bool hasCircularDependency(const QList<QJsonObject> &plugins);
-
-private:
-    RustDependencyResolver *m_resolver = nullptr;
-};
-
-// ─────────────────────────────────────────────────────────────────────
-//  RustArchiveExtractorAdapter — wraps Rust FFI ArchiveExtractor
-// ─────────────────────────────────────────────────────────────────────
-class RustArchiveExtractorAdapter : public QObject
-{
-    Q_OBJECT
-public:
-    explicit RustArchiveExtractorAdapter(QObject *parent = nullptr);
-    ~RustArchiveExtractorAdapter() override;
-
-    /// Extract a ZIP archive from a byte buffer to a destination directory.
-    /// Returns true on success.
-    bool extract(const QByteArray &archiveData, const QString &destDir);
-
-private:
-    RustArchiveExtractor *m_extractor = nullptr;
-};
-
-// ─────────────────────────────────────────────────────────────────────
 //  UiActionBridge — routes every user action through the Rust handler.
 //  Rust validates + decides; Qt only executes the returned commands.
 // ─────────────────────────────────────────────────────────────────────
@@ -556,17 +362,10 @@ public:
     RustLspClientAdapter*             lspClient() const { return m_lsp; }
     RustDapClientAdapter*             dapClient() const { return m_dap; }
     RustEventBusAdapter*              eventBus() const { return m_eventBus; }
-    RustPluginManagerAdapter*         pluginManager() const { return m_pluginManager; }
     RustWorkspaceAdapter*             workspace() const { return m_workspace; }
     RustTaskRunnerAdapter*            taskRunner() const { return m_taskRunner; }
     RustUpdaterAdapter*               updater() const { return m_updater; }
     RustConfigValidatorAdapter*       configValidator() const { return m_configValidator; }
-    RustPluginRegistryAdapter*        pluginRegistry() const { return m_pluginRegistry; }
-    RustPermissionManagerAdapter*      permissionManager() const { return m_permissionManager; }
-    RustServiceLocatorAdapter*         serviceLocator() const { return m_serviceLocator; }
-    RustPluginCrashHandlerAdapter*     crashHandler() const { return m_crashHandler; }
-    RustDependencyResolverAdapter*     dependencyResolver() const { return m_dependencyResolver; }
-    RustArchiveExtractorAdapter*       archiveExtractor() const { return m_archiveExtractor; }
     UiActionBridge*                    uiActions() const { return m_uiActions; }
 
 private:
@@ -578,17 +377,10 @@ private:
     RustLspClientAdapter*             m_lsp = nullptr;
     RustDapClientAdapter*             m_dap = nullptr;
     RustEventBusAdapter*              m_eventBus = nullptr;
-    RustPluginManagerAdapter*         m_pluginManager = nullptr;
     RustWorkspaceAdapter*             m_workspace = nullptr;
     RustTaskRunnerAdapter*            m_taskRunner = nullptr;
     RustUpdaterAdapter*               m_updater = nullptr;
     RustConfigValidatorAdapter*       m_configValidator = nullptr;
-    RustPluginRegistryAdapter*        m_pluginRegistry = nullptr;
-    RustPermissionManagerAdapter*      m_permissionManager = nullptr;
-    RustServiceLocatorAdapter*         m_serviceLocator = nullptr;
-    RustPluginCrashHandlerAdapter*     m_crashHandler = nullptr;
-    RustDependencyResolverAdapter*     m_dependencyResolver = nullptr;
-    RustArchiveExtractorAdapter*       m_archiveExtractor = nullptr;
     UiActionBridge*                    m_uiActions = nullptr;
 
     static RustBackend* s_instance;

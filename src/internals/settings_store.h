@@ -94,7 +94,7 @@ public:
      * @brief QSettings-compatible view of this store.
      *
      * Backed by QSettings::registerFormat callbacks that route reads and
-     * writes through the Rust store, so plugin/legacy code keeps compiling
+     * writes through the Rust store, so legacy code keeps compiling
      * without touching plaintext configuration files. Deleting keys through
      * this view is supported via a load/write comparison.
      */

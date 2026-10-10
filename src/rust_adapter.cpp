@@ -4,13 +4,6 @@
 #include <QJsonArray>
 #include <QMetaObject>
 #include <QDebug>
-#include <QDir>
-#include <QFile>
-#include <QTextStream>
-#include <QStandardPaths>
-#include <QDateTime>
-#include <QtConcurrent/QtConcurrent>
-#include <QFutureWatcher>
 
 // ═══════════════════════════════════════════════════════════════════════
 //  RustLspClientAdapter
@@ -591,104 +584,6 @@ void RustEventBusAdapter::onEventCb(const char *event, const char *jsonData, voi
 }
 
 // ═══════════════════════════════════════════════════════════════════════
-//  RustPluginManagerAdapter
-// ═══════════════════════════════════════════════════════════════════════
-
-RustPluginManagerAdapter::RustPluginManagerAdapter(QObject *parent)
-    : QObject(parent)
-{
-    m_manager = rust_plugin_manager_new();
-    rust_pm_on_plugin_loaded(m_manager, &onPluginLoadedCb, this);
-    rust_pm_on_plugin_unloaded(m_manager, &onPluginUnloadedCb, this);
-    rust_pm_on_plugin_error(m_manager, &onPluginErrorCb, this);
-}
-
-RustPluginManagerAdapter::~RustPluginManagerAdapter()
-{
-    rust_plugin_manager_free(m_manager);
-}
-
-bool RustPluginManagerAdapter::loadPlugins(const QString &path)
-{
-    QByteArray p = path.toUtf8();
-    return rust_pm_load_plugins(m_manager, p.constData());
-}
-
-bool RustPluginManagerAdapter::loadPlugin(const QString &filePath)
-{
-    QByteArray p = filePath.toUtf8();
-    return rust_pm_load_plugin(m_manager, p.constData());
-}
-
-void RustPluginManagerAdapter::unloadPlugin(const QString &id)
-{
-    QByteArray i = id.toUtf8();
-    rust_pm_unload_plugin(m_manager, i.constData());
-}
-
-void RustPluginManagerAdapter::unloadAll()
-{
-    rust_pm_unload_all(m_manager);
-}
-
-bool RustPluginManagerAdapter::isLoaded(const QString &id) const
-{
-    QByteArray i = id.toUtf8();
-    return rust_pm_is_loaded(m_manager, i.constData());
-}
-
-QString RustPluginManagerAdapter::pluginVersion(const QString &id) const
-{
-    QByteArray i = id.toUtf8();
-    char *ver = rust_pm_plugin_version(m_manager, i.constData());
-    if (!ver) return {};
-    QString result = QString::fromUtf8(ver);
-    rust_free_string(ver);
-    return result;
-}
-
-QStringList RustPluginManagerAdapter::listLoaded() const
-{
-    size_t len = 0;
-    char **list = rust_pm_list_loaded(m_manager, &len);
-    QStringList result;
-    for (size_t i = 0; i < len; ++i) {
-        result << QString::fromUtf8(list[i]);
-    }
-    rust_pm_free_strings(list, len);
-    return result;
-}
-
-void RustPluginManagerAdapter::onPluginLoadedCb(const char *id, const char *, void *userData)
-{
-    auto *self = static_cast<RustPluginManagerAdapter*>(userData);
-    QString pluginId = QString::fromUtf8(id);
-    QMetaObject::invokeMethod(self, [self, pluginId]() {
-        emit self->pluginLoaded(pluginId);
-    }, Qt::QueuedConnection);
-}
-
-void RustPluginManagerAdapter::onPluginUnloadedCb(const char *id, const char *, void *userData)
-{
-    auto *self = static_cast<RustPluginManagerAdapter*>(userData);
-    QString pluginId = QString::fromUtf8(id);
-    QMetaObject::invokeMethod(self, [self, pluginId]() {
-        emit self->pluginUnloaded(pluginId);
-    }, Qt::QueuedConnection);
-}
-
-void RustPluginManagerAdapter::onPluginErrorCb(const char *id, const char *data,
-                                                 void *userData)
-{
-    auto *self = static_cast<RustPluginManagerAdapter*>(userData);
-    QString pluginId = QString::fromUtf8(id);
-    QString error = QString::fromUtf8(data);
-    QMetaObject::invokeMethod(self, [self, pluginId, error]() {
-        emit self->pluginError(pluginId, error);
-    }, Qt::QueuedConnection);
-}
-
-// ═══════════════════════════════════════════════════════════════════════
 //  RustWorkspaceAdapter
 // ═══════════════════════════════════════════════════════════════════════
 
@@ -728,7 +623,7 @@ QStringList RustWorkspaceAdapter::folders() const
     for (size_t i = 0; i < len; ++i) {
         result << QString::fromUtf8(folders[i]);
     }
-    rust_pm_free_strings(folders, len);
+    rust_free_strings(folders, len);
     return result;
 }
 
@@ -765,7 +660,7 @@ QStringList RustWorkspaceAdapter::recentFiles() const
     for (size_t i = 0; i < len; ++i) {
         result << QString::fromUtf8(files[i]);
     }
-    rust_pm_free_strings(files, len);
+    rust_free_strings(files, len);
     return result;
 }
 
@@ -833,7 +728,7 @@ QStringList RustTaskRunnerAdapter::availableTasks() const
     for (size_t i = 0; i < len; ++i) {
         result << QString::fromUtf8(tasks[i]);
     }
-    rust_pm_free_strings(tasks, len);
+    rust_free_strings(tasks, len);
     return result;
 }
 
@@ -955,415 +850,6 @@ void RustConfigValidatorAdapter::onValidationErrorCb(const char *data, void *use
 }
 
 // ═══════════════════════════════════════════════════════════════════════
-//  RustPluginRegistryAdapter
-// ═══════════════════════════════════════════════════════════════════════
-
-RustPluginRegistryAdapter::RustPluginRegistryAdapter(QObject *parent)
-    : QObject(parent)
-{
-    m_registry = rust_plugin_registry_new();
-    rust_plugin_registry_on_update(m_registry, &onRegistryUpdatedCb, this);
-    rust_plugin_registry_on_install_failed(m_registry, &onInstallFailedCb, this);
-}
-
-RustPluginRegistryAdapter::~RustPluginRegistryAdapter()
-{
-    rust_plugin_registry_free(m_registry);
-}
-
-void RustPluginRegistryAdapter::setRegistryUrl(const QString &url)
-{
-    QByteArray u = url.toUtf8();
-    rust_plugin_registry_set_url(m_registry, u.constData());
-}
-
-QString RustPluginRegistryAdapter::registryUrl() const
-{
-    char *url = rust_plugin_registry_get_url(m_registry);
-    QString result = QString::fromUtf8(url);
-    rust_free_string(url);
-    return result;
-}
-
-void RustPluginRegistryAdapter::checkForUpdates()
-{
-    // Run the fetch on a background thread: the Rust side does a blocking
-    // HTTP request (reqwest::blocking::get) which must never run on the GUI
-    // thread. Results come back through the registered callbacks, which
-    // marshal onto this thread via queued connections.
-    auto *watcher = new QFutureWatcher<void>(this);
-    connect(watcher, &QFutureWatcher<void>::finished, this, [this, watcher]() {
-        watcher->deleteLater();
-    });
-    watcher->setFuture(QtConcurrent::run([this]() {
-        rust_plugin_registry_check_updates(m_registry);
-    }));
-}
-
-bool RustPluginRegistryAdapter::upgradeAvailable(const QString &pluginId, const QString &currentVersion) const
-{
-    QByteArray id = pluginId.toUtf8();
-    QByteArray ver = currentVersion.toUtf8();
-    return rust_plugin_registry_upgrade_available(m_registry, id.constData(), ver.constData());
-}
-
-void RustPluginRegistryAdapter::onRegistryUpdatedCb(const char *data, void *userData)
-{
-    auto *self = static_cast<RustPluginRegistryAdapter*>(userData);
-    QString json = QString::fromUtf8(data);
-    QMetaObject::invokeMethod(self, [self, json]() {
-        emit self->registryUpdated(json);
-    }, Qt::QueuedConnection);
-}
-
-void RustPluginRegistryAdapter::onInstallFailedCb(const char *id, const char *error, void *userData)
-{
-    auto *self = static_cast<RustPluginRegistryAdapter*>(userData);
-    QString pluginId = QString::fromUtf8(id);
-    QString err = QString::fromUtf8(error);
-    QMetaObject::invokeMethod(self, [self, pluginId, err]() {
-        emit self->installFailed(pluginId, err);
-    }, Qt::QueuedConnection);
-}
-
-// ═══════════════════════════════════════════════════════════════════════
-//  RustPermissionManagerAdapter
-// ═══════════════════════════════════════════════════════════════════════
-
-RustPermissionManagerAdapter::RustPermissionManagerAdapter(QObject *parent)
-    : QObject(parent)
-    , m_rustPm(rust_permission_manager_new())
-{
-}
-
-RustPermissionManagerAdapter::~RustPermissionManagerAdapter()
-{
-    if (m_rustPm) {
-        rust_permission_manager_free(m_rustPm);
-        m_rustPm = nullptr;
-    }
-}
-
-bool RustPermissionManagerAdapter::checkPermission(const QString &pluginId, Permission permission)
-{
-    if (!m_rustPm) return false;
-    QByteArray idBytes = pluginId.toUtf8();
-    return rust_permission_manager_check(m_rustPm, idBytes.constData(), static_cast<int>(permission));
-}
-
-void RustPermissionManagerAdapter::requestPermission(const QString &pluginId, Permission permission)
-{
-    if (!m_rustPm) return;
-    QByteArray idBytes = pluginId.toUtf8();
-    rust_permission_manager_request(m_rustPm, idBytes.constData(), static_cast<int>(permission));
-}
-
-void RustPermissionManagerAdapter::grantPermission(const QString &pluginId, Permission permission)
-{
-    if (!m_rustPm) return;
-    QByteArray idBytes = pluginId.toUtf8();
-    rust_permission_manager_grant(m_rustPm, idBytes.constData(), static_cast<int>(permission));
-}
-
-void RustPermissionManagerAdapter::revokePermission(const QString &pluginId, Permission permission)
-{
-    if (!m_rustPm) return;
-    QByteArray idBytes = pluginId.toUtf8();
-    rust_permission_manager_revoke(m_rustPm, idBytes.constData(), static_cast<int>(permission));
-}
-
-QList<Permission> RustPermissionManagerAdapter::grantedPermissions(const QString &pluginId) const
-{
-    if (!m_declaredPermissions.contains(pluginId))
-        return {};
-    return m_declaredPermissions[pluginId];
-}
-
-void RustPermissionManagerAdapter::setDeclaredPermissions(const QString &pluginId, const QList<Permission> &permissions)
-{
-    m_declaredPermissions[pluginId] = permissions;
-}
-
-QList<Permission> RustPermissionManagerAdapter::declaredPermissions(const QString &pluginId) const
-{
-    if (!m_declaredPermissions.contains(pluginId))
-        return {};
-    return m_declaredPermissions[pluginId];
-}
-
-// ═══════════════════════════════════════════════════════════════════════
-//  RustServiceLocatorAdapter
-// ═══════════════════════════════════════════════════════════════════════
-
-RustServiceLocatorAdapter::RustServiceLocatorAdapter(QObject *parent)
-    : QObject(parent)
-    , m_rustSl(rust_service_locator_new())
-{
-}
-
-RustServiceLocatorAdapter::~RustServiceLocatorAdapter()
-{
-    if (m_rustSl) {
-        rust_service_locator_free(m_rustSl);
-        m_rustSl = nullptr;
-    }
-}
-
-void RustServiceLocatorAdapter::unregisterService(const QString &id)
-{
-    QByteArray idBytes = id.toUtf8();
-    rust_service_locator_unregister(m_rustSl, idBytes.constData());
-}
-
-bool RustServiceLocatorAdapter::hasService(const QString &id) const
-{
-    QByteArray idBytes = id.toUtf8();
-    return rust_service_locator_has(m_rustSl, idBytes.constData());
-}
-
-QStringList RustServiceLocatorAdapter::registeredServices() const
-{
-    size_t len = 0;
-    char **list = rust_service_locator_list(m_rustSl, &len);
-    if (!list) return {};
-    QStringList result;
-    for (size_t i = 0; i < len; ++i)
-        result << QString::fromUtf8(list[i]);
-    rust_service_locator_free_list(list, len);
-    return result;
-}
-
-// ═══════════════════════════════════════════════════════════════════════
-//  RustPluginCrashHandlerAdapter
-// ═══════════════════════════════════════════════════════════════════════
-
-RustPluginCrashHandlerAdapter::RustPluginCrashHandlerAdapter(QObject *parent)
-    : QObject(parent)
-    , m_rustH(rust_crash_handler_new())
-    , m_crashLogPath(QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + "/plugin_crashes.log")
-{
-    QDir().mkpath(QFileInfo(m_crashLogPath).absolutePath());
-    rust_crash_handler_on_crash(m_rustH, &RustPluginCrashHandlerAdapter::onCrashCb, this);
-}
-
-RustPluginCrashHandlerAdapter::~RustPluginCrashHandlerAdapter()
-{
-    if (m_rustH) {
-        rust_crash_handler_free(m_rustH);
-        m_rustH = nullptr;
-    }
-}
-
-void RustPluginCrashHandlerAdapter::handleCrash(const QString &pluginId)
-{
-    QByteArray idBytes = pluginId.toUtf8();
-    QString errorStr = QStringLiteral("Process crashed");
-    QByteArray errorBytes = errorStr.toUtf8();
-    rust_crash_handler_report_crash(m_rustH, idBytes.constData(), errorBytes.constData());
-
-    CrashInfo info;
-    info.pluginId = pluginId;
-    info.timestamp = QDateTime::currentDateTime();
-    info.errorType = errorStr;
-    info.stackTrace = QString();
-    info.autoDisabled = true;
-
-    m_crashHistory.prepend(info);
-    if (m_crashHistory.size() > 100) m_crashHistory.removeLast();
-
-    QString logEntry = QString("[%1] Plugin crashed: %2\n")
-                           .arg(info.timestamp.toString(Qt::ISODate))
-                           .arg(pluginId);
-    QFile logFile(m_crashLogPath);
-    if (logFile.open(QIODevice::Append | QIODevice::Text)) {
-        QTextStream out(&logFile);
-        out << logEntry;
-    }
-
-    disablePlugin(pluginId);
-    emit pluginCrashed(pluginId, info);
-    qWarning() << "Plugin crashed:" << pluginId << "at" << info.timestamp;
-}
-
-void RustPluginCrashHandlerAdapter::disablePlugin(const QString &pluginId)
-{
-    m_disabledPlugins[pluginId] = true;
-}
-
-bool RustPluginCrashHandlerAdapter::isPluginDisabled(const QString &pluginId) const
-{
-    return m_disabledPlugins.value(pluginId, false);
-}
-
-void RustPluginCrashHandlerAdapter::enablePlugin(const QString &pluginId)
-{
-    m_disabledPlugins.remove(pluginId);
-}
-
-QList<CrashInfo> RustPluginCrashHandlerAdapter::recentCrashes(int limit) const
-{
-    if (limit <= 0 || limit >= m_crashHistory.size())
-        return m_crashHistory;
-    return m_crashHistory.mid(0, limit);
-}
-
-void RustPluginCrashHandlerAdapter::onCrashCb(const char *pluginId, const char *error, void *userData)
-{
-    auto *self = static_cast<RustPluginCrashHandlerAdapter*>(userData);
-    if (!self) return;
-    QString id = QString::fromUtf8(pluginId);
-    QString err = QString::fromUtf8(error);
-    QMetaObject::invokeMethod(self, [self, id, err]() {
-        CrashInfo info;
-        info.pluginId = id;
-        info.timestamp = QDateTime::currentDateTime();
-        info.errorType = err;
-        info.stackTrace = QString();
-        info.autoDisabled = true;
-        self->m_crashHistory.prepend(info);
-        if (self->m_crashHistory.size() > 100) self->m_crashHistory.removeLast();
-        self->disablePlugin(id);
-        emit self->pluginCrashed(id, info);
-    }, Qt::QueuedConnection);
-}
-
-// ═══════════════════════════════════════════════════════════════════════
-//  RustArchiveExtractorAdapter
-// ═══════════════════════════════════════════════════════════════════════
-
-RustArchiveExtractorAdapter::RustArchiveExtractorAdapter(QObject *parent)
-    : QObject(parent)
-{
-    m_extractor = rust_archive_extractor_new();
-}
-
-RustArchiveExtractorAdapter::~RustArchiveExtractorAdapter()
-{
-    if (m_extractor) {
-        rust_archive_extractor_free(m_extractor);
-        m_extractor = nullptr;
-    }
-}
-
-bool RustArchiveExtractorAdapter::extract(const QByteArray &archiveData, const QString &destDir)
-{
-    if (!m_extractor) return false;
-    QByteArray dirBytes = destDir.toUtf8();
-    return rust_archive_extractor_extract(m_extractor,
-        reinterpret_cast<const uint8_t*>(archiveData.constData()),
-        archiveData.size(),
-        dirBytes.constData());
-}
-
-// ═══════════════════════════════════════════════════════════════════════
-//  RustDependencyResolverAdapter — uses Rust FFI directly
-// ═══════════════════════════════════════════════════════════════════════
-
-RustDependencyResolverAdapter::RustDependencyResolverAdapter(QObject *parent)
-    : QObject(parent)
-    , m_resolver(rust_dep_resolver_new())
-{
-}
-
-RustDependencyResolverAdapter::~RustDependencyResolverAdapter()
-{
-    if (m_resolver) {
-        rust_dep_resolver_free(m_resolver);
-        m_resolver = nullptr;
-    }
-}
-
-/// Helper: add all plugins to the Rust resolver, clear first.
-/// Returns false if any plugin metadata is invalid.
-static bool addAllPlugins(RustDependencyResolver *resolver, const QList<QJsonObject> &plugins)
-{
-    rust_dep_resolver_clear(resolver);
-    for (const QJsonObject &p : plugins) {
-        QByteArray id = p["id"].toString().toUtf8();
-        QByteArray meta = QJsonDocument(p).toJson(QJsonDocument::Compact);
-        if (!rust_dep_resolver_add_plugin(resolver, id.constData(), meta.constData())) {
-            return false;
-        }
-    }
-    return true;
-}
-
-QList<RustDependencyResolverAdapter::DependencyError> RustDependencyResolverAdapter::validate(
-    const QList<QJsonObject> &plugins, const QSet<QString> &actuallyLoaded)
-{
-    QList<DependencyError> errors;
-    if (!m_resolver) return errors;
-
-    // Try to resolve all plugins together
-    if (!addAllPlugins(m_resolver, plugins)) {
-        // Metadata parse failure — report all plugins as unparseable
-        for (const QJsonObject &p : plugins) {
-            DependencyError err;
-            err.pluginId = p["id"].toString();
-            err.missingDependency = QString();
-            err.isOptional = false;
-            errors.append(err);
-        }
-        return errors;
-    }
-
-    size_t len = 0;
-    char **result = rust_dep_resolver_order(m_resolver, &len);
-
-    // If order is empty AND we have plugins, resolution failed (missing deps or cycle)
-    if ((!result || len == 0) && !plugins.isEmpty()) {
-        // Check each plugin's dependencies against actuallyLoaded
-        for (const QJsonObject &p : plugins) {
-            QString pluginId = p["id"].toString();
-            QJsonArray depArray = p["dependencies"].toArray();
-            for (const QJsonValue &val : depArray) {
-                QString depId = val.toString();
-                if (!actuallyLoaded.contains(depId)) {
-                    DependencyError err;
-                    err.pluginId = pluginId;
-                    err.missingDependency = depId;
-                    err.isOptional = false;
-                    errors.append(err);
-                }
-            }
-        }
-    }
-
-    if (result) {
-        rust_dep_resolver_free_order(result, len);
-    }
-    return errors;
-}
-
-QStringList RustDependencyResolverAdapter::topologicalSort(const QList<QJsonObject> &plugins)
-{
-    if (!m_resolver) return {};
-
-    // Add all plugins to the resolver first
-    if (!addAllPlugins(m_resolver, plugins)) {
-        return {};
-    }
-
-    // Now resolve the order
-    size_t len = 0;
-    char **result = rust_dep_resolver_order(m_resolver, &len);
-    QStringList sorted;
-    if (result && len > 0) {
-        for (size_t i = 0; i < len; ++i) {
-            sorted.append(QString::fromUtf8(result[i]));
-        }
-        rust_dep_resolver_free_order(result, len);
-    }
-    return sorted;
-}
-
-bool RustDependencyResolverAdapter::hasCircularDependency(const QList<QJsonObject> &plugins)
-{
-    // Use topologicalSort — if it returns empty, there's a cycle
-    return topologicalSort(plugins).isEmpty() && !plugins.isEmpty();
-}
-
-// ═══════════════════════════════════════════════════════════════════════
 //  UiActionBridge
 // ═══════════════════════════════════════════════════════════════════════
 
@@ -1448,7 +934,7 @@ QStringList UiActionBridge::auditLog() const
     for (size_t i = 0; i < len; ++i) {
         result << QString::fromUtf8(entries[i]);
     }
-    rust_pm_free_strings(entries, len);
+    rust_free_strings(entries, len);
     return result;
 }
 
@@ -1464,17 +950,10 @@ RustBackend::RustBackend(QObject *parent)
     m_eventBus = new RustEventBusAdapter(this);
     m_lsp = new RustLspClientAdapter(this);
     m_dap = new RustDapClientAdapter(this);
-    m_pluginManager = new RustPluginManagerAdapter(this);
     m_workspace = new RustWorkspaceAdapter(this);
     m_taskRunner = new RustTaskRunnerAdapter(this);
     m_updater = new RustUpdaterAdapter(this);
     m_configValidator = new RustConfigValidatorAdapter(this);
-    m_pluginRegistry = new RustPluginRegistryAdapter(this);
-    m_permissionManager = new RustPermissionManagerAdapter(this);
-    m_serviceLocator = new RustServiceLocatorAdapter(this);
-    m_crashHandler = new RustPluginCrashHandlerAdapter(this);
-    m_dependencyResolver = new RustDependencyResolverAdapter(this);
-    m_archiveExtractor = new RustArchiveExtractorAdapter(this);
     m_uiActions = new UiActionBridge(this);
 }
 

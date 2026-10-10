@@ -586,15 +586,15 @@ mod tests {
     #[test]
     fn test_secret_roundtrip() {
         let (_dir, storage) = test_storage();
-        assert!(!storage.has_secret("plugins/token"));
-        storage.set_secret("plugins/token", "abc123").expect("set secret");
-        assert!(storage.has_secret("plugins/token"));
+        assert!(!storage.has_secret("auth/token"));
+        storage.set_secret("auth/token", "abc123").expect("set secret");
+        assert!(storage.has_secret("auth/token"));
         assert_eq!(
-            storage.get_secret("plugins/token").expect("get secret").as_deref(),
+            storage.get_secret("auth/token").expect("get secret").as_deref(),
             Some("abc123")
         );
-        storage.delete_secret("plugins/token").expect("delete secret");
-        assert!(!storage.has_secret("plugins/token"));
+        storage.delete_secret("auth/token").expect("delete secret");
+        assert!(!storage.has_secret("auth/token"));
     }
 
     #[test]
