@@ -196,6 +196,71 @@ scriptura/
 
 ---
 
+## Plugins
+
+Scriptura has a small plugin system for **themes** today (more kinds are planned). Plugins are plain JSON manifest files that live in the editor's settings data directory, so they travel with the user's configuration rather than the install.
+
+### Where plugins live
+
+```text
+<settings dir>/plugins/
+```
+
+`ThemeManager::pluginsDir()` resolves this path at runtime (decision #7). On each startup the editor scans this directory and loads every valid manifest.
+
+### Theme plugin format
+
+A theme plugin is a single JSON file whose **filename stem must equal its `id`**. The shared manifest envelope is:
+
+| Field       | Required | Notes                                                       |
+|-------------|----------|-------------------------------------------------------------|
+| `id`        | yes      | Non-empty, must match the filename stem (e.g. `my-theme.json` → `my-theme`) |
+| `name`      | yes      | Display name                                                |
+| `version`   | yes      | Valid [semver](https://semver.org/)                         |
+| `kind`      | no       | `"theme"` (default). Unknown kinds are rejected.           |
+| `apiVersion`| no       | Defaults to `1`. Must not exceed the host's supported API (`HOST_API_VERSION`, currently `1`). |
+| `theme`     | yes      | Theme config (see below)                                    |
+
+The `theme` object may omit any field; the editor merges what it is given onto the built-in palette for the chosen family/mode, so a partial theme still resolves to a complete `ThemeDefinition`.
+
+```json
+{
+  "id": "my-theme",
+  "name": "My Theme",
+  "version": "1.0.0",
+  "kind": "theme",
+  "theme": {
+    "family": "blue",
+    "mode": "dark",
+    "colors": {
+      "bgColor": "#1a1b1e",
+      "textColor": "#afafb6"
+    }
+  }
+}
+```
+
+### Installing a theme
+
+1. Create the JSON file above.
+2. Place it in `<settings dir>/plugins/`.
+3. Restart Scriptura (or open **Appearance → Themes** and pick it).
+
+The settings directory is created on first run; see `SettingsStore::storageDirectory()` for the platform-specific path.
+
+### Developing a plugin
+
+- **One file per plugin.** Each plugin is a single `.json` file in the plugins directory; there is no separate code to compile for theme plugins.
+- **Filename = id.** The file must be named `<id>.json` or it is rejected at scan time.
+- **Validate before shipping.** The registry checks `id`/filename match, semver `version`, known `kind`, and `apiVersion` ≤ the host's supported API. Malformed JSON is skipped silently.
+- **Enable/disable is per-plugin.** Toggling a plugin off persists it under the settings key `plugin/disabled/<id>` and survives restarts. Disabled plugins are recorded with `state: "disabled"` and resolve no payload.
+- **Built-in kinds are immutable.** The `theme` kind is built into the editor and cannot be overridden or removed by plugins. New kinds can be registered at runtime by the Rust backend (see `plugin_registry.rs`), but the add-only registry rejects duplicate kind ids.
+- **Built-in palette.** The C++ `ThemeManager::buildDefinition` holds the canonical color map. The Rust `theme_engine` only supplies a minimal fallback for its own tests; a theme manifest overrides individual color keys on top of the built-in base.
+
+See `src/rust_backend/src/plugin_registry.rs` for the registry implementation and `src/rust_backend/src/theme_engine.rs` for the theme merge logic.
+
+---
+
 ## Community
 
 Scriptura is built by the [Nano Collective](https://nanocollective.org), a community collective building AI tooling not for profit, but for the community. The work needs a second maintainer as much as it needs code.
