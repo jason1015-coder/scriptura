@@ -26,6 +26,7 @@
 #include <QMessageBox>
 #include <QFileSystemModel>
 #include <QDir>
+#include <QDirIterator>
 #include <QTextCursor>
 #include <QApplication>
 #include <QScreen>
@@ -1040,24 +1041,91 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
         }
     };
 
-    auto rebuildPluginsPanel = [this, pluginsPanel, pluginsPanelLayout, clearLayout, pluginRegistry]() {
-        clearLayout(pluginsPanelLayout);
+    // ── Install: copy a folder of plugin files into the plugins dir ────────
+    // The plugins dir is the single storage place (decision #7): the user
+    // picks a folder from their filesystem and its contents are copied in,
+    // then the registry re-scans so the new plugin shows up immediately.
+    // QDirIterator::Subdirectories walks the tree recursively so the lambda
+    // can stay capture-less and safe to store on a long-lived connection.
+    auto copyDirectoryContents = [](const QString &srcDir, const QString &dstDir) -> bool {
+        QDir dst(dstDir);
+        if (!dst.exists() && !QDir().mkpath(dstDir))
+            return false;
+        QDir src(srcDir);
+        if (!src.exists())
+            return false;
+        src.setFilter(QDir::Files | QDir::NoDotAndDotDot);
+        QDirIterator it(src, QDirIterator::Subdirectories);
+        while (it.hasNext()) {
+            it.next();
+            const QFileInfo info = it.fileInfo();
+            const QString relPath = src.relativeFilePath(info.absoluteFilePath());
+            const QString dstPath = dstDir + QLatin1Char('/') + relPath;
+            if (!QDir().mkpath(QFileInfo(dstPath).absolutePath()))
+                return false;
+            if (QFile::exists(dstPath) && !QFile::remove(dstPath))
+                return false;
+            if (!QFile::copy(info.absoluteFilePath(), dstPath))
+                return false;
+        }
+        return true;
+    };
+
+    auto installPlugin = [this, pluginRegistry, copyDirectoryContents]() {
+        const QString pluginsDir = ThemeManager::pluginsDir();
+        const QString startDir = QStandardPaths::writableLocation(QStandardPaths::HomeLocation);
+        const QString srcDir = QFileDialog::getExistingDirectory(
+            this, tr("Select Plugin Folder"),
+            startDir.isEmpty() ? QDir::homePath() : startDir,
+            QFileDialog::DontUseNativeDialog);
+        if (srcDir.isEmpty() || !QFileInfo(srcDir).isDir())
+            return;
+        if (!copyDirectoryContents(srcDir, pluginsDir)) {
+            QMessageBox::warning(this, tr("Install Plugin"),
+                tr("Could not copy plugin files from \"%1\" into \"%2\".")
+                    .arg(srcDir, pluginsDir));
+            return;
+        }
+        // The storage place is the same dir the registry scans; re-scan so the
+        // freshly copied plugin appears right away without a restart.
+        pluginRegistry->scan(pluginsDir);
+    };
+
+    // Persistent top bar: the Install button stays put while the list below is
+    // rebuilt by rebuildPluginsPanel(), so clearLayout() never tears it down.
+    QPushButton *installBtn = new QPushButton(QIcon(QStringLiteral(":/icons/install.svg")),
+                                              tr("Install Plugin…"), pluginsPanel);
+    installBtn->setToolTip(tr("Open a folder picker to choose a plugin folder, "
+                              "then copy it into the plugins directory."));
+    pluginsPanelLayout->addWidget(installBtn);
+
+    QWidget *pluginsList = new QWidget(pluginsPanel);
+    QVBoxLayout *pluginsListLayout = new QVBoxLayout(pluginsList);
+    pluginsListLayout->setContentsMargins(0, 0, 0, 0);
+    pluginsPanelLayout->addWidget(pluginsList, 1);
+
+    connect(installBtn, &QPushButton::clicked, this, installPlugin);
+
+    auto rebuildPluginsPanel = [this, pluginsList, pluginsListLayout, clearLayout, pluginRegistry]() {
+        clearLayout(pluginsListLayout);
         const QJsonArray plugins = pluginRegistry->list();
         if (plugins.isEmpty()) {
             QLabel *none = new QLabel(
-                tr("No plugins installed. Drop a <id>.json into the plugins folder and reopen the Plugins tab."),
-                pluginsPanel);
+                tr("No plugins installed. Click \"Install Plugin…\" to add one "
+                   "from a folder on disk, or drop a <id>.json into %1.")
+                    .arg(ThemeManager::pluginsDir()),
+                pluginsList);
             none->setWordWrap(true);
-            pluginsPanelLayout->addWidget(none);
-            pluginsPanelLayout->addStretch();
+            pluginsListLayout->addWidget(none);
+            pluginsListLayout->addStretch();
             return;
         }
         // Header row: Name | Details | Enabled
         QHBoxLayout *header = new QHBoxLayout();
         header->setSpacing(6);
-        QLabel *nameHeader = new QLabel(tr("Name"), pluginsPanel);
-        QLabel *detailsHeader = new QLabel(tr("Details"), pluginsPanel);
-        QLabel *enabledHeader = new QLabel(tr("Enabled"), pluginsPanel);
+        QLabel *nameHeader = new QLabel(tr("Name"), pluginsList);
+        QLabel *detailsHeader = new QLabel(tr("Details"), pluginsList);
+        QLabel *enabledHeader = new QLabel(tr("Enabled"), pluginsList);
         QFont headerFont = nameHeader->font();
         headerFont.setBold(true);
         nameHeader->setFont(headerFont);
@@ -1066,7 +1134,7 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
         header->addWidget(nameHeader, 2);
         header->addWidget(detailsHeader, 3);
         header->addWidget(enabledHeader, 0);
-        pluginsPanelLayout->addLayout(header);
+        pluginsListLayout->addLayout(header);
 
         for (const QJsonValue &v : plugins) {
             const QJsonObject o = v.toObject();
@@ -1080,19 +1148,19 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
             QHBoxLayout *row = new QHBoxLayout();
             row->setSpacing(6);
 
-            QLabel *nameLabel = new QLabel(name.isEmpty() ? id : name, pluginsPanel);
+            QLabel *nameLabel = new QLabel(name.isEmpty() ? id : name, pluginsList);
             row->addWidget(nameLabel, 2);
 
             QLabel *metaLabel = new QLabel(
-                tr("%1  •  v%2  •  %3  •  %4").arg(kind, version, state, id), pluginsPanel);
+                tr("%1  •  v%2  •  %3  •  %4").arg(kind, version, state, id), pluginsList);
             metaLabel->setProperty("class", "muted");
             row->addWidget(metaLabel, 3);
 
-            QCheckBox *toggle = new QCheckBox(tr("Enabled"), pluginsPanel);
+            QCheckBox *toggle = new QCheckBox(tr("Enabled"), pluginsList);
             toggle->setChecked(enabled);
             row->addWidget(toggle, 0);
 
-            pluginsPanelLayout->addLayout(row);
+            pluginsListLayout->addLayout(row);
 
             // Defer the registry mutation so this toggle's own signal handler
             // finishes before rebuildPluginsPanel() tears the row down.
@@ -1102,17 +1170,16 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
                 }, Qt::QueuedConnection);
             });
         }
-        pluginsPanelLayout->addStretch();
+        pluginsListLayout->addStretch();
     };
 
     rebuildPluginsPanel();
     connect(pluginRegistry, &RustPluginRegistryAdapter::registryChanged,
-            pluginsPanel, [rebuildPluginsPanel]() {
+            pluginsList, [rebuildPluginsPanel]() {
                 rebuildPluginsPanel();
             });
 
     registerPanel(":/icons/config.svg", tr("Manage Plugins"), tr("Plugins"), true, pluginsPanel);
-
     // Connect bookmark panel to active editor (per-tab sync)
     connect(ui->tabWidget, &QTabWidget::currentChanged, this, [this](int index) {
         if (index >= 0 && index < ui->tabWidget->count()) {

@@ -57,6 +57,7 @@
     <file alias="icons/svg-image.svg">resources/icons/svg-image.svg</file>
     <file alias="icons/console.svg">resources/icons/console.svg</file>
     <file alias="icons/config.svg">resources/icons/config.svg</file>
+    <file alias="icons/install.svg">resources/icons/install.svg</file>
     <file alias="icons/archive.svg">resources/icons/archive.svg</file>
     <file alias="icons/lock.svg">resources/icons/lock.svg</file>
     <file alias="icons/license.svg">resources/icons/license.svg</file>
