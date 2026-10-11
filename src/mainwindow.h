@@ -410,6 +410,7 @@ protected:
     void loadProjectDirectory(const QString &dirName);
     void openFileInTab(const QString &fileName);
     void applyTheme(const Theme &theme);
+    void applyThemeDefinition(const ThemeDefinition &def, bool isDark);
     void setSidebarCollapsed(bool collapsed);
     bool isSidebarCollapsed() const { return m_sidebarCollapsed; }
     void updateFileTreeFolderIcons();

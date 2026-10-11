@@ -105,6 +105,151 @@ QWidget* MainWindow::createUnifiedSettingsWidget()
 
     mainLayout->addWidget(themeGroup);
 
+    // ── Plugin system (PLUGINS.md §7) ─────────────────────────────────────
+    // The Rust plugin registry is the single source of truth. Appearance →
+    // Themes shows only *enabled* theme plugins; a dedicated Plugins section
+    // (added below) lists every plugin with an Enable toggle. Toggling persists
+    // the disabled flag in Rust and both lists refresh via registryChanged().
+    auto *pluginRegistry = RustBackend::instance()->pluginRegistry();
+    pluginRegistry->scan(ThemeManager::pluginsDir());
+
+    auto clearLayout = [](QLayout *layout) {
+        if (!layout) return;
+        QLayoutItem *item;
+        while ((item = layout->takeAt(0)) != nullptr) {
+            if (QWidget *w = item->widget()) w->deleteLater();
+            delete item;
+        }
+    };
+
+    // Enabled theme-plugin ids read straight from the registry (no re-scan, so
+    // refreshing never re-triggers registryChanged()).
+    auto enabledThemeIds = [pluginRegistry]() {
+        QStringList ids;
+        const QJsonArray plugins = pluginRegistry->list();
+        for (const QJsonValue &v : plugins) {
+            const QJsonObject o = v.toObject();
+            if (o.value(QStringLiteral("kind")).toString() == QLatin1String("theme")
+                && o.value(QStringLiteral("enabled")).toBool()) {
+                ids << o.value(QStringLiteral("id")).toString();
+            }
+        }
+        return ids;
+    };
+
+    // ── Custom Themes container (rebuildable) ───────────────────────────────
+    QWidget *customThemesContainer = new QWidget(content);
+    QVBoxLayout *customThemesLayout = new QVBoxLayout(customThemesContainer);
+    customThemesLayout->setContentsMargins(0, 0, 0, 0);
+    mainLayout->addWidget(customThemesContainer);
+
+    auto rebuildCustomThemes = [this, content, customThemesContainer, customThemesLayout,
+                                clearLayout, enabledThemeIds]() {
+        clearLayout(customThemesLayout);
+        const QStringList ids = enabledThemeIds();
+        if (ids.isEmpty()) {
+            customThemesContainer->setVisible(false);
+            return;
+        }
+        customThemesContainer->setVisible(true);
+        QGroupBox *customThemeGroup = new QGroupBox(tr("Custom Themes"), customThemesContainer);
+        QGridLayout *customGrid = new QGridLayout(customThemeGroup);
+        customGrid->setSpacing(6);
+        int cIdx = 0;
+        for (const QString &ctId : ids) {
+            QPushButton *btn = new QPushButton(ctId, customThemeGroup);
+            btn->setCursor(Qt::PointingHandCursor);
+            btn->setCheckable(true);
+            const QString idCopy = ctId;
+            connect(btn, &QPushButton::clicked, this, [this, idCopy]() {
+                m_themeManager->applyCustomTheme(ThemeManager::pluginsDir(), idCopy);
+            });
+            customGrid->addWidget(btn, cIdx / 4, cIdx % 4);
+            ++cIdx;
+        }
+        customThemesLayout->addWidget(customThemeGroup);
+    };
+
+    // ── Plugins section (rebuildable) ───────────────────────────────────────
+    QGroupBox *pluginsGroup = new QGroupBox(tr("Plugins"), content);
+    QVBoxLayout *pluginsLayout = new QVBoxLayout(pluginsGroup);
+    pluginsLayout->setSpacing(6);
+    mainLayout->addWidget(pluginsGroup);
+
+    auto rebuildPlugins = [this, content, pluginsGroup, pluginsLayout,
+                           clearLayout, pluginRegistry]() {
+        clearLayout(pluginsLayout);
+        const QJsonArray plugins = pluginRegistry->list();
+        if (plugins.isEmpty()) {
+            QLabel *none = new QLabel(
+                tr("No plugins installed. Drop a <id>.json into the plugins folder and reopen Settings."),
+                pluginsGroup);
+            none->setWordWrap(true);
+            pluginsLayout->addWidget(none);
+            return;
+        }
+        // Header row: Name | Details | Enabled
+        QHBoxLayout *header = new QHBoxLayout();
+        header->setSpacing(6);
+        QLabel *nameHeader = new QLabel(tr("Name"), pluginsGroup);
+        QLabel *detailsHeader = new QLabel(tr("Details"), pluginsGroup);
+        QLabel *enabledHeader = new QLabel(tr("Enabled"), pluginsGroup);
+        QFont headerFont = nameHeader->font();
+        headerFont.setBold(true);
+        nameHeader->setFont(headerFont);
+        detailsHeader->setFont(headerFont);
+        enabledHeader->setFont(headerFont);
+        header->addWidget(nameHeader, 2);
+        header->addWidget(detailsHeader, 3);
+        header->addWidget(enabledHeader, 0);
+        pluginsLayout->addLayout(header);
+
+        for (const QJsonValue &v : plugins) {
+            const QJsonObject o = v.toObject();
+            const QString id = o.value(QStringLiteral("id")).toString();
+            const QString name = o.value(QStringLiteral("name")).toString();
+            const QString version = o.value(QStringLiteral("version")).toString();
+            const QString kind = o.value(QStringLiteral("kind")).toString();
+            const QString state = o.value(QStringLiteral("state")).toString();
+            const bool enabled = o.value(QStringLiteral("enabled")).toBool();
+
+            QHBoxLayout *row = new QHBoxLayout();
+            row->setSpacing(6);
+
+            QLabel *nameLabel = new QLabel(name.isEmpty() ? id : name, pluginsGroup);
+            row->addWidget(nameLabel, 2);
+
+            QLabel *metaLabel = new QLabel(
+                tr("%1  •  v%2  •  %3  •  %4").arg(kind, version, state, id), pluginsGroup);
+            metaLabel->setProperty("class", "muted");
+            row->addWidget(metaLabel, 3);
+
+            QCheckBox *toggle = new QCheckBox(tr("Enabled"), pluginsGroup);
+            toggle->setChecked(enabled);
+            row->addWidget(toggle, 0);
+
+            pluginsLayout->addLayout(row);
+
+            // Defer the registry mutation so this toggle's own signal handler
+            // finishes before rebuildPlugins() tears the row down.
+            connect(toggle, &QCheckBox::toggled, this, [pluginRegistry, id](bool checked) {
+                QMetaObject::invokeMethod(pluginRegistry, [pluginRegistry, id, checked]() {
+                    pluginRegistry->setDisabled(id, !checked);
+                }, Qt::QueuedConnection);
+            });
+        }
+    };
+
+    // Initial population + keep both lists in sync when the registry changes
+    // (a toggle persists via setDisabled, which emits registryChanged()).
+    rebuildCustomThemes();
+    rebuildPlugins();
+    connect(pluginRegistry, &RustPluginRegistryAdapter::registryChanged,
+            content, [rebuildCustomThemes, rebuildPlugins]() {
+                rebuildCustomThemes();
+                rebuildPlugins();
+            });
+
     // ── Layout Section ────────────────────────────────────────────────────
     // The window chrome arrangement. Applying a layout re-parents the panes
     // live, so the preview is immediate.
@@ -499,6 +644,13 @@ void MainWindow::applyTheme(const Theme &theme)
                                              static_cast<ThemeManager::ColorFamily>(static_cast<int>(theme.family)),
                                              static_cast<ThemeManager::Mode>(static_cast<int>(theme.mode)));
 
+    applyThemeDefinition(def, theme.isDark());
+
+    SettingsStore::instance().setValue("theme/selected", themeToLegacyInt(theme));
+}
+
+void MainWindow::applyThemeDefinition(const ThemeDefinition &def, bool isDark)
+{
     // Wire ThemeIcons to the ThemeManager so SVG icons use the dedicated svgColor
     ThemeIcons::instance()->setThemeManager(m_themeManager);
     ThemeIcons::instance()->recolorAll();
@@ -517,15 +669,6 @@ void MainWindow::applyTheme(const Theme &theme)
     }
 
     QPalette palette = ThemeManager::buildPalette(def);
-    bool isDark = theme.isDark();
-
-    QColor windowColor = def.bgColor;
-    QColor baseColor = def.baseColor;
-    QColor buttonColor = def.buttonColor;
-    QColor textColor = def.textColor;
-    QColor accentColor = def.highlightColor;
-    QColor midColor = def.midColor;
-    QColor lightColor = def.lightColor;
 
     for (QWidget *widget : QApplication::allWidgets()) {
         widget->setPalette(palette);
@@ -546,8 +689,6 @@ void MainWindow::applyTheme(const Theme &theme)
     // not look like a bright box inside a dark window.
     if (m_terminalPanel)
         m_terminalPanel->setTerminalColors(def.textColor, def.baseColor);
-
-    SettingsStore::instance().setValue("theme/selected", themeToLegacyInt(theme));
 }
 
 void MainWindow::on_action_theme_triggered()

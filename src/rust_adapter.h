@@ -311,6 +311,57 @@ private:
 };
 
 // ─────────────────────────────────────────────────────────────────────
+//  RustThemeEngineAdapter — resolves theme plugins (kind == "theme") to a
+//  complete ThemeDefinition JSON. Mirrors RustConfigValidatorAdapter.
+// ─────────────────────────────────────────────────────────────────────
+class RustThemeEngineAdapter : public QObject
+{
+    Q_OBJECT
+public:
+    explicit RustThemeEngineAdapter(QObject *parent = nullptr);
+    ~RustThemeEngineAdapter() override;
+
+    /// Scan `<pluginsDir>` for `kind:"theme"` manifests and resolve them.
+    void scan(const QString &pluginsDir);
+    /// Complete resolved ThemeDefinition JSON for `id` (empty when absent).
+    QJsonObject resolvedTheme(const QString &id) const;
+    /// Enabled plugin theme ids (disabled entries excluded).
+    QStringList enabledThemeIds() const;
+    void setDisabled(const QString &id, bool disabled);
+    bool isDisabled(const QString &id) const;
+
+private:
+    RustThemeEngine *m_engine = nullptr;
+};
+
+// ─────────────────────────────────────────────────────────────────────
+//  RustPluginRegistryAdapter — the generic kind-registry surface consumed by
+//  the Plugins page: a flat list of every plugin with an Enable toggle.
+// ─────────────────────────────────────────────────────────────────────
+class RustPluginRegistryAdapter : public QObject
+{
+    Q_OBJECT
+public:
+    explicit RustPluginRegistryAdapter(QObject *parent = nullptr);
+    ~RustPluginRegistryAdapter() override;
+
+    void scan(const QString &pluginsDir);
+    /// [{id,name,version,kind,enabled,state}] — one object per plugin.
+    QJsonArray list() const;
+    /// Persist the enabled flag (key `plugin/disabled/<id>`) and skip it next scan.
+    void setDisabled(const QString &id, bool disabled);
+    /// Resolved payload for a plugin id (complete ThemeDefinition JSON).
+    QJsonObject resolved(const QString &id) const;
+
+signals:
+    /// Emitted after a scan + toggle so the Settings page can refresh.
+    void registryChanged();
+
+private:
+    RustPluginRegistry *m_registry = nullptr;
+};
+
+// ─────────────────────────────────────────────────────────────────────
 //  UiActionBridge — routes every user action through the Rust handler.
 //  Rust validates + decides; Qt only executes the returned commands.
 // ─────────────────────────────────────────────────────────────────────
@@ -367,6 +418,8 @@ public:
     RustUpdaterAdapter*               updater() const { return m_updater; }
     RustConfigValidatorAdapter*       configValidator() const { return m_configValidator; }
     UiActionBridge*                    uiActions() const { return m_uiActions; }
+    RustThemeEngineAdapter*           themeEngine() const { return m_themeEngine; }
+    RustPluginRegistryAdapter*        pluginRegistry() const { return m_pluginRegistry; }
 
 private:
     RustBackend(QObject *parent = nullptr);
@@ -382,6 +435,8 @@ private:
     RustUpdaterAdapter*               m_updater = nullptr;
     RustConfigValidatorAdapter*       m_configValidator = nullptr;
     UiActionBridge*                    m_uiActions = nullptr;
+    RustThemeEngineAdapter*           m_themeEngine = nullptr;
+    RustPluginRegistryAdapter*        m_pluginRegistry = nullptr;
 
     static RustBackend* s_instance;
 };

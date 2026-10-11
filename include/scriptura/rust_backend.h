@@ -1,31 +1,37 @@
-#ifndef RUST_BACKEND_H
-#define RUST_BACKEND_H
+# ifndef RUST_BACKEND_H
+# define RUST_BACKEND_H
 
-#include <stdint.h>
-#include <stddef.h>
-#include <stdbool.h>
+# include <stdint.h>
+# include <stddef.h>
+# include <stdbool.h>
 
-#ifdef __cplusplus
+# ifdef __cplusplus
+# include <filesystem>
+# include <string>
+# include <vector>
+# include <utility>
+
 extern "C" {
-#endif
 
-/* ── Opaque handle types ──────────────────────────────────────── */
-typedef struct RustEventBus               RustEventBus;
-typedef struct RustLspClient              RustLspClient;
-typedef struct RustDapClient              RustDapClient;
-typedef struct RustDebugSession           RustDebugSession;
-typedef struct RustTaskRunner             RustTaskRunner;
-typedef struct RustUpdater                RustUpdater;
-typedef struct RustVersionFetcher         RustVersionFetcher;
-typedef struct RustWorkspace              RustWorkspace;
-typedef struct RustConfigValidator        RustConfigValidator;
-typedef struct RustLengthPrefixedFramer   RustLengthPrefixedFramer;
-typedef struct RustLanguageRegistry       RustLanguageRegistry;
-typedef struct RustLanguageServerManager  RustLanguageServerManager;
+// Opaque handle types (Rust-backed singletons / objects).
+typedef struct RustThemeEngine             RustThemeEngine;
+typedef struct RustPluginRegistry          RustPluginRegistry;
+typedef struct RustEventBus                RustEventBus;
+typedef struct RustLspClient               RustLspClient;
+typedef struct RustDapClient               RustDapClient;
+typedef struct RustDebugSession            RustDebugSession;
+typedef struct RustTaskRunner              RustTaskRunner;
+typedef struct RustUpdater                 RustUpdater;
+typedef struct RustVersionFetcher          RustVersionFetcher;
+typedef struct RustWorkspace               RustWorkspace;
+typedef struct RustConfigValidator         RustConfigValidator;
+typedef struct RustLengthPrefixedFramer    RustLengthPrefixedFramer;
+typedef struct RustLanguageRegistry        RustLanguageRegistry;
+typedef struct RustLanguageServerManager   RustLanguageServerManager;
 typedef struct RustDebugConfigurationManager RustDebugConfigurationManager;
-typedef struct RustUiActionHandler        RustUiActionHandler;
+typedef struct RustUiActionHandler         RustUiActionHandler;
 
-/* ── C callback type aliases ───────────────────────────────────── */
+// ── C callback type aliases ──────────────────────────────────────────────
 typedef void (*OnStringMessage)(const char* data, void* user_data);
 typedef void (*OnEvent)(const char* event, const char* json_data, void* user_data);
 typedef void (*OnDapStopped)(const char* reason, int thread_id, void* user_data);
@@ -34,14 +40,45 @@ typedef void (*OnScopes)(int frame_id, const char* json_scopes, void* user_data)
 typedef void (*OnVariables)(int var_ref, const char* json_vars, void* user_data);
 typedef void (*OnDapBreakpoints)(const char* source, const char* json_breakpoints, void* user_data);
 
-/* ── Global helpers ────────────────────────────────────────────── */
+// ── Global helpers ────────────────────────────────────────────────────────
 char* rust_last_error(void);
 void  rust_free_string(char* s);
 void  rust_free_strings(char** strs, size_t len);
 
-/* ══════════════════════════════════════════════════════════════════
- *  EventBus
- * ══════════════════════════════════════════════════════════════════ */
+// ══════════════════════════════════════════════════════════════════════════
+//  Theme Engine (plugin registry — theme kind, phase 1)
+// ══════════════════════════════════════════════════════════════════════════
+// Rust owns discover → validate → resolve (merge colors onto the built-in
+// family/mode base). C++ owns buildPalette / stylesheet / draw.
+// ══════════════════════════════════════════════════════════════════════════
+
+RustThemeEngine* rust_theme_engine_new(void);
+void              rust_theme_engine_free(RustThemeEngine* te);
+void              rust_theme_engine_scan(RustThemeEngine* te, const char* plugins_dir);
+char**            rust_theme_engine_list(RustThemeEngine* te, size_t* out_len);   // [{id,name,version,resolved}]
+char*             rust_theme_engine_get(RustThemeEngine* te, const char* id);      // resolved ThemeDefinition JSON
+char*             rust_theme_engine_validate(RustThemeEngine* te, const char* json);
+void              rust_theme_engine_set_disabled(RustThemeEngine* te, const char* id, int disabled);
+int               rust_theme_engine_is_disabled(RustThemeEngine* te, const char* id);
+
+// ══════════════════════════════════════════════════════════════════════════
+//  Plugin Registry (generic kind-registry core; theme-only for now)
+// ══════════════════════════════════════════════════════════════════════════
+// For the theme-only increment this reuses ThemeEngine internally; the C++
+// side keeps a single consistent handle type and a stable surface for the
+// future generic registry + kind handlers + HostApi (tab, panel, …).
+// ══════════════════════════════════════════════════════════════════════════
+
+RustPluginRegistry* rust_plugin_registry_new(void);
+void                rust_plugin_registry_free(RustPluginRegistry* r);
+void                rust_plugin_registry_scan(RustPluginRegistry* r, const char* plugins_dir);
+char**              rust_plugin_registry_list(RustPluginRegistry* r, size_t* out_len); // [{id,name,version,kind,enabled,state}]
+void                rust_plugin_registry_set_disabled(RustPluginRegistry* r, const char* id, int disabled);
+char*               rust_plugin_registry_get(RustPluginRegistry* r, const char* id);    // resolved ThemeDefinition JSON
+
+// ══════════════════════════════════════════════════════════════════════════
+//  EventBus
+// ══════════════════════════════════════════════════════════════════════════
 RustEventBus* rust_eventbus_new(void);
 void          rust_eventbus_free(RustEventBus* bus);
 
@@ -53,15 +90,15 @@ void     rust_eventbus_publish(RustEventBus* bus, const char* event,
                                const char* json_data);
 bool     rust_eventbus_has_subscribers(RustEventBus* bus, const char* event);
 
-/* ══════════════════════════════════════════════════════════════════
- *  LengthPrefixedFramer
- * ══════════════════════════════════════════════════════════════════ */
+// ══════════════════════════════════════════════════════════════════════════
+//  LengthPrefixedFramer
+// ══════════════════════════════════════════════════════════════════════════
 RustLengthPrefixedFramer* rust_framer_new(void);
 void                      rust_framer_free(RustLengthPrefixedFramer* framer);
 
-/* ══════════════════════════════════════════════════════════════════
- *  LSP Client
- * ══════════════════════════════════════════════════════════════════ */
+// ══════════════════════════════════════════════════════════════════════════
+//  LSP Client
+// ══════════════════════════════════════════════════════════════════════════
 RustLspClient* rust_lsp_client_new(void);
 void           rust_lsp_client_free(RustLspClient* client);
 
@@ -116,7 +153,7 @@ int rust_lsp_formatting(RustLspClient* client,
                         const char* uri, const char* json_options);
 void rust_lsp_feed_message(RustLspClient* client, const char* json_data);
 
-/* ── LSP callback setters ──────────────────────────────────────── */
+// ── LSP callback setters ──────────────────────────────────────────────────
 void rust_lsp_on_server_started(RustLspClient* client,
                                 OnStringMessage cb, void* user_data);
 void rust_lsp_on_server_failed(RustLspClient* client,
@@ -140,9 +177,9 @@ void rust_lsp_on_code_action(RustLspClient* client,
                              void (*cb)(int, const char*, void*),
                              void* user_data);
 
-/* ══════════════════════════════════════════════════════════════════
- *  DAP Client
- * ══════════════════════════════════════════════════════════════════ */
+// ══════════════════════════════════════════════════════════════════════════
+//  DAP Client
+// ══════════════════════════════════════════════════════════════════════════
 RustDapClient* rust_dap_client_new(void);
 void           rust_dap_client_free(RustDapClient* client);
 
@@ -174,7 +211,7 @@ void rust_dap_evaluate(RustDapClient* client,
                        const char* context);
 void rust_dap_feed_message(RustDapClient* client, const char* json_data);
 
-/* ── DAP callback setters ──────────────────────────────────────── */
+// ── DAP callback setters ──────────────────────────────────────────────────
 void rust_dap_on_server_started(RustDapClient* c, OnStringMessage cb, void* u);
 void rust_dap_on_server_failed(RustDapClient* c, OnStringMessage cb, void* u);
 void rust_dap_on_initialized(RustDapClient* c, OnStringMessage cb, void* u);
@@ -186,9 +223,9 @@ void rust_dap_on_scopes(RustDapClient* c, OnScopes cb, void* u);
 void rust_dap_on_variables(RustDapClient* c, OnVariables cb, void* u);
 void rust_dap_on_evaluation(RustDapClient* c, OnStringMessage cb, void* u);
 
-/* ══════════════════════════════════════════════════════════════════
- *  Task Runner
- * ══════════════════════════════════════════════════════════════════ */
+// ══════════════════════════════════════════════════════════════════════════
+//  Task Runner
+// ══════════════════════════════════════════════════════════════════════════
 RustTaskRunner* rust_task_runner_new(void);
 void            rust_task_runner_free(RustTaskRunner* runner);
 
@@ -197,15 +234,15 @@ void   rust_task_runner_run(RustTaskRunner* runner, const char* task_name);
 void   rust_task_runner_stop(RustTaskRunner* runner);
 char** rust_task_runner_available(RustTaskRunner* runner, size_t* out_len);
 
-/* ── Task Runner callback setters ──────────────────────────────── */
+// ── Task Runner callback setters ──────────────────────────────────────────
 void rust_task_runner_on_started(RustTaskRunner* r, OnStringMessage cb, void* u);
 void rust_task_runner_on_finished(RustTaskRunner* r, OnStringMessage cb, void* u);
 void rust_task_runner_on_output(RustTaskRunner* r, OnStringMessage cb, void* u);
 void rust_task_runner_on_error(RustTaskRunner* r, OnStringMessage cb, void* u);
 
-/* ══════════════════════════════════════════════════════════════════
- *  Updater
- * ══════════════════════════════════════════════════════════════════ */
+// ══════════════════════════════════════════════════════════════════════════
+//  Updater
+// ══════════════════════════════════════════════════════════════════════════
 RustUpdater* rust_updater_new(void);
 void         rust_updater_free(RustUpdater* updater);
 
@@ -216,9 +253,9 @@ char* rust_updater_latest_version(const RustUpdater* updater);
 void  rust_updater_on_update_available(RustUpdater* u,
                                        OnStringMessage cb, void* user);
 
-/* ══════════════════════════════════════════════════════════════════
- *  Version Fetcher
- * ══════════════════════════════════════════════════════════════════ */
+// ══════════════════════════════════════════════════════════════════════════
+//  Version Fetcher
+// ══════════════════════════════════════════════════════════════════════════
 RustVersionFetcher* rust_version_fetcher_new(void);
 void                rust_version_fetcher_free(RustVersionFetcher* vf);
 
@@ -227,9 +264,9 @@ char* rust_version_fetcher_latest(RustVersionFetcher* vf);
 void  rust_version_fetcher_on_fetched(RustVersionFetcher* vf,
                                       OnStringMessage cb, void* user_data);
 
-/* ══════════════════════════════════════════════════════════════════
- *  Workspace
- * ══════════════════════════════════════════════════════════════════ */
+// ══════════════════════════════════════════════════════════════════════════
+//  Workspace
+// ══════════════════════════════════════════════════════════════════════════
 RustWorkspace* rust_workspace_new(void);
 void           rust_workspace_free(RustWorkspace* ws);
 
@@ -246,9 +283,9 @@ void   rust_workspace_add_recent(RustWorkspace* ws, const char* path);
 char*  rust_workspace_path(RustWorkspace* ws);
 bool   rust_workspace_is_loaded(RustWorkspace* ws);
 
-/* ══════════════════════════════════════════════════════════════════
- *  Config Validator
- * ══════════════════════════════════════════════════════════════════ */
+// ══════════════════════════════════════════════════════════════════════════
+//  Config Validator
+// ══════════════════════════════════════════════════════════════════════════
 RustConfigValidator* rust_config_validator_new(void);
 void                 rust_config_validator_free(RustConfigValidator* cv);
 
@@ -258,9 +295,9 @@ char* rust_config_validator_validate(RustConfigValidator* cv,
 void  rust_config_validator_on_error(RustConfigValidator* cv,
                                      OnStringMessage cb, void* user_data);
 
-/* ══════════════════════════════════════════════════════════════════
- *  Debug Session
- * ══════════════════════════════════════════════════════════════════ */
+// ══════════════════════════════════════════════════════════════════════════
+//  Debug Session
+// ══════════════════════════════════════════════════════════════════════════
 RustDebugSession* rust_debug_session_new(void);
 void              rust_debug_session_free(RustDebugSession* session);
 
@@ -269,9 +306,9 @@ void rust_debug_session_stop(RustDebugSession* session);
 void rust_debug_session_on_state_change(RustDebugSession* session,
                                         OnStringMessage cb, void* user_data);
 
-/* ══════════════════════════════════════════════════════════════════
- *  Debug Configuration Manager
- * ══════════════════════════════════════════════════════════════════ */
+// ══════════════════════════════════════════════════════════════════════════
+//  Debug Configuration Manager
+// ══════════════════════════════════════════════════════════════════════════
 RustDebugConfigurationManager* rust_debug_config_manager_new(void);
 void                           rust_debug_config_manager_free(
                                 RustDebugConfigurationManager* m);
@@ -283,9 +320,9 @@ char** rust_debug_config_manager_list(RustDebugConfigurationManager* m,
 char*  rust_debug_config_manager_get(RustDebugConfigurationManager* m,
                                      const char* name);
 
-/* ══════════════════════════════════════════════════════════════════
- *  Language Registry
- * ══════════════════════════════════════════════════════════════════ */
+// ══════════════════════════════════════════════════════════════════════════
+//  Language Registry
+// ══════════════════════════════════════════════════════════════════════════
 RustLanguageRegistry* rust_language_registry_new(void);
 void                  rust_language_registry_free(RustLanguageRegistry* lr);
 
@@ -300,9 +337,9 @@ char* rust_language_registry_get(RustLanguageRegistry* lr, const char* lang_id);
 char* rust_language_registry_detect(RustLanguageRegistry* lr,
                                     const char* filename);
 
-/* ══════════════════════════════════════════════════════════════════
- *  Language Server Manager
- * ══════════════════════════════════════════════════════════════════ */
+// ══════════════════════════════════════════════════════════════════════════
+//  Language Server Manager
+// ══════════════════════════════════════════════════════════════════════════
 RustLanguageServerManager* rust_ls_manager_new(void);
 void                       rust_ls_manager_free(RustLanguageServerManager* m);
 
@@ -313,14 +350,14 @@ void rust_ls_manager_start(RustLanguageServerManager* m,
 void rust_ls_manager_stop(RustLanguageServerManager* m, const char* lang_id);
 void rust_ls_manager_stop_all(RustLanguageServerManager* m);
 
-/* ══════════════════════════════════════════════════════════════════
- *  Diff Engine
- * ══════════════════════════════════════════════════════════════════ */
+// ══════════════════════════════════════════════════════════════════════════
+//  Diff Engine
+// ══════════════════════════════════════════════════════════════════════════
 char* rust_diff_compute(const char* left, const char* right);
 
-/* ══════════════════════════════════════════════════════════════════
- *  Encoding Engine
- * ══════════════════════════════════════════════════════════════════ */
+// ══════════════════════════════════════════════════════════════════════════
+//  Encoding Engine
+// ══════════════════════════════════════════════════════════════════════════
 char* rust_encoding_detect(const char* file_path);
 char* rust_encoding_detect_line_ending(const char* file_path);
 bool  rust_encoding_has_bom(const char* file_path);
@@ -329,21 +366,21 @@ char* rust_encoding_read(const char* file_path, const char* encoding);
 bool  rust_encoding_write(const char* file_path, const char* content, const char* encoding);
 char* rust_encoding_supported(void);
 
-/* ══════════════════════════════════════════════════════════════════
- *  Blame Engine
- * ══════════════════════════════════════════════════════════════════ */
+// ══════════════════════════════════════════════════════════════════════════
+//  Blame Engine
+// ══════════════════════════════════════════════════════════════════════════
 char* rust_blame_parse(const char* output);
 
-/* ══════════════════════════════════════════════════════════════════
- *  Emmet Engine
- * ══════════════════════════════════════════════════════════════════ */
+// ══════════════════════════════════════════════════════════════════════════
+//  Emmet Engine
+// ══════════════════════════════════════════════════════════════════════════
 char* rust_emmet_expand(const char* abbreviation);
 char* rust_emmet_expand_json(const char* abbreviation);
 bool  rust_emmet_is_css_shorthand(const char* text);
 
-/* ══════════════════════════════════════════════════════════════════
- *  Session Engine
- * ══════════════════════════════════════════════════════════════════ */
+// ══════════════════════════════════════════════════════════════════════════
+//  Session Engine
+// ══════════════════════════════════════════════════════════════════════════
 bool  rust_session_has_saved(void);
 bool  rust_session_clear(void);
 char* rust_session_load(void);
@@ -351,16 +388,16 @@ bool  rust_session_save(const char* json);
 bool  rust_session_has_hot_exit(void);
 char* rust_session_load_hot_exit(void);
 
-/* ══════════════════════════════════════════════════════════════════
- *  Test Engine
- * ══════════════════════════════════════════════════════════════════ */
+// ══════════════════════════════════════════════════════════════════════════
+//  Test Engine
+// ══════════════════════════════════════════════════════════════════════════
 char* rust_test_detect_framework(const char* project_path);
 char* rust_test_build_command(const char* framework, const char* project_path, const char* filter);
 char* rust_test_parse_output(const char* framework, const char* output);
 
-/* ══════════════════════════════════════════════════════════════════
- *  Settings Store (encrypted file + OS keychain)
- * ══════════════════════════════════════════════════════════════════ */
+// ══════════════════════════════════════════════════════════════════════════
+//  Settings Store (encrypted file + OS keychain)
+// ══════════════════════════════════════════════════════════════════════════
 int   settings_initialize(void);
 int   settings_initialize_with_names(const char* app, const char* org);
 char* settings_migration_status(void);
@@ -385,13 +422,9 @@ char* settings_get_path(void);
 char* settings_get_dir(void);
 void  settings_free_string(char* s);
 
-/* ══════════════════════════════════════════════════════════════════════
- *  UI Action Handler
- * ══════════════════════════════════════════════════════════════════════
- * Every user interaction is routed through Rust: it validates the action +
- * payload, decides, and returns the minimal Qt commands for C++ to execute.
- * Action/command names live in ui_actions.h (mirrors ui_actions.rs).
- */
+// ══════════════════════════════════════════════════════════════════════════
+//  UI Action Handler
+// ══════════════════════════════════════════════════════════════════════════
 RustUiActionHandler* rust_ui_actions_new(void);
 void                rust_ui_actions_free(RustUiActionHandler* h);
 
@@ -406,8 +439,7 @@ char* rust_ui_actions_handle(RustUiActionHandler* h,
  * Free the array with rust_free_strings(). */
 char** rust_ui_actions_log(RustUiActionHandler* h, size_t* out_len);
 
-#ifdef __cplusplus
-} /* extern "C" */
-#endif
+} // extern "C"
 
-#endif /* RUST_BACKEND_H */
+# endif // __cplusplus
+# endif /* RUST_BACKEND_H */

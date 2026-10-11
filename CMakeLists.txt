@@ -233,9 +233,11 @@ target_include_directories(scriptura_core PUBLIC
 # undefined references from objects/libraries that appear BEFORE it.
 target_link_libraries(scriptura PRIVATE
     scriptura_core
-    "${RUST_LIB_REL_PATH}"
     Qt${QT_VERSION_MAJOR}::Widgets
     Qt${QT_VERSION_MAJOR}::Network
+    "-Wl,--start-group"
+    "${RUST_LIB_REL_PATH}"
+    "-Wl,--end-group"
 )
 
 if(WIN32)

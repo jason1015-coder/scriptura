@@ -1197,3 +1197,151 @@ pub extern "C" fn rust_ui_actions_log(
     mem::forget(arr);
     ptr
 }
+
+// ═══════════════════════════════════════════════════════════════════════
+//  Theme Engine (plugin registry phase 1 — theme kind)
+// ═══════════════════════════════════════════════════════════════════════
+
+pub enum RustThemeEngine {}
+pub enum RustPluginRegistry {}
+
+make_new!(rust_theme_engine_new, crate::theme_engine::ThemeEngine, RustThemeEngine);
+make_free!(rust_theme_engine_free, crate::theme_engine::ThemeEngine, RustThemeEngine);
+
+#[no_mangle]
+pub extern "C" fn rust_theme_engine_scan(te: *mut RustThemeEngine, plugins_dir: *const c_char) {
+    if te.is_null() || plugins_dir.is_null() {
+        return;
+    }
+    let te = unsafe { &mut *(te as *mut crate::theme_engine::ThemeEngine) };
+    unsafe { te.scan(crate::cstr_to_str(plugins_dir)); }
+}
+
+#[no_mangle]
+pub extern "C" fn rust_theme_engine_list(te: *mut RustThemeEngine, out_len: *mut usize) -> *mut *mut c_char {
+    if te.is_null() {
+        unsafe { *out_len = 0; }
+        return std::ptr::null_mut();
+    }
+    let te = unsafe { &*(te as *const crate::theme_engine::ThemeEngine) };
+    let list = te.list();
+    unsafe { *out_len = list.len(); }
+    if list.is_empty() {
+        return std::ptr::null_mut();
+    }
+    let mut arr: Vec<*mut c_char> = list
+        .into_iter()
+        .map(|r| crate::str_to_cstring(&serde_json::to_string(&r).unwrap_or_default()))
+        .collect();
+    arr.shrink_to_fit();
+    let ptr = arr.as_mut_ptr();
+    mem::forget(arr);
+    ptr
+}
+
+#[no_mangle]
+pub extern "C" fn rust_theme_engine_get(te: *mut RustThemeEngine, id: *const c_char) -> *mut c_char {
+    if te.is_null() || id.is_null() {
+        return std::ptr::null_mut();
+    }
+    let te = unsafe { &*(te as *const crate::theme_engine::ThemeEngine) };
+    let id_str = unsafe { crate::cstr_to_str(id) };
+    match te.get(id_str) {
+        Some(r) => crate::str_to_cstring(&serde_json::to_string(&r.resolved).unwrap_or_default()),
+        None => std::ptr::null_mut(),
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn rust_theme_engine_validate(te: *mut RustThemeEngine, json_manifest: *const c_char) -> *mut c_char {
+    if te.is_null() || json_manifest.is_null() {
+        return crate::str_to_cstring(&String::new());
+    }
+    let te = unsafe { &*(te as *const crate::theme_engine::ThemeEngine) };
+    match unsafe { te.validate(crate::cstr_to_str(json_manifest)) } {
+        Ok(_) => crate::str_to_cstring(""),
+        Err(e) => crate::str_to_cstring(&e.to_string()),
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn rust_theme_engine_set_disabled(te: *mut RustThemeEngine, id: *const c_char, disabled: i32) {
+    if te.is_null() || id.is_null() {
+        return;
+    }
+    let te = unsafe { &mut *(te as *mut crate::theme_engine::ThemeEngine) };
+    unsafe { te.set_disabled(crate::cstr_to_str(id), disabled != 0); }
+}
+
+#[no_mangle]
+pub extern "C" fn rust_theme_engine_is_disabled(te: *const RustThemeEngine, id: *const c_char) -> bool {
+    if te.is_null() || id.is_null() {
+        return false;
+    }
+    let te = unsafe { &*(te as *const crate::theme_engine::ThemeEngine) };
+    unsafe { te.is_disabled(crate::cstr_to_str(id)) }
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  Plugin Registry (generic kind-registry core; theme-only for now)
+// ═══════════════════════════════════════════════════════════════════════
+
+make_new!(rust_plugin_registry_new, crate::plugin_registry::PluginRegistry, RustPluginRegistry);
+make_free!(rust_plugin_registry_free, crate::plugin_registry::PluginRegistry, RustPluginRegistry);
+
+#[no_mangle]
+pub extern "C" fn rust_plugin_registry_scan(r: *mut RustPluginRegistry, plugins_dir: *const c_char) {
+    if r.is_null() || plugins_dir.is_null() {
+        return;
+    }
+    let r = unsafe { &*(r as *const crate::plugin_registry::PluginRegistry) };
+    r.scan(unsafe { crate::cstr_to_str(plugins_dir) });
+}
+
+/// Returns an array of JSON strings, one per plugin:
+/// `[{id,name,version,kind,enabled,state}]` (PLUGINS.md §7).
+#[no_mangle]
+pub extern "C" fn rust_plugin_registry_list(r: *mut RustPluginRegistry, out_len: *mut usize) -> *mut *mut c_char {
+    if r.is_null() {
+        unsafe { *out_len = 0; }
+        return std::ptr::null_mut();
+    }
+    let r = unsafe { &*(r as *const crate::plugin_registry::PluginRegistry) };
+    let list = r.list();
+    unsafe { *out_len = list.len(); }
+    if list.is_empty() {
+        return std::ptr::null_mut();
+    }
+    let mut arr: Vec<*mut c_char> = list
+        .into_iter()
+        .map(|rec| crate::str_to_cstring(&serde_json::to_string(&rec).unwrap_or_default()))
+        .collect();
+    arr.shrink_to_fit();
+    let ptr = arr.as_mut_ptr();
+    mem::forget(arr);
+    ptr
+}
+
+#[no_mangle]
+pub extern "C" fn rust_plugin_registry_set_disabled(r: *mut RustPluginRegistry, id: *const c_char, disabled: i32) {
+    if r.is_null() || id.is_null() {
+        return;
+    }
+    let r = unsafe { &*(r as *const crate::plugin_registry::PluginRegistry) };
+    r.set_disabled(unsafe { crate::cstr_to_str(id) }, disabled != 0);
+}
+
+/// Resolved payload for a plugin id (for `theme`: a complete ThemeDefinition
+/// JSON). Returns null when the plugin is not loaded. Caller frees with
+/// `rust_free_string`.
+#[no_mangle]
+pub extern "C" fn rust_plugin_registry_get(r: *mut RustPluginRegistry, id: *const c_char) -> *mut c_char {
+    if r.is_null() || id.is_null() {
+        return std::ptr::null_mut();
+    }
+    let r = unsafe { &*(r as *const crate::plugin_registry::PluginRegistry) };
+    match r.get_resolved(unsafe { crate::cstr_to_str(id) }) {
+        Some(v) => crate::str_to_cstring(&serde_json::to_string(&v).unwrap_or_default()),
+        None => std::ptr::null_mut(),
+    }
+}

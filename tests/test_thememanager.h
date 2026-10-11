@@ -10,6 +10,8 @@ private slots:
     void testDefaultTheme();
     void testApplyTheme();
     void testThemeProperties();
+    void testPluginResolution();
+    void testPluginEnableToggle();
 };
 
 #endif

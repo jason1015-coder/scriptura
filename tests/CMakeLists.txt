@@ -18,14 +18,20 @@ set_target_properties(scriptura_tests PROPERTIES
 
 # Rust backend static library (scriptura_core's rust_adapter.cpp calls into it via FFI).
 # RUST_LIB_REL_PATH is inherited from the parent CMakeLists.txt scope.
+# IMPORTANT: keep the Rust staticlib AFTER scriptura_core in the link line so
+# the linker resolves the extern "C" symbols from rust_adapter.cpp.
 target_link_libraries(scriptura_tests PRIVATE
     scriptura_core
-    "${RUST_LIB_REL_PATH}"
     Qt${QT_VERSION_MAJOR}::Test
     Qt${QT_VERSION_MAJOR}::Widgets
     Qt${QT_VERSION_MAJOR}::Core
     Qt${QT_VERSION_MAJOR}::Network
+    "${RUST_LIB_REL_PATH}"
 )
+
+if(UNIX AND NOT APPLE)
+    target_link_libraries(scriptura_tests PRIVATE pthread dl rt m)
+endif()
 
 if(WIN32)
     # Rust FFI needs bcrypt (BCryptGenRandom from getrandom crate) plus other system libs

@@ -37,6 +37,8 @@ mod emmet_engine;
 mod session_engine;
 mod test_engine;
 mod ui_actions;
+mod theme_engine;
+mod plugin_registry;
 
 use std::cell::RefCell;
 use std::ffi::{CStr, CString};

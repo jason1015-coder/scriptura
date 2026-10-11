@@ -1,4 +1,6 @@
 #include "thememanager.h"
+#include "rust_adapter.h"
+#include "internals/settings_store.h"
 #include <QApplication>
 #include <QPalette>
 #include <QColor>
@@ -6,6 +8,12 @@
 #include <QStyle>
 #include <QSyntaxHighlighter>
 #include <QDebug>
+#include <QDir>
+#include <QFile>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QJsonParseError>
+
 
 // ── Helper to build a shared suffix (light/dark) ─────────────────────
 namespace {
@@ -210,6 +218,103 @@ void ThemeManager::applyTheme(const Theme &theme)
 
     emit themeChanged(theme);
 }
+
+void ThemeManager::applyDefinition(const ThemeDefinition &def)
+{
+    m_currentDefinition = def;
+
+    QApplication::setStyle("Fusion");
+    QPalette palette = buildPalette(m_currentDefinition);
+    QApplication::setPalette(palette);
+
+    QApplication *app = qobject_cast<QApplication*>(QApplication::instance());
+    if (app) {
+        app->setStyleSheet(generateGlobalStylesheet());
+    }
+
+    emit themeChanged(Theme(m_currentTheme.family, m_currentTheme.mode, m_currentTheme.features));
+}
+
+// ── Rust-backed custom-theme resolve + apply (PLUGINS.md §5.3) ───────────────
+
+QString ThemeManager::pluginsDir()
+{
+    // Themes/plugins live under the settings data dir (decision #7).
+    return SettingsStore::instance().storageDirectory() + QStringLiteral("/plugins");
+}
+
+bool ThemeManager::applyCustomTheme(const QString &pluginsDir, const QString &id)
+{
+    // The plugin registry is the single persisted source of truth for both the
+    // Plugins page and Appearance → Themes, so a disabled theme is absent here
+    // too (§7). The resolved JSON is a COMPLETE ThemeDefinition (§5.2).
+    auto *registry = RustBackend::instance()->pluginRegistry();
+    registry->scan(pluginsDir);
+    const QJsonObject resolved = registry->resolved(id);
+    if (resolved.isEmpty()) {
+        return false;
+    }
+    applyDefinition(fromJson(resolved));
+    return true;
+}
+
+QStringList ThemeManager::customThemeIds() const
+{
+    // Enabled custom themes only (kind == "theme"); a disabled plugin is
+    // absent from Appearance → Themes (§5.4 / §7).
+    auto *registry = RustBackend::instance()->pluginRegistry();
+    registry->scan(pluginsDir());
+    QStringList ids;
+    const QJsonArray plugins = registry->list();
+    for (const QJsonValue &v : plugins) {
+        const QJsonObject o = v.toObject();
+        if (o.value(QStringLiteral("kind")).toString() == QLatin1String("theme")
+            && o.value(QStringLiteral("enabled")).toBool()) {
+            ids << o.value(QStringLiteral("id")).toString();
+        }
+    }
+    return ids;
+}
+
+ThemeDefinition ThemeManager::fromJson(const QJsonObject &json)
+{
+    ThemeDefinition def;
+
+    auto parseColor = [&](const QString &key) -> QColor {
+        QString v = json.value(key).toString().trimmed();
+        if (v.isEmpty()) return QColor();
+        QColor c(v);
+        if (!c.isValid()) return QColor();
+        return c;
+    };
+
+    def.bgColor        = parseColor(QStringLiteral("bgColor"));
+    def.textColor      = parseColor(QStringLiteral("textColor"));
+    def.svgColor       = parseColor(QStringLiteral("svgColor"));
+    def.buttonColor    = parseColor(QStringLiteral("buttonColor"));
+    def.highlightColor = parseColor(QStringLiteral("highlightColor"));
+    def.baseColor      = parseColor(QStringLiteral("baseColor"));
+    def.borderColor    = parseColor(QStringLiteral("borderColor"));
+    def.lightColor     = parseColor(QStringLiteral("lightColor"));
+    def.midColor       = parseColor(QStringLiteral("midColor"));
+    def.darkColor      = parseColor(QStringLiteral("darkColor"));
+    def.buttonTextColor   = parseColor(QStringLiteral("buttonTextColor"));
+    def.highlightedText   = parseColor(QStringLiteral("highlightedText"));
+    def.synKeyword      = parseColor(QStringLiteral("synKeyword"));
+    def.synString       = parseColor(QStringLiteral("synString"));
+    def.synComment      = parseColor(QStringLiteral("synComment"));
+    def.synNumber       = parseColor(QStringLiteral("synNumber"));
+    def.synPreprocessor = parseColor(QStringLiteral("synPreprocessor"));
+    def.synTag          = parseColor(QStringLiteral("synTag"));
+    def.synAttribute    = parseColor(QStringLiteral("synAttribute"));
+    def.synCssProperty  = parseColor(QStringLiteral("synCssProperty"));
+    def.synVariable     = parseColor(QStringLiteral("synVariable"));
+    def.synFunction     = parseColor(QStringLiteral("synFunction"));
+    def.synEscape       = parseColor(QStringLiteral("synEscape"));
+
+    return def;
+}
+
 
 void ThemeManager::setCurrentTheme(const Theme &theme)
 {

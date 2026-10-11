@@ -850,6 +850,120 @@ void RustConfigValidatorAdapter::onValidationErrorCb(const char *data, void *use
 }
 
 // ═══════════════════════════════════════════════════════════════════════
+//  RustThemeEngineAdapter
+// ═══════════════════════════════════════════════════════════════════════
+
+RustThemeEngineAdapter::RustThemeEngineAdapter(QObject *parent)
+    : QObject(parent)
+{
+    m_engine = rust_theme_engine_new();
+}
+
+RustThemeEngineAdapter::~RustThemeEngineAdapter()
+{
+    rust_theme_engine_free(m_engine);
+}
+
+void RustThemeEngineAdapter::scan(const QString &pluginsDir)
+{
+    QByteArray dir = pluginsDir.toUtf8();
+    rust_theme_engine_scan(m_engine, dir.constData());
+}
+
+QJsonObject RustThemeEngineAdapter::resolvedTheme(const QString &id) const
+{
+    QByteArray bid = id.toUtf8();
+    char *json = rust_theme_engine_get(m_engine, bid.constData());
+    if (!json) {
+        return {};
+    }
+    QJsonObject obj = QJsonDocument::fromJson(QByteArray(json)).object();
+    rust_free_string(json);
+    return obj;
+}
+
+QStringList RustThemeEngineAdapter::enabledThemeIds() const
+{
+    size_t len = 0;
+    char **items = rust_theme_engine_list(m_engine, &len);
+    QStringList result;
+    for (size_t i = 0; i < len; ++i) {
+        const QJsonObject o = QJsonDocument::fromJson(QByteArray(items[i])).object();
+        if (!rust_theme_engine_is_disabled(m_engine, o.value(QStringLiteral("id")).toString().toUtf8().constData())) {
+            result << o.value(QStringLiteral("id")).toString();
+        }
+    }
+    rust_free_strings(items, len);
+    return result;
+}
+
+void RustThemeEngineAdapter::setDisabled(const QString &id, bool disabled)
+{
+    QByteArray bid = id.toUtf8();
+    rust_theme_engine_set_disabled(m_engine, bid.constData(), disabled ? 1 : 0);
+}
+
+bool RustThemeEngineAdapter::isDisabled(const QString &id) const
+{
+    QByteArray bid = id.toUtf8();
+    return rust_theme_engine_is_disabled(m_engine, bid.constData()) != 0;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  RustPluginRegistryAdapter
+// ═══════════════════════════════════════════════════════════════════════
+
+RustPluginRegistryAdapter::RustPluginRegistryAdapter(QObject *parent)
+    : QObject(parent)
+{
+    m_registry = rust_plugin_registry_new();
+}
+
+RustPluginRegistryAdapter::~RustPluginRegistryAdapter()
+{
+    rust_plugin_registry_free(m_registry);
+}
+
+void RustPluginRegistryAdapter::scan(const QString &pluginsDir)
+{
+    QByteArray dir = pluginsDir.toUtf8();
+    rust_plugin_registry_scan(m_registry, dir.constData());
+    emit registryChanged();
+}
+
+QJsonArray RustPluginRegistryAdapter::list() const
+{
+    size_t len = 0;
+    char **items = rust_plugin_registry_list(m_registry, &len);
+    QJsonArray arr;
+    for (size_t i = 0; i < len; ++i) {
+        arr.append(QJsonDocument::fromJson(QByteArray(items[i])).object());
+    }
+    rust_free_strings(items, len);
+    return arr;
+}
+
+void RustPluginRegistryAdapter::setDisabled(const QString &id, bool disabled)
+{
+    QByteArray bid = id.toUtf8();
+    rust_plugin_registry_set_disabled(m_registry, bid.constData(), disabled ? 1 : 0);
+    emit registryChanged();
+}
+
+QJsonObject RustPluginRegistryAdapter::resolved(const QString &id) const
+{
+    QByteArray bid = id.toUtf8();
+    char *json = rust_plugin_registry_get(m_registry, bid.constData());
+    if (!json) {
+        return {};
+    }
+    QJsonObject obj = QJsonDocument::fromJson(QByteArray(json)).object();
+    rust_free_string(json);
+    return obj;
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════
 //  UiActionBridge
 // ═══════════════════════════════════════════════════════════════════════
 
@@ -955,6 +1069,8 @@ RustBackend::RustBackend(QObject *parent)
     m_updater = new RustUpdaterAdapter(this);
     m_configValidator = new RustConfigValidatorAdapter(this);
     m_uiActions = new UiActionBridge(this);
+    m_themeEngine = new RustThemeEngineAdapter(this);
+    m_pluginRegistry = new RustPluginRegistryAdapter(this);
 }
 
 RustBackend::~RustBackend()

@@ -109,6 +109,30 @@ public:
     // Build a QPalette from a definition (for Qt widget styling)
     static QPalette buildPalette(const ThemeDefinition &def);
 
+    // Apply a fully-resolved custom ThemeDefinition (replaces applyTheme for
+    // built-ins). Sets m_currentDefinition and emits themeChanged().
+    void applyDefinition(const ThemeDefinition &def);
+
+    // Decode a ThemeDefinition from the resolved JSON a custom theme produces.
+    static ThemeDefinition fromJson(const QJsonObject &json);
+
+    // Directory under which theme plugins are discovered
+    // (<settings data dir>/plugins — decision #7).
+    static QString pluginsDir();
+
+    // ── Rust-backed custom-theme resolve + apply ─────────────────────────
+    // Load the resolved ThemeDefinition JSON for the given plugin id and apply it.
+    // Plugin ids live under settings_get_dir()/plugins/; the resolved JSON is what
+    // rust_theme_engine_get() returns (the merged ThemeDefinition).
+    bool applyCustomTheme(const QString &pluginsDir, const QString &id);
+
+    // List enabled plugin ids (themes) from settings so the appearance panel and
+    // the Plugins page can render the right set. Disabled entries are skipped.
+    QStringList customThemeIds() const;
+
+    // Metrics / helpers
+    int inheritedColorCount() const;
+
     // Legacy helpers (internally use buildDefinition + buildPalette)
     QPalette buildBasePalette(ColorFamily family, Mode mode) const;
 
