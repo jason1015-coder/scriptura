@@ -231,14 +231,27 @@ target_include_directories(scriptura_core PUBLIC
 # IMPORTANT: Rust library MUST come AFTER scriptura_core in the link line.
 # GNU/Clang linkers resolve symbols left-to-right: a library only satisfies
 # undefined references from objects/libraries that appear BEFORE it.
-target_link_libraries(scriptura PRIVATE
-    scriptura_core
-    Qt${QT_VERSION_MAJOR}::Widgets
-    Qt${QT_VERSION_MAJOR}::Network
-    "-Wl,--start-group"
-    "${RUST_LIB_REL_PATH}"
-    "-Wl,--end-group"
-)
+#
+# --start-group/--end-group are GNU ld options unsupported by Apple's ld
+# (and the Apple linker already resolves circular references by default),
+# so only apply them on non-Apple platforms.
+if(APPLE)
+    target_link_libraries(scriptura PRIVATE
+        scriptura_core
+        Qt${QT_VERSION_MAJOR}::Widgets
+        Qt${QT_VERSION_MAJOR}::Network
+        "${RUST_LIB_REL_PATH}"
+    )
+else()
+    target_link_libraries(scriptura PRIVATE
+        scriptura_core
+        Qt${QT_VERSION_MAJOR}::Widgets
+        Qt${QT_VERSION_MAJOR}::Network
+        "-Wl,--start-group"
+        "${RUST_LIB_REL_PATH}"
+        "-Wl,--end-group"
+    )
+endif()
 
 if(WIN32)
     # Rust FFI needs bcrypt (BCryptGenRandom from getrandom crate), dwmapi, etc.
