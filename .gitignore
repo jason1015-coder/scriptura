@@ -176,3 +176,5 @@ env/
 # Deployment
 /package/
 Scriptura-Setup.exe
+
+.harn/
