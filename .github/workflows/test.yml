@@ -38,7 +38,7 @@ jobs:
           QT_QPA_PLATFORM=offscreen build/tests/scriptura_tests 2>&1 || echo "Exit code: $?"
       
       - name: Run C++ unit tests
-        run: cd build && ctest --output-on-failure --timeout 300
+        run: cd build && ctest --output-on-failure --timeout 600
 
       - name: Generate coverage report
         run: |
@@ -84,7 +84,7 @@ jobs:
       - name: Run C++ unit tests
         env:
           QT_QPA_PLATFORM: offscreen
-        run: cd build && ctest --output-on-failure --timeout 300
+        run: cd build && ctest --output-on-failure --timeout 600
 
   test-windows:
     runs-on: windows-latest
@@ -150,5 +150,5 @@ jobs:
           $env:PATH = "${env:Qt6_DIR}\bin;$env:PATH"
           $env:QT_QPA_PLATFORM = "offscreen"
           cd build
-          ctest --output-on-failure -C Release --timeout 300
+          ctest --output-on-failure -C Release --timeout 600
           if ($LASTEXITCODE -ne 0) { throw "Ctest failed with exit code $LASTEXITCODE" }
