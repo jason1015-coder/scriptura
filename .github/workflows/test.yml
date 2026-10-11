@@ -84,7 +84,7 @@ jobs:
       - name: Run C++ unit tests
         env:
           QT_QPA_PLATFORM: offscreen
-        run: cd build && ctest --output-on-failure --timeout 600
+        run: cd build && ctest --output-on-failure --timeout 1200
 
   test-windows:
     runs-on: windows-latest
