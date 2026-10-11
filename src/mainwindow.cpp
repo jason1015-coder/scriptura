@@ -1020,6 +1020,99 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
     m_bookmarkPanel->hide();
     registerPanel(":/icons/file.svg", tr("Bookmarks"), tr("Bookmarks"), true, m_bookmarkPanel);
 
+    // ── Plugins Panel ────────────────────────────────────────────────────
+    // Dedicated tab for managing plugins (enable/disable, view details)
+    auto *pluginRegistry = RustBackend::instance()->pluginRegistry();
+    pluginRegistry->scan(ThemeManager::pluginsDir());
+
+    QWidget *pluginsPanel = new QWidget(this);
+    pluginsPanel->hide();
+    QVBoxLayout *pluginsPanelLayout = new QVBoxLayout(pluginsPanel);
+    pluginsPanelLayout->setSpacing(6);
+    pluginsPanelLayout->setContentsMargins(16, 16, 16, 16);
+
+    auto clearLayout = [](QLayout *layout) {
+        if (!layout) return;
+        QLayoutItem *item;
+        while ((item = layout->takeAt(0)) != nullptr) {
+            if (QWidget *w = item->widget()) w->deleteLater();
+            delete item;
+        }
+    };
+
+    auto rebuildPluginsPanel = [this, pluginsPanel, pluginsPanelLayout, clearLayout, pluginRegistry]() {
+        clearLayout(pluginsPanelLayout);
+        const QJsonArray plugins = pluginRegistry->list();
+        if (plugins.isEmpty()) {
+            QLabel *none = new QLabel(
+                tr("No plugins installed. Drop a <id>.json into the plugins folder and reopen the Plugins tab."),
+                pluginsPanel);
+            none->setWordWrap(true);
+            pluginsPanelLayout->addWidget(none);
+            pluginsPanelLayout->addStretch();
+            return;
+        }
+        // Header row: Name | Details | Enabled
+        QHBoxLayout *header = new QHBoxLayout();
+        header->setSpacing(6);
+        QLabel *nameHeader = new QLabel(tr("Name"), pluginsPanel);
+        QLabel *detailsHeader = new QLabel(tr("Details"), pluginsPanel);
+        QLabel *enabledHeader = new QLabel(tr("Enabled"), pluginsPanel);
+        QFont headerFont = nameHeader->font();
+        headerFont.setBold(true);
+        nameHeader->setFont(headerFont);
+        detailsHeader->setFont(headerFont);
+        enabledHeader->setFont(headerFont);
+        header->addWidget(nameHeader, 2);
+        header->addWidget(detailsHeader, 3);
+        header->addWidget(enabledHeader, 0);
+        pluginsPanelLayout->addLayout(header);
+
+        for (const QJsonValue &v : plugins) {
+            const QJsonObject o = v.toObject();
+            const QString id = o.value(QStringLiteral("id")).toString();
+            const QString name = o.value(QStringLiteral("name")).toString();
+            const QString version = o.value(QStringLiteral("version")).toString();
+            const QString kind = o.value(QStringLiteral("kind")).toString();
+            const QString state = o.value(QStringLiteral("state")).toString();
+            const bool enabled = o.value(QStringLiteral("enabled")).toBool();
+
+            QHBoxLayout *row = new QHBoxLayout();
+            row->setSpacing(6);
+
+            QLabel *nameLabel = new QLabel(name.isEmpty() ? id : name, pluginsPanel);
+            row->addWidget(nameLabel, 2);
+
+            QLabel *metaLabel = new QLabel(
+                tr("%1  •  v%2  •  %3  •  %4").arg(kind, version, state, id), pluginsPanel);
+            metaLabel->setProperty("class", "muted");
+            row->addWidget(metaLabel, 3);
+
+            QCheckBox *toggle = new QCheckBox(tr("Enabled"), pluginsPanel);
+            toggle->setChecked(enabled);
+            row->addWidget(toggle, 0);
+
+            pluginsPanelLayout->addLayout(row);
+
+            // Defer the registry mutation so this toggle's own signal handler
+            // finishes before rebuildPluginsPanel() tears the row down.
+            connect(toggle, &QCheckBox::toggled, this, [pluginRegistry, id](bool checked) {
+                QMetaObject::invokeMethod(pluginRegistry, [pluginRegistry, id, checked]() {
+                    pluginRegistry->setDisabled(id, !checked);
+                }, Qt::QueuedConnection);
+            });
+        }
+        pluginsPanelLayout->addStretch();
+    };
+
+    rebuildPluginsPanel();
+    connect(pluginRegistry, &RustPluginRegistryAdapter::registryChanged,
+            pluginsPanel, [rebuildPluginsPanel]() {
+                rebuildPluginsPanel();
+            });
+
+    registerPanel(":/icons/config.svg", tr("Manage Plugins"), tr("Plugins"), true, pluginsPanel);
+
     // Connect bookmark panel to active editor (per-tab sync)
     connect(ui->tabWidget, &QTabWidget::currentChanged, this, [this](int index) {
         if (index >= 0 && index < ui->tabWidget->count()) {
