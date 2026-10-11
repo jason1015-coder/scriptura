@@ -816,6 +816,12 @@ void TestTerminal::testViewFontSizeClamped()
 
 void TestTerminal::testPanelRunsCommandInTerminal()
 {
+    // TerminalPanel spawns a shell via PTY; offscreen CI (especially macOS) hangs
+    // waiting for the pty. Skip in offscreen mode.
+    if (QString(qgetenv("QT_QPA_PLATFORM")) == "offscreen") {
+        QSKIP("Terminal PTY not available in offscreen mode");
+    }
+
 #ifdef Q_OS_UNIX
     TerminalPanel panel;
     panel.setShellProgram(QStringLiteral("/bin/sh"));
@@ -837,6 +843,12 @@ void TestTerminal::testPanelRunsCommandInTerminal()
 
 void TestTerminal::testPanelSessionLifecycle()
 {
+    // TerminalPanel spawns a shell via PTY; offscreen CI (especially macOS) hangs
+    // waiting for the pty. Skip in offscreen mode.
+    if (QString(qgetenv("QT_QPA_PLATFORM")) == "offscreen") {
+        QSKIP("Terminal PTY not available in offscreen mode");
+    }
+
 #ifdef Q_OS_UNIX
     TerminalPanel panel;
     panel.setShellProgram(QStringLiteral("/bin/sh"));
