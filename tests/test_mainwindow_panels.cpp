@@ -337,10 +337,10 @@ void TestMainWindowPanels::testReopenedPanelGetsItsTabBack()
     QVERIFY(fx.create());
 
     const int searchIndex = fx.panelIndex(QStringLiteral("Search"));
-    const int terminalIndex = fx.panelIndex(QStringLiteral("Terminal"));
-    QVERIFY(searchIndex >= 0 && terminalIndex >= 0);
+    const int bookmarksIndex = fx.panelIndex(QStringLiteral("Bookmarks"));
+    QVERIFY(searchIndex >= 0 && bookmarksIndex >= 0);
     fx.win->openPanelAsTab(searchIndex);
-    fx.win->openPanelAsTab(terminalIndex);
+    fx.win->openPanelAsTab(bookmarksIndex);
     QCOMPARE(openPanelTabTitles(fx.tabBar).size(), 2);
 
     fx.win->closePanelTab(searchIndex);
@@ -353,14 +353,14 @@ void TestMainWindowPanels::testReopenedPanelGetsItsTabBack()
     const QStringList titles = openPanelTabTitles(fx.tabBar);
     QCOMPARE(titles.size(), 2);
     QVERIFY(titles.contains(QStringLiteral("Search")));
-    QVERIFY(titles.contains(QStringLiteral("Terminal")));
-    QCOMPARE(panelTabIndex(fx.tabBar, terminalIndex) >= 0, true);
+    QVERIFY(titles.contains(QStringLiteral("Bookmarks")));
+    QCOMPARE(panelTabIndex(fx.tabBar, bookmarksIndex) >= 0, true);
     QCOMPARE(fx.tabBar->currentIndex(), panelTabIndex(fx.tabBar, searchIndex));
 
-    fx.tabBar->setCurrentIndex(panelTabIndex(fx.tabBar, terminalIndex));
+    fx.tabBar->setCurrentIndex(panelTabIndex(fx.tabBar, bookmarksIndex));
     QCoreApplication::processEvents();
     QCOMPARE(fx.editorStack->currentWidget()->metaObject()->className(),
-             QByteArray("TerminalPanel"));
+             QByteArray("BookmarkPanelWidget"));
 }
 
 void TestMainWindowPanels::testEveryPanelOpensAsTab()
