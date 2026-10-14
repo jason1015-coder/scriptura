@@ -219,10 +219,12 @@ A theme plugin is a single JSON file whose **filename stem must equal its `id`**
 | `version`   | yes      | Valid [semver](https://semver.org/)                         |
 | `kind`      | no       | `"theme"` (default). Unknown kinds are rejected.           |
 | `apiVersion`| no       | Defaults to `1`. Must not exceed the host's supported API (`HOST_API_VERSION`, currently `1`). |
-| `theme`     | yes      | Theme config (see below)                                    |
+| `theme`     | no       | Default theme config (family/mode) for all themes in the pack |
+| `themes`    | no       | Array of theme variants (replaces single `theme` for multi-theme packs) |
 
 The `theme` object may omit any field; the editor merges what it is given onto the built-in palette for the chosen family/mode, so a partial theme still resolves to a complete `ThemeDefinition`.
 
+**Single theme (legacy format):**
 ```json
 {
   "id": "my-theme",
@@ -239,6 +241,31 @@ The `theme` object may omit any field; the editor merges what it is given onto t
   }
 }
 ```
+
+**Multiple themes (new format):**
+```json
+{
+  "id": "my-theme-pack",
+  "name": "My Theme Pack",
+  "version": "1.0.0",
+  "kind": "theme",
+  "theme": { "family": "blue", "mode": "dark" },
+  "themes": [
+    {
+      "id": "variant-a",
+      "name": "Variant A",
+      "theme": { "colors": { "bgColor": "#111111" } }
+    },
+    {
+      "id": "variant-b",
+      "name": "Variant B",
+      "theme": { "colors": { "bgColor": "#222222" } }
+    }
+  ]
+}
+```
+
+Each theme in `themes` has its own `id` and `name`, and optionally its own `theme` config. The plugin-level `theme` provides defaults (family/mode) inherited by all variants. The resolved theme IDs use the format `plugin-id:theme-id` (e.g., `my-theme-pack:variant-a`).
 
 ### Installing a theme
 

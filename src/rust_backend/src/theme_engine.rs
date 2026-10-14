@@ -19,6 +19,16 @@ pub struct ThemeManifest {
     pub kind: String, // "theme" | "tab"
     #[serde(default)]
     pub theme: Option<ThemeConfig>,
+    #[serde(default)]
+    pub themes: Option<Vec<ThemeEntry>>,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct ThemeEntry {
+    pub id: String,
+    pub name: String,
+    #[serde(default)]
+    pub theme: Option<ThemeConfig>,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -42,6 +52,15 @@ pub struct ThemeLoadResult {
     pub name: String,
     pub version: String,
     pub resolved: serde_json::Value,
+}
+
+/// Multiple resolved themes from a single plugin.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct MultiThemeLoadResult {
+    pub plugin_id: String,
+    pub plugin_name: String,
+    pub plugin_version: String,
+    pub themes: Vec<ThemeLoadResult>,
 }
 
 /// C++-facing resolved-theme record used by the registry list.
@@ -102,10 +121,8 @@ pub fn builtin_colors(family: &str, mode: &str) -> serde_json::Value {
     })
 }
 
-/// Merge `manifest.theme.colors` (any subset) onto the built-in base.
+/// Resolve a single ThemeConfig onto the built-in base.
 /// Unknown keys are ignored; missing keys fall back to the base.
-/// This is the heritability guarantee: a partial theme is still a complete
-/// ThemeDefinition, never a partial one that C++ has to fill in.
 pub fn resolve_colors(manifest: &ThemeManifest) -> serde_json::Value {
     let base = builtin_colors(
         manifest.theme.as_ref().and_then(|t| t.family.as_deref()).unwrap_or("default"),
@@ -128,10 +145,68 @@ pub fn resolve_colors(manifest: &ThemeManifest) -> serde_json::Value {
     serde_json::Value::Object(merged)
 }
 
+/// Resolve a ThemeEntry onto the built-in base.
+pub fn resolve_theme_entry(entry: &ThemeEntry, default_family: &str, default_mode: &str) -> serde_json::Value {
+    let base = builtin_colors(
+        entry.theme.as_ref().and_then(|t| t.family.as_deref()).unwrap_or(default_family),
+        entry.theme.as_ref().and_then(|t| t.mode.as_deref()).unwrap_or(default_mode),
+    );
+
+    let base_map = base.as_object().expect("builtin_colors is always an object");
+    let mut merged: serde_json::Map<String, serde_json::Value> = base_map.clone();
+
+    if let Some(colors) = &entry.theme.as_ref().and_then(|t| t.colors.as_ref()) {
+        if let Some(colors_map) = colors.as_object() {
+            for (key, val) in colors_map {
+                if base_map.contains_key(key) {
+                    merged.insert(key.clone(), val.clone());
+                }
+            }
+        }
+    }
+
+    serde_json::Value::Object(merged)
+}
+
+/// Resolve multiple themes from a manifest (supports both legacy single theme and new multiple themes).
+pub fn resolve_all_themes(manifest: &ThemeManifest) -> Vec<ThemeLoadResult> {
+    let mut results = Vec::new();
+    
+    // Default family/mode from the plugin-level theme config (if any)
+    let default_family = manifest.theme.as_ref().and_then(|t| t.family.as_deref()).unwrap_or("default");
+    let default_mode = manifest.theme.as_ref().and_then(|t| t.mode.as_deref()).unwrap_or("light");
+    
+    // If there are multiple themes, use those
+    if let Some(themes) = &manifest.themes {
+        for entry in themes {
+            let resolved = resolve_theme_entry(entry, default_family, default_mode);
+            results.push(ThemeLoadResult {
+                id: entry.id.clone(),
+                name: entry.name.clone(),
+                version: manifest.version.clone(),
+                resolved,
+            });
+        }
+    } 
+    // Otherwise fall back to single theme (legacy)
+    else if manifest.theme.is_some() {
+        let resolved = resolve_colors(manifest);
+        results.push(ThemeLoadResult {
+            id: manifest.id.clone(),
+            name: manifest.name.clone(),
+            version: manifest.version.clone(),
+            resolved,
+        });
+    }
+    
+    results
+}
+
 
 // ── Public scanner API ───────────────────────────────────────────────────────
 
-pub fn load_theme(themes_dir: &Path, id: &str) -> Result<ThemeLoadResult, String> {
+/// Load all themes from a plugin file (supports multiple themes per file).
+pub fn load_themes(themes_dir: &Path, id: &str) -> Result<Vec<ThemeLoadResult>, String> {
     let theme_file = themes_dir.join(format!("{}.json", id));
     if !theme_file.exists() {
         return Err(format!("Theme file not found: {}", theme_file.display()));
@@ -149,17 +224,22 @@ pub fn load_theme(themes_dir: &Path, id: &str) -> Result<ThemeLoadResult, String
         ));
     }
 
-    let resolved = resolve_colors(&manifest);
+    let themes = resolve_all_themes(&manifest);
+    if themes.is_empty() {
+        return Err(format!("No valid themes found in plugin '{}'", id));
+    }
 
-    Ok(ThemeLoadResult {
-        id: manifest.id.clone(),
-        name: manifest.name.clone(),
-        version: manifest.version.clone(),
-        resolved,
-    })
+    Ok(themes)
 }
 
-/// Scans all theme files in the directory and returns a list of loaded themes.
+/// Load a single theme by plugin ID and theme ID (for backwards compatibility).
+pub fn load_theme(themes_dir: &Path, plugin_id: &str) -> Result<ThemeLoadResult, String> {
+    let themes = load_themes(themes_dir, plugin_id)?;
+    // Return the first theme for backwards compatibility
+    themes.into_iter().next().ok_or_else(|| "No themes found".to_string())
+}
+
+/// Scan all theme files in the directory and return a list of loaded themes.
 pub fn scan_themes(themes_dir: &Path) -> Vec<ThemeLoadResult> {
     let mut results = Vec::new();
     let dir = match fs::read_dir(themes_dir) {
@@ -170,8 +250,8 @@ pub fn scan_themes(themes_dir: &Path) -> Vec<ThemeLoadResult> {
         let path = entry.path();
         if path.is_file() && path.extension().and_then(|s| s.to_str()) == Some("json") {
             let id = path.file_stem().and_then(|s| s.to_str()).unwrap_or_default();
-            match load_theme(themes_dir, id) {
-                Ok(result) => results.push(result),
+            match load_themes(themes_dir, id) {
+                Ok(themes) => results.extend(themes),
                 Err(e) => eprintln!("Failed to load theme {}: {}", path.display(), e),
             }
         }
@@ -289,6 +369,7 @@ mod tests {
                     "synKeyword": "#93c5fd"
                 })),
             }),
+            themes: None,
         };
 
         let resolved = resolve_colors(&manifest);
@@ -318,6 +399,7 @@ mod tests {
                 features: None,
                 colors: None,
             }),
+            themes: None,
         };
 
         let resolved = resolve_colors(&manifest);
@@ -344,6 +426,7 @@ mod tests {
                     "unknownFutureKey": "#ffffff"
                 })),
             }),
+            themes: None,
         };
 
         let resolved = resolve_colors(&manifest);
@@ -433,6 +516,7 @@ mod tests {
                     "synKeyword": "#93c5fd"
                 })),
             }),
+            themes: None,
         };
 
         let resolved = resolve_colors(&manifest);

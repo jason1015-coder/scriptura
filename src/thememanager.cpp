@@ -250,7 +250,23 @@ bool ThemeManager::applyCustomTheme(const QString &pluginsDir, const QString &id
     // too (§7). The resolved JSON is a COMPLETE ThemeDefinition (§5.2).
     auto *registry = RustBackend::instance()->pluginRegistry();
     registry->scan(pluginsDir);
-    const QJsonObject resolved = registry->resolved(id);
+    
+    // Handle compound ID format: "plugin-id:theme-id"
+    QString resolvedId = id;
+    if (id.contains(':')) {
+        // Already a compound ID, use as-is
+    } else {
+        // Legacy single theme plugin - try direct ID first
+        const QJsonObject resolved = registry->resolved(id);
+        if (!resolved.isEmpty()) {
+            applyDefinition(fromJson(resolved));
+            return true;
+        }
+        // If not found, the ID might be a plugin ID with multiple themes
+        // We'll let the registry handle it below
+    }
+    
+    const QJsonObject resolved = registry->resolved(resolvedId);
     if (resolved.isEmpty()) {
         return false;
     }

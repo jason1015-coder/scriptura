@@ -16,7 +16,7 @@ use std::sync::Mutex;
 
 use serde_json::Value;
 
-use crate::theme_engine::{resolve_colors, ThemeManifest};
+use crate::theme_engine::{resolve_all_themes, resolve_colors, ThemeManifest, ThemeLoadResult};
 
 /// Host API version this build supports. A manifest whose `apiVersion`
 /// exceeds this is rejected (PLUGINS.md §2).
@@ -77,6 +77,7 @@ pub trait KindHandler: Send + Sync {
 
 /// The built-in `theme` handler. Delegates the colour merge to `theme_engine`
 /// so a partial theme still resolves to a complete ThemeDefinition.
+/// Supports both legacy single theme and new multiple themes per plugin.
 pub struct ThemeKindHandler;
 
 impl KindHandler for ThemeKindHandler {
@@ -95,7 +96,12 @@ impl KindHandler for ThemeKindHandler {
     fn activate(&self, ctx: &ActivateCtx) -> Result<Value, String> {
         let manifest: ThemeManifest = serde_json::from_value(ctx.manifest.clone())
             .map_err(|e| format!("invalid theme manifest: {e}"))?;
-        Ok(resolve_colors(&manifest))
+        let themes = resolve_all_themes(&manifest);
+        if themes.is_empty() {
+            return Err("no valid themes in manifest".to_string());
+        }
+        // Return array of resolved themes
+        Ok(serde_json::to_value(themes).unwrap())
     }
 
     fn builtin(&self) -> bool {
@@ -316,15 +322,40 @@ impl PluginRegistry {
                 });
             }
             Some(Ok(resolved)) => {
-                self.resolved.lock().unwrap().insert(id.clone(), resolved);
-                self.record(PluginRecord {
-                    id,
-                    name,
-                    version,
-                    kind,
-                    enabled: true,
-                    state: "loaded".to_string(),
-                });
+                // Handle both single theme (legacy) and multiple themes (new)
+                if let Some(themes_array) = resolved.as_array() {
+                    // Multiple themes: create a record for each
+                    for theme in themes_array {
+                        if let (Some(theme_id), Some(theme_name), Some(theme_resolved)) = (
+                            theme.get("id").and_then(|v| v.as_str()),
+                            theme.get("name").and_then(|v| v.as_str()),
+                            theme.get("resolved"),
+                        ) {
+                            // Use compound ID: plugin-id:theme-id
+                            let compound_id = format!("{}:{}", id, theme_id);
+                            self.resolved.lock().unwrap().insert(compound_id.clone(), theme_resolved.clone());
+                            self.record(PluginRecord {
+                                id: compound_id,
+                                name: format!("{} — {}", name, theme_name),
+                                version: version.clone(),
+                                kind: kind.clone(),
+                                enabled: true,
+                                state: "loaded".to_string(),
+                            });
+                        }
+                    }
+                } else {
+                    // Legacy single theme
+                    self.resolved.lock().unwrap().insert(id.clone(), resolved);
+                    self.record(PluginRecord {
+                        id,
+                        name,
+                        version,
+                        kind,
+                        enabled: true,
+                        state: "loaded".to_string(),
+                    });
+                }
             }
         }
     }
@@ -478,12 +509,13 @@ mod tests {
         reg.scan(dir.path().to_str().unwrap());
         let list = reg.list();
         assert_eq!(list.len(), 1);
-        assert_eq!(list[0].id, "my-theme");
+        // New compound ID format: plugin-id:theme-id
+        assert_eq!(list[0].id, "my-theme:my-theme");
         assert_eq!(list[0].kind, "theme");
         assert!(list[0].enabled);
         assert_eq!(list[0].state, "loaded");
         // Resolved payload is a COMPLETE ThemeDefinition with the override applied.
-        let resolved = reg.get_resolved("my-theme").expect("resolved");
+        let resolved = reg.get_resolved("my-theme:my-theme").expect("resolved");
         assert_eq!(resolved["bgColor"], "#1a1b1e");
         assert!(resolved.as_object().unwrap().len() >= 23);
         assert!(resolved.get("textColor").is_some());

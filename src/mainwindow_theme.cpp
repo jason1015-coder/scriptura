@@ -124,43 +124,103 @@ QWidget* MainWindow::createUnifiedSettingsWidget()
         }
     };
 
-    // Enabled theme-plugin ids read straight from the registry.
-    auto enabledThemeIds = [pluginRegistry]() {
-        QStringList ids;
+    // Helper to build a styled button from a resolved ThemeDefinition JSON
+    auto makeThemeButton = [](QWidget *parent, const QString &label, const QJsonObject &resolved) {
+        QPushButton *btn = new QPushButton(label, parent);
+        btn->setCursor(Qt::PointingHandCursor);
+        btn->setCheckable(true);
+        btn->setMinimumHeight(48);
+        btn->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+        
+        // Extract colors from resolved ThemeDefinition
+        QColor bg = QColor(resolved.value("bgColor").toString("#2d2d30"));
+        QColor tc = QColor(resolved.value("textColor").toString("#afafb6"));
+        QColor hl = QColor(resolved.value("highlightColor").toString("#6496ff"));
+        QColor br = QColor(resolved.value("borderColor").toString("#4c4c51"));
+        
+        btn->setStyleSheet(QStringLiteral(
+            "QPushButton {"
+            "  background-color: %1; color: %2; padding: 10px;"
+            "  border: 2px solid %3; border-radius: 10px; text-align: left;"
+            "  font-weight: 500;"
+            "}"
+            "QPushButton:checked {"
+            "  border-color: %4;"
+            "}"
+            "QPushButton:hover:!checked {"
+            "  border-color: %4;"
+            "}")
+            .arg(bg.name(), tc.name(), br.name(), hl.name()));
+        return btn;
+    };
+
+    // Enabled theme plugins read straight from the registry.
+    auto enabledThemePlugins = [pluginRegistry]() {
+        QJsonArray result;
         const QJsonArray plugins = pluginRegistry->list();
         for (const QJsonValue &v : plugins) {
             const QJsonObject o = v.toObject();
             if (o.value(QStringLiteral("kind")).toString() == QLatin1String("theme")
                 && o.value(QStringLiteral("enabled")).toBool()) {
-                ids << o.value(QStringLiteral("id")).toString();
+                result.append(o);
             }
         }
-        return ids;
+        return result;
     };
 
     auto rebuildCustomThemes = [this, content, customThemesContainer, customThemesLayout,
-                                clearLayout, enabledThemeIds]() {
+                                clearLayout, enabledThemePlugins, makeThemeButton, pluginRegistry]() {
         clearLayout(customThemesLayout);
-        const QStringList ids = enabledThemeIds();
-        if (ids.isEmpty()) {
+        const QJsonArray plugins = enabledThemePlugins();
+        if (plugins.isEmpty()) {
             customThemesContainer->setVisible(false);
             return;
         }
         customThemesContainer->setVisible(true);
         QGroupBox *customThemeGroup = new QGroupBox(tr("Custom Themes"), customThemesContainer);
         QGridLayout *customGrid = new QGridLayout(customThemeGroup);
-        customGrid->setSpacing(6);
+        customGrid->setSpacing(8);
         int cIdx = 0;
-        for (const QString &ctId : ids) {
-            QPushButton *btn = new QPushButton(ctId, customThemeGroup);
-            btn->setCursor(Qt::PointingHandCursor);
-            btn->setCheckable(true);
-            const QString idCopy = ctId;
-            connect(btn, &QPushButton::clicked, this, [this, idCopy]() {
-                m_themeManager->applyCustomTheme(ThemeManager::pluginsDir(), idCopy);
-            });
-            customGrid->addWidget(btn, cIdx / 4, cIdx % 4);
-            ++cIdx;
+        for (const QJsonValue &v : plugins) {
+            const QJsonObject plugin = v.toObject();
+            QString pluginId = plugin.value(QStringLiteral("id")).toString();
+            QString pluginName = plugin.value(QStringLiteral("name")).toString();
+            
+            // Get resolved themes for this plugin
+            QJsonValue resolvedVal = pluginRegistry->resolved(pluginId);
+            if (resolvedVal.isArray()) {
+                // Multiple themes per plugin
+                QJsonArray themes = resolvedVal.toArray();
+                for (const QJsonValue &themeVal : themes) {
+                    QJsonObject theme = themeVal.toObject();
+                    QString themeId = theme.value(QStringLiteral("id")).toString();
+                    QString themeName = theme.value(QStringLiteral("name")).toString();
+                    QJsonObject themeResolved = theme.value(QStringLiteral("resolved")).toObject();
+                    
+                    if (themeResolved.isEmpty()) continue;
+                    
+                    QString compoundId = pluginId + ":" + themeId;
+                    QString label = pluginName + " — " + themeName;
+                    
+                    QPushButton *btn = makeThemeButton(customThemeGroup, label, themeResolved);
+                    connect(btn, &QPushButton::clicked, this, [this, compoundId]() {
+                        m_themeManager->applyCustomTheme(ThemeManager::pluginsDir(), compoundId);
+                    });
+                    customGrid->addWidget(btn, cIdx / 4, cIdx % 4);
+                    ++cIdx;
+                }
+            } else if (resolvedVal.isObject()) {
+                // Legacy single theme
+                QJsonObject themeResolved = resolvedVal.toObject();
+                if (!themeResolved.isEmpty()) {
+                    QPushButton *btn = makeThemeButton(customThemeGroup, pluginName, themeResolved);
+                    connect(btn, &QPushButton::clicked, this, [this, pluginId]() {
+                        m_themeManager->applyCustomTheme(ThemeManager::pluginsDir(), pluginId);
+                    });
+                    customGrid->addWidget(btn, cIdx / 4, cIdx % 4);
+                    ++cIdx;
+                }
+            }
         }
         customThemesLayout->addWidget(customThemeGroup);
     };
