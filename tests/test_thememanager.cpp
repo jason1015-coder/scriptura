@@ -84,7 +84,12 @@ void TestThemeManager::testPluginResolution()
     // --- Phase 2: Use the RustBackend adapter to scan and resolve ---
     auto *registry = RustBackend::instance()->pluginRegistry();
     registry->scan(pluginDir);
-    QJsonObject resolved = registry->resolved(pluginId);
+
+    // Resolved theme ids use the documented "plugin-id:theme-id" format, so a
+    // legacy single-theme file resolves under "<plugin-id>:<plugin-id>"
+    // (see README → Theme plugins).
+    const QString resolvedId = pluginId + ":" + pluginId;
+    QJsonObject resolved = registry->resolved(resolvedId);
     QVERIFY(!resolved.isEmpty()); // Should resolve to a complete ThemeDefinition
     
     // Validate the merged colors: plugin-specific keys override the built-in base.
@@ -97,10 +102,11 @@ void TestThemeManager::testPluginResolution()
     // directory and applies the resolved ThemeDefinition. Passing our temp dir
     // keeps the test hermetic (the default plugins dir is not consulted here).
     ThemeManager tm;
-    QVERIFY(tm.applyCustomTheme(pluginDir, pluginId));
+    QVERIFY(tm.applyCustomTheme(pluginDir, resolvedId));
 
     // The registry (single source of truth) must list the theme as an enabled
-    // theme plugin. We drive this off the same temp dir so it stays hermetic.
+    // theme plugin under its compound id. We drive this off the same temp dir so
+    // it stays hermetic.
     QStringList enabledThemeIds;
     const QJsonArray allPlugins = registry->list();
     for (const QJsonValue &v : allPlugins) {
@@ -110,7 +116,7 @@ void TestThemeManager::testPluginResolution()
             enabledThemeIds << o.value(QStringLiteral("id")).toString();
         }
     }
-    QVERIFY(enabledThemeIds.contains(pluginId));
+    QVERIFY(enabledThemeIds.contains(resolvedId));
 
     // --- Phase 4: Cleanup ---
     QDir(pluginDir).removeRecursively();
@@ -130,6 +136,10 @@ void TestThemeManager::testPluginEnableToggle()
     QDir().mkpath(pluginDir);
     const QString idA = "theme_a_" + suffix;
     const QString idB = "theme_b_" + suffix;
+    // The registry exposes theme plugins under compound ids, which is also the
+    // key used for the persistable disabled flag (README → Theme plugins).
+    const QString resolvedA = idA + ":" + idA;
+    const QString resolvedB = idB + ":" + idB;
 
     auto writePlugin = [&](const QString &id, const QString &bg) {
         QJsonObject obj;
@@ -171,21 +181,21 @@ void TestThemeManager::testPluginEnableToggle()
 
     // Both themes start enabled and appear in the Appearance set.
     QStringList enabled = enabledThemeIds();
-    QVERIFY(enabled.contains(idA));
-    QVERIFY(enabled.contains(idB));
+    QVERIFY(enabled.contains(resolvedA));
+    QVERIFY(enabled.contains(resolvedB));
 
     // Disabling theme_a must emit registryChanged and drop it from Appearance.
-    registry->setDisabled(idA, true);
+    registry->setDisabled(resolvedA, true);
     QCOMPARE(spy.count(), 2);
     enabled = enabledThemeIds();
-    QVERIFY(!enabled.contains(idA));
-    QVERIFY(enabled.contains(idB));
+    QVERIFY(!enabled.contains(resolvedA));
+    QVERIFY(enabled.contains(resolvedB));
 
     // Re-enabling brings it back.
-    registry->setDisabled(idA, false);
+    registry->setDisabled(resolvedA, false);
     QCOMPARE(spy.count(), 3);
     enabled = enabledThemeIds();
-    QVERIFY(enabled.contains(idA));
+    QVERIFY(enabled.contains(resolvedA));
 
     QDir(pluginDir).removeRecursively();
 }
