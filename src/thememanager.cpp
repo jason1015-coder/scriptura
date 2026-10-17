@@ -257,7 +257,7 @@ bool ThemeManager::applyCustomTheme(const QString &pluginsDir, const QString &id
         // Already a compound ID, use as-is
     } else {
         // Legacy single theme plugin - try direct ID first
-        const QJsonObject resolved = registry->resolved(id);
+        const QJsonObject resolved = registry->resolved(id).toObject();
         if (!resolved.isEmpty()) {
             applyDefinition(fromJson(resolved));
             return true;
@@ -266,7 +266,7 @@ bool ThemeManager::applyCustomTheme(const QString &pluginsDir, const QString &id
         // We'll let the registry handle it below
     }
     
-    const QJsonObject resolved = registry->resolved(resolvedId);
+    const QJsonObject resolved = registry->resolved(resolvedId).toObject();
     if (resolved.isEmpty()) {
         return false;
     }

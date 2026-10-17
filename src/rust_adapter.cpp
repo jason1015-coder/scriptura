@@ -973,16 +973,18 @@ bool RustPluginRegistryAdapter::remove(const QString &pluginsDir, const QString 
     return ok;
 }
 
-QJsonObject RustPluginRegistryAdapter::resolved(const QString &id) const
+QJsonValue RustPluginRegistryAdapter::resolved(const QString &id) const
 {
     QByteArray bid = id.toUtf8();
     char *json = rust_plugin_registry_get(m_registry, bid.constData());
     if (!json) {
         return {};
     }
-    QJsonObject obj = QJsonDocument::fromJson(QByteArray(json)).object();
+    QJsonDocument doc = QJsonDocument::fromJson(QByteArray(json));
     rust_free_string(json);
-    return obj;
+    if (doc.isArray()) return doc.array();
+    if (doc.isObject()) return doc.object();
+    return {};
 }
 
 

@@ -5,6 +5,7 @@
 #include <QString>
 #include <QStringList>
 #include <QJsonObject>
+#include <QJsonValue>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QTextEdit>
@@ -356,7 +357,7 @@ public:
     /// Returns `true` on success. Emits `registryChanged()`.
     bool remove(const QString &pluginsDir, const QString &id);
     /// Resolved payload for a plugin id (complete ThemeDefinition JSON).
-    QJsonObject resolved(const QString &id) const;
+    QJsonValue resolved(const QString &id) const;
 
 signals:
     /// Emitted after a scan + toggle so the Settings page can refresh.

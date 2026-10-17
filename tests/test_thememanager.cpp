@@ -89,7 +89,7 @@ void TestThemeManager::testPluginResolution()
     // legacy single-theme file resolves under "<plugin-id>:<plugin-id>"
     // (see README → Theme plugins).
     const QString resolvedId = pluginId + ":" + pluginId;
-    QJsonObject resolved = registry->resolved(resolvedId);
+    QJsonObject resolved = registry->resolved(resolvedId).toObject();
     QVERIFY(!resolved.isEmpty()); // Should resolve to a complete ThemeDefinition
     
     // Validate the merged colors: plugin-specific keys override the built-in base.
