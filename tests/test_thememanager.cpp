@@ -116,7 +116,9 @@ void TestThemeManager::testPluginResolution()
             enabledThemeIds << o.value(QStringLiteral("id")).toString();
         }
     }
-    QVERIFY(enabledThemeIds.contains(resolvedId));
+    // The enabled check uses the base ID: list() now aggregates one plugin
+    // file to one row, exposing the base ID rather than compound theme IDs.
+    QVERIFY(enabledThemeIds.contains(pluginId));
 
     // --- Phase 4: Cleanup ---
     QDir(pluginDir).removeRecursively();
@@ -136,10 +138,10 @@ void TestThemeManager::testPluginEnableToggle()
     QDir().mkpath(pluginDir);
     const QString idA = "theme_a_" + suffix;
     const QString idB = "theme_b_" + suffix;
-    // The registry exposes theme plugins under compound ids, which is also the
-    // key used for the persistable disabled flag (README → Theme plugins).
-    const QString resolvedA = idA + ":" + idA;
-    const QString resolvedB = idB + ":" + idB;
+    // The registry exposes theme plugins under compound ids internally, but
+    // list() now aggregates to base ids (one plugin file = one row) and the
+    // UI toggles by base id. resolved() still uses compound ids for theme
+    // application (README → Theme plugins).
 
     auto writePlugin = [&](const QString &id, const QString &bg) {
         QJsonObject obj;
@@ -180,22 +182,25 @@ void TestThemeManager::testPluginEnableToggle()
     };
 
     // Both themes start enabled and appear in the Appearance set.
+    // list() returns base ids (one plugin file = one row).
     QStringList enabled = enabledThemeIds();
-    QVERIFY(enabled.contains(resolvedA));
-    QVERIFY(enabled.contains(resolvedB));
+    QVERIFY(enabled.contains(idA));
+    QVERIFY(enabled.contains(idB));
 
     // Disabling theme_a must emit registryChanged and drop it from Appearance.
-    registry->setDisabled(resolvedA, true);
+    // The UI passes the base id from list(); set_disabled updates all
+    // compound records with the matching prefix.
+    registry->setDisabled(idA, true);
     QCOMPARE(spy.count(), 2);
     enabled = enabledThemeIds();
-    QVERIFY(!enabled.contains(resolvedA));
-    QVERIFY(enabled.contains(resolvedB));
+    QVERIFY(!enabled.contains(idA));
+    QVERIFY(enabled.contains(idB));
 
     // Re-enabling brings it back.
-    registry->setDisabled(resolvedA, false);
+    registry->setDisabled(idA, false);
     QCOMPARE(spy.count(), 3);
     enabled = enabledThemeIds();
-    QVERIFY(enabled.contains(resolvedA));
+    QVERIFY(enabled.contains(idA));
 
     QDir(pluginDir).removeRecursively();
 }

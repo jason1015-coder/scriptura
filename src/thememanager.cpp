@@ -278,10 +278,12 @@ QStringList ThemeManager::customThemeIds() const
 {
     // Enabled custom themes only (kind == "theme"); a disabled plugin is
     // absent from Appearance → Themes (§5.4 / §7).
+    // Use listThemes() so each individual theme (compound id) is returned,
+    // not the aggregated plugin-level view used by the Plugins page.
     auto *registry = RustBackend::instance()->pluginRegistry();
     registry->scan(pluginsDir());
     QStringList ids;
-    const QJsonArray plugins = registry->list();
+    const QJsonArray plugins = registry->listThemes();
     for (const QJsonValue &v : plugins) {
         const QJsonObject o = v.toObject();
         if (o.value(QStringLiteral("kind")).toString() == QLatin1String("theme")

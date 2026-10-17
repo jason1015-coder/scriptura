@@ -155,9 +155,11 @@ QWidget* MainWindow::createUnifiedSettingsWidget()
     };
 
     // Enabled theme plugins read straight from the registry.
+    // Use listThemes() so each individual theme appears separately in the
+    // Appearance → Themes grid (not the aggregated plugin-level view).
     auto enabledThemePlugins = [pluginRegistry]() {
         QJsonArray result;
-        const QJsonArray plugins = pluginRegistry->list();
+        const QJsonArray plugins = pluginRegistry->listThemes();
         for (const QJsonValue &v : plugins) {
             const QJsonObject o = v.toObject();
             if (o.value(QStringLiteral("kind")).toString() == QLatin1String("theme")

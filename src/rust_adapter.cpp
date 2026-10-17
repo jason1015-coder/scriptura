@@ -943,6 +943,18 @@ QJsonArray RustPluginRegistryAdapter::list() const
     return arr;
 }
 
+QJsonArray RustPluginRegistryAdapter::listThemes() const
+{
+    size_t len = 0;
+    char **items = rust_plugin_registry_list_themes(m_registry, &len);
+    QJsonArray arr;
+    for (size_t i = 0; i < len; ++i) {
+        arr.append(QJsonDocument::fromJson(QByteArray(items[i])).object());
+    }
+    rust_free_strings(items, len);
+    return arr;
+}
+
 void RustPluginRegistryAdapter::setDisabled(const QString &id, bool disabled)
 {
     QByteArray bid = id.toUtf8();

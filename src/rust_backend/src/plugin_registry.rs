@@ -374,6 +374,54 @@ impl PluginRegistry {
 
     pub fn list(&self) -> Vec<PluginRecord> {
         let records = self.records.lock().unwrap();
+        // Aggregate by base ID (part before first ':') so a plugin file with
+        // multiple themes appears as ONE row rather than one row per theme.
+        let mut aggregated: HashMap<String, PluginRecord> = HashMap::new();
+        for rec in records.values() {
+            let base_id = rec.id.split(':').next().unwrap_or(&rec.id).to_string();
+            match aggregated.get_mut(&base_id) {
+                Some(existing) => {
+                    // Merge states across themes from the same file:
+                    // loaded > failed-load > disabled.
+                    if rec.state == "loaded" {
+                        existing.state = "loaded".to_string();
+                        existing.enabled = true;
+                    } else if existing.state != "loaded" && rec.state == "failed-load" {
+                        existing.state = "failed-load".to_string();
+                    }
+                }
+                None => {
+                    // For compound IDs (`base:theme`), strip the " — theme"
+                    // suffix so the name shows the plugin name, not a theme name.
+                    let display_name = if rec.id.contains(':') {
+                        rec.name
+                            .split(" — ")
+                            .next()
+                            .unwrap_or(&rec.name)
+                            .to_string()
+                    } else {
+                        rec.name.clone()
+                    };
+                    aggregated.insert(base_id.clone(), PluginRecord {
+                        id: base_id,
+                        name: display_name,
+                        version: rec.version.clone(),
+                        kind: rec.kind.clone(),
+                        enabled: rec.enabled,
+                        state: rec.state.clone(),
+                    });
+                }
+            }
+        }
+        let mut v: Vec<_> = aggregated.into_values().collect();
+        v.sort_by(|a, b| a.id.cmp(&b.id));
+        v
+    }
+
+    /// Return every individual theme record (NOT aggregated). Used by the
+    /// Settings → Appearance → Themes page which needs one entry per theme.
+    pub fn list_themes(&self) -> Vec<PluginRecord> {
+        let records = self.records.lock().unwrap();
         let mut v: Vec<_> = records.values().cloned().collect();
         v.sort_by(|a, b| a.id.cmp(&b.id));
         v
@@ -392,16 +440,22 @@ impl PluginRegistry {
         let key = format!("{DISABLED_KEY_PREFIX}{id}");
         settings_set(&key, if disabled { "true" } else { "false" });
 
-        // Keep the cached record in sync so list() reflects the change
+        // Keep the cached records in sync so list() reflects the change
         // immediately. Records snapshot `enabled`/`state` at scan time, but the
         // Plugins UI and its tests read list() right after a toggle (PLUGINS.md
         // §7) without forcing a re-scan.
-        if let Some(rec) = self.records.lock().unwrap().get_mut(id) {
-            rec.enabled = !disabled;
-            if disabled {
-                rec.state = "disabled".to_string();
-            } else if rec.state == "disabled" {
-                rec.state = "loaded".to_string();
+        // Update the exact ID and every compound ID prefixed with `<id>:` so
+        // toggling a grouped plugin (base ID) affects all of its themes.
+        let prefix = format!("{id}:");
+        let mut records = self.records.lock().unwrap();
+        for (k, rec) in records.iter_mut() {
+            if k == id || k.starts_with(&prefix) {
+                rec.enabled = !disabled;
+                if disabled {
+                    rec.state = "disabled".to_string();
+                } else if rec.state == "disabled" {
+                    rec.state = "loaded".to_string();
+                }
             }
         }
     }
@@ -558,12 +612,13 @@ mod tests {
         reg.scan(dir.path().to_str().unwrap());
         let list = reg.list();
         assert_eq!(list.len(), 1);
-        // New compound ID format: plugin-id:theme-id
-        assert_eq!(list[0].id, "my-theme:my-theme");
+        // Aggregated: one plugin file = one row, showing the base ID.
+        assert_eq!(list[0].id, "my-theme");
         assert_eq!(list[0].kind, "theme");
         assert!(list[0].enabled);
         assert_eq!(list[0].state, "loaded");
-        // Resolved payload is a COMPLETE ThemeDefinition with the override applied.
+        // Resolved payload (stored under the compound ID) is a COMPLETE
+        // ThemeDefinition with the override applied.
         let resolved = reg.get_resolved("my-theme:my-theme").expect("resolved");
         assert_eq!(resolved["bgColor"], "#1a1b1e");
         assert!(resolved.as_object().unwrap().len() >= 23);

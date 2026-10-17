@@ -1322,6 +1322,30 @@ pub extern "C" fn rust_plugin_registry_list(r: *mut RustPluginRegistry, out_len:
     ptr
 }
 
+/// Return every individual theme record (NOT aggregated by base id).
+/// Used by the Settings → Appearance → Themes page.
+#[no_mangle]
+pub extern "C" fn rust_plugin_registry_list_themes(r: *mut RustPluginRegistry, out_len: *mut usize) -> *mut *mut c_char {
+    if r.is_null() {
+        unsafe { *out_len = 0; }
+        return std::ptr::null_mut();
+    }
+    let r = unsafe { &*(r as *const crate::plugin_registry::PluginRegistry) };
+    let list = r.list_themes();
+    unsafe { *out_len = list.len(); }
+    if list.is_empty() {
+        return std::ptr::null_mut();
+    }
+    let mut arr: Vec<*mut c_char> = list
+        .into_iter()
+        .map(|rec| crate::str_to_cstring(&serde_json::to_string(&rec).unwrap_or_default()))
+        .collect();
+    arr.shrink_to_fit();
+    let ptr = arr.as_mut_ptr();
+    mem::forget(arr);
+    ptr
+}
+
 #[no_mangle]
 pub extern "C" fn rust_plugin_registry_set_disabled(r: *mut RustPluginRegistry, id: *const c_char, disabled: i32) {
     if r.is_null() || id.is_null() {

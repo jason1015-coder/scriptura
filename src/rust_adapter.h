@@ -346,8 +346,10 @@ public:
     ~RustPluginRegistryAdapter() override;
 
     void scan(const QString &pluginsDir);
-    /// [{id,name,version,kind,enabled,state}] — one object per plugin.
+    /// Aggregated: one row per plugin file (compound ids grouped by base id).
     QJsonArray list() const;
+    /// Individual theme records (NOT aggregated) — for Appearance → Themes.
+    QJsonArray listThemes() const;
     /// Persist the enabled flag (key `plugin/disabled/<id>`) and skip it next scan.
     void setDisabled(const QString &id, bool disabled);
     /// Remove a plugin: delete its `<id>.json` manifest from disk and clear state.
