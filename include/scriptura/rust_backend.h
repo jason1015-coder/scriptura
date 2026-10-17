@@ -74,6 +74,7 @@ void                rust_plugin_registry_free(RustPluginRegistry* r);
 void                rust_plugin_registry_scan(RustPluginRegistry* r, const char* plugins_dir);
 char**              rust_plugin_registry_list(RustPluginRegistry* r, size_t* out_len); // [{id,name,version,kind,enabled,state}]
 void                rust_plugin_registry_set_disabled(RustPluginRegistry* r, const char* id, int disabled);
+bool                rust_plugin_registry_remove(RustPluginRegistry* r, const char* plugins_dir, const char* id);
 char*               rust_plugin_registry_get(RustPluginRegistry* r, const char* id);    // resolved ThemeDefinition JSON
 
 // ══════════════════════════════════════════════════════════════════════════

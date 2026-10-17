@@ -350,6 +350,9 @@ public:
     QJsonArray list() const;
     /// Persist the enabled flag (key `plugin/disabled/<id>`) and skip it next scan.
     void setDisabled(const QString &id, bool disabled);
+    /// Remove a plugin: delete its `<id>.json` manifest from disk and clear state.
+    /// Returns `true` on success. Emits `registryChanged()`.
+    bool remove(const QString &pluginsDir, const QString &id);
     /// Resolved payload for a plugin id (complete ThemeDefinition JSON).
     QJsonObject resolved(const QString &id) const;
 

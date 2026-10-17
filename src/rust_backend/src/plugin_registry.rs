@@ -53,6 +53,12 @@ fn settings_set(key: &str, value: &str) {
     }
 }
 
+fn settings_remove(key: &str) {
+    if let Ok(ckey) = std::ffi::CString::new(key) {
+        crate::settings::ffi::settings_remove(ckey.as_ptr());
+    }
+}
+
 // ── Kind handlers (PLUGINS.md §3.2) ──────────────────────────────────────────
 
 /// Context handed to a kind handler when it activates a concrete plugin.
@@ -398,6 +404,49 @@ impl PluginRegistry {
                 rec.state = "loaded".to_string();
             }
         }
+    }
+
+    /// Remove a plugin: delete its `<base_id>.json` manifest from disk and clear
+    /// all cached state (records, resolved payload, disabled flag) for every
+    /// theme that originated from that file (compound IDs `base_id:theme_id`).
+    /// Returns `Ok(())` when the file was deleted (or didn't exist) and state
+    /// was cleared; `Err(msg)` on filesystem failure.
+    pub fn remove(&self, plugins_dir: &str, id: &str) -> Result<(), String> {
+        // A plugin may expose multiple themes via compound IDs (`base:theme`).
+        // The manifest file is always named `<base_id>.json`, so extract the
+        // base ID to delete the whole file — not just one theme entry.
+        let base_id = id.split(':').next().unwrap_or(id);
+        let path = Path::new(plugins_dir).join(format!("{base_id}.json"));
+        if path.exists() {
+            fs::remove_file(&path).map_err(|e| format!("failed to delete '{base_id}': {e}"))?;
+        }
+        // Clear every record/resolved/disabled entry that came from this file:
+        // the exact ID itself plus any compound IDs prefixed with `base_id:`.
+        let prefix = format!("{base_id}:");
+        let mut to_remove = Vec::new();
+        {
+            let records = self.records.lock().unwrap();
+            for key in records.keys() {
+                if key == base_id || key.starts_with(&prefix) {
+                    to_remove.push(key.clone());
+                }
+            }
+        }
+        for key in &to_remove {
+            self.records.lock().unwrap().remove(key);
+            self.resolved.lock().unwrap().remove(key);
+            self.disabled.lock().unwrap().remove(key);
+        }
+        let key = format!("{DISABLED_KEY_PREFIX}{base_id}");
+        settings_remove(&key);
+        // Also clear any disabled flags for compound theme IDs from this file.
+        for key in &to_remove {
+            if key != base_id {
+                let dkey = format!("{DISABLED_KEY_PREFIX}{key}");
+                settings_remove(&dkey);
+            }
+        }
+        Ok(())
     }
 
     pub fn is_disabled(&self, id: &str) -> bool {

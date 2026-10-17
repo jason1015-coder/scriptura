@@ -1036,8 +1036,23 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
         if (!layout) return;
         QLayoutItem *item;
         while ((item = layout->takeAt(0)) != nullptr) {
-            if (QWidget *w = item->widget()) w->deleteLater();
-            delete item;
+            if (QWidget *w = item->widget()) {
+                w->hide();
+                w->deleteLater();
+                delete item;
+            } else if (QLayout *childLayout = item->layout()) {
+                QLayoutItem *childItem;
+                while ((childItem = childLayout->takeAt(0)) != nullptr) {
+                    if (QWidget *cw = childItem->widget()) {
+                        cw->hide();
+                        cw->deleteLater();
+                    }
+                    delete childItem;
+                }
+                delete item;
+            } else {
+                delete item;
+            }
         }
     };
 
@@ -1120,20 +1135,23 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
             pluginsListLayout->addStretch();
             return;
         }
-        // Header row: Name | Details | Enabled
+        // Header row: Name | Details | Enabled | Actions
         QHBoxLayout *header = new QHBoxLayout();
         header->setSpacing(6);
         QLabel *nameHeader = new QLabel(tr("Name"), pluginsList);
         QLabel *detailsHeader = new QLabel(tr("Details"), pluginsList);
         QLabel *enabledHeader = new QLabel(tr("Enabled"), pluginsList);
+        QLabel *actionsHeader = new QLabel(tr("Actions"), pluginsList);
         QFont headerFont = nameHeader->font();
         headerFont.setBold(true);
         nameHeader->setFont(headerFont);
         detailsHeader->setFont(headerFont);
         enabledHeader->setFont(headerFont);
+        actionsHeader->setFont(headerFont);
         header->addWidget(nameHeader, 2);
         header->addWidget(detailsHeader, 3);
         header->addWidget(enabledHeader, 0);
+        header->addWidget(actionsHeader, 0);
         pluginsListLayout->addLayout(header);
 
         for (const QJsonValue &v : plugins) {
@@ -1160,6 +1178,11 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
             toggle->setChecked(enabled);
             row->addWidget(toggle, 0);
 
+            QPushButton *removeBtn = new QPushButton(QIcon(QStringLiteral(":/icons/close.svg")),
+                                                     tr("Remove"), pluginsList);
+            removeBtn->setToolTip(tr("Uninstall plugin '%1'").arg(name.isEmpty() ? id : name));
+            row->addWidget(removeBtn, 0);
+
             pluginsListLayout->addLayout(row);
 
             // Defer the registry mutation so this toggle's own signal handler
@@ -1168,6 +1191,26 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
                 QMetaObject::invokeMethod(pluginRegistry, [pluginRegistry, id, checked]() {
                     pluginRegistry->setDisabled(id, !checked);
                 }, Qt::QueuedConnection);
+            });
+
+            connect(removeBtn, &QPushButton::clicked, this, [this, pluginRegistry, id, name]() {
+                const QString displayName = name.isEmpty() ? id : name;
+                int ret = QMessageBox::question(
+                    this, tr("Remove Plugin"),
+                    tr("Are you sure you want to remove the plugin '%1'?\n"
+                       "Its manifest file will be deleted from the plugins directory.")
+                        .arg(displayName),
+                    QMessageBox::Yes | QMessageBox::No);
+                if (ret != QMessageBox::Yes)
+                    return;
+                const QString pluginsDir = ThemeManager::pluginsDir();
+                if (!pluginRegistry->remove(pluginsDir, id)) {
+                    QMessageBox::warning(this, tr("Remove Plugin"),
+                        tr("Could not remove plugin '%1' from '%2'.")
+                            .arg(displayName, pluginsDir));
+                }
+                // registryChanged() is emitted by remove() on success, which
+                // triggers rebuildPluginsPanel() automatically.
             });
         }
         pluginsListLayout->addStretch();

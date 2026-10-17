@@ -1331,6 +1331,18 @@ pub extern "C" fn rust_plugin_registry_set_disabled(r: *mut RustPluginRegistry, 
     r.set_disabled(unsafe { crate::cstr_to_str(id) }, disabled != 0);
 }
 
+/// Remove a plugin: delete its `<id>.json` manifest from the plugins dir and
+/// clear all cached state. Returns `true` on success (or if the file did not
+/// exist), `false` on failure.
+#[no_mangle]
+pub extern "C" fn rust_plugin_registry_remove(r: *mut RustPluginRegistry, plugins_dir: *const c_char, id: *const c_char) -> bool {
+    if r.is_null() || plugins_dir.is_null() || id.is_null() {
+        return false;
+    }
+    let r = unsafe { &*(r as *const crate::plugin_registry::PluginRegistry) };
+    r.remove(unsafe { crate::cstr_to_str(plugins_dir) }, unsafe { crate::cstr_to_str(id) }).is_ok()
+}
+
 /// Resolved payload for a plugin id (for `theme`: a complete ThemeDefinition
 /// JSON). Returns null when the plugin is not loaded. Caller frees with
 /// `rust_free_string`.

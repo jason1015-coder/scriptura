@@ -950,6 +950,17 @@ void RustPluginRegistryAdapter::setDisabled(const QString &id, bool disabled)
     emit registryChanged();
 }
 
+bool RustPluginRegistryAdapter::remove(const QString &pluginsDir, const QString &id)
+{
+    QByteArray dir = pluginsDir.toUtf8();
+    QByteArray bid = id.toUtf8();
+    bool ok = rust_plugin_registry_remove(m_registry, dir.constData(), bid.constData());
+    if (ok) {
+        emit registryChanged();
+    }
+    return ok;
+}
+
 QJsonObject RustPluginRegistryAdapter::resolved(const QString &id) const
 {
     QByteArray bid = id.toUtf8();
