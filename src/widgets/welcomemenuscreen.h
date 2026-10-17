@@ -49,6 +49,9 @@ private:
     QStringList m_recentProjects;
     static constexpr int MAX_RECENT_PROJECTS = 10;
 
+    // Top logo (recoloured to match theme in setThemeBackground)
+    QLabel *m_logoLabel = nullptr;
+
     // Window dragging state
     bool m_dragging = false;
     QPoint m_dragStartPos;

@@ -9,6 +9,9 @@
 #include <QTimer>
 #include <QPalette>
 #include <QColor>
+#include <QSvgRenderer>
+#include <QPainter>
+#include "themeicons.h"
 
 class SplashScreen : public QWidget
 {
@@ -24,25 +27,16 @@ public:
         layout->setContentsMargins(20, 20, 20, 20);
         layout->setSpacing(10);
 
-        // App icon
+        // App icon (SVG)
         QLabel *iconLabel = new QLabel(this);
-        QPixmap pixmap(":/icon.png");
-        if (pixmap.isNull()) {
-            // Fallback: try loading from file system
-            pixmap.load("icon.png");
-        }
-        if (!pixmap.isNull()) {
-            iconLabel->setPixmap(pixmap.scaled(128, 128, Qt::KeepAspectRatio, Qt::SmoothTransformation));
-        } else {
-            iconLabel->setText("Scriptura");
-            iconLabel->setStyleSheet("font-size: 32px; font-weight: bold; color: palette(text);");
-        }
+        iconLabel->setObjectName("splashIcon");
         iconLabel->setAlignment(Qt::AlignCenter);
 
         // App name
         QLabel *nameLabel = new QLabel(tr("Scriptura"), this);
-        nameLabel->setStyleSheet("font-size: 24px; font-weight: bold; color: palette(text);");
+        nameLabel->setObjectName("splashName");
         nameLabel->setAlignment(Qt::AlignCenter);
+        nameLabel->setStyleSheet("font-size: 24px; font-weight: bold;");
 
         layout->addStretch();
         layout->addWidget(iconLabel, 0, Qt::AlignCenter);
@@ -52,7 +46,7 @@ public:
         // Set initial style (will be overridden by setThemeBackground)
         setStyleSheet(R"(
             SplashScreen {
-                background-color: white;
+                background-color: palette(window);
                 border: none;
                 border-radius: 14px;
             }
@@ -61,6 +55,10 @@ public:
 
     void setThemeBackground(const QColor &color)
     {
+        double lum = 0.299 * color.red() + 0.587 * color.green() + 0.114 * color.blue();
+        bool isDark = lum < 160.0;
+        QColor textColor = isDark ? QColor(220, 220, 220) : QColor(30, 30, 32);
+
         setStyleSheet(QString(R"(
             SplashScreen {
                 background-color: %1;
@@ -68,14 +66,18 @@ public:
                 border-radius: 14px;
             }
             QLabel {
-                color: palette(text);
+                color: %2;
             }
-        )").arg(color.name()));
+        )").arg(color.name()).arg(textColor.name()));
+
+        QLabel *iconLabel = findChild<QLabel*>("splashIcon");
+        if (iconLabel) {
+            iconLabel->setPixmap(ThemeIcons::instance()->pixmap(":/icons/app-icon.svg", textColor, 128));
+        }
     }
 
     void showWithDelay(int milliseconds = 2500)
     {
-        // Adjust size to content and center on screen
         adjustSize();
         QScreen *screen = QApplication::primaryScreen();
         if (screen) {
@@ -84,16 +86,10 @@ public:
             int y = (screenGeometry.height() - height()) / 2;
             move(x, y);
         }
-        
+
         show();
         raise();
         QApplication::processEvents();
-
-        // NOTE: Do not auto-close here. Let the caller create and show the
-        // main window first, then close the splash. Auto-closing on our own
-        // timer can make the splash the last visible top-level window, which
-        // triggers QApplication's lastWindowClosed -> quit and prevents the
-        // main window from ever appearing.
     }
 };
 

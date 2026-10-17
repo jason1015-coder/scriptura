@@ -260,6 +260,7 @@ bool ThemeManager::applyCustomTheme(const QString &pluginsDir, const QString &id
         const QJsonObject resolved = registry->resolved(id).toObject();
         if (!resolved.isEmpty()) {
             applyDefinition(fromJson(resolved));
+            SettingsStore::instance().setValue("theme/custom", id);
             return true;
         }
         // If not found, the ID might be a plugin ID with multiple themes
@@ -271,6 +272,7 @@ bool ThemeManager::applyCustomTheme(const QString &pluginsDir, const QString &id
         return false;
     }
     applyDefinition(fromJson(resolved));
+    SettingsStore::instance().setValue("theme/custom", id);
     return true;
 }
 

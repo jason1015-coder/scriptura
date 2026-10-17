@@ -119,22 +119,22 @@ void WelcomeMenuScreen::setupUI()
     headerLayout->setSpacing(16);
 
     // Large logo
-    QLabel *logoLabel = new QLabel(this);
+    m_logoLabel = new QLabel(this);
     QPixmap logoPixmap(":/icons/app-icon.svg");
     if (!logoPixmap.isNull()) {
-        logoLabel->setPixmap(logoPixmap.scaled(64, 64, Qt::KeepAspectRatio, Qt::SmoothTransformation));
+        m_logoLabel->setPixmap(logoPixmap.scaled(64, 64, Qt::KeepAspectRatio, Qt::SmoothTransformation));
     } else {
         // Fallback text logo
-        logoLabel->setText("SC");
-        QFont logoFont = logoLabel->font();
+        m_logoLabel->setText("SC");
+        QFont logoFont = m_logoLabel->font();
         logoFont.setPointSize(28);
         logoFont.setBold(true);
-        logoLabel->setFont(logoFont);
+        m_logoLabel->setFont(logoFont);
     }
-    logoLabel->setFixedSize(64, 64);
-    logoLabel->setAlignment(Qt::AlignCenter);
+    m_logoLabel->setFixedSize(64, 64);
+    m_logoLabel->setAlignment(Qt::AlignCenter);
 
-    headerLayout->addWidget(logoLabel);
+    headerLayout->addWidget(m_logoLabel);
     headerLayout->addStretch();
 
     // ── Window control buttons (minimize, maximize, close) ─────────────
@@ -416,6 +416,8 @@ void WelcomeMenuScreen::setThemeBackground(const QColor &color)
     // is computed from the widget's own palette, so pass it explicitly rather
     // than let a role guess it.
     auto themeIcons = ThemeIcons::instance();
+    if (m_logoLabel)
+        m_logoLabel->setPixmap(themeIcons->pixmap(":/icons/app-icon.svg", textColor, 64));
     if (m_openProjectBtn)
         m_openProjectBtn->setIcon(themeIcons->icon(":/icons/folder.svg", buttonTextColor));
     if (m_cloneBtn)

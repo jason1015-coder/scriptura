@@ -3,6 +3,7 @@
 #include "splashscreen.h"
 #include <QFileDialog>
 #include "internals/settings_store.h"
+#include "thememanager.h"
 #include "welcomemenuscreen.h"
 #include "rust_adapter.h"
 #include "scriptura_actions.h"
@@ -708,10 +709,18 @@ QDialogButtonBox > QPushButton {
 
     // Load theme before showing splash screen
     SettingsStore::instance().initialize();
-    int legacyTheme = SettingsStore::instance().value("theme/selected", 0).toInt();
-    ThemeColorFamily family = getThemeFamily(legacyTheme);
-    ThemeMode mode = getThemeMode(legacyTheme);
-    QColor themeWindowColor = getThemeWindowColor(family, mode);
+    QColor themeWindowColor;
+    QString customThemeId = SettingsStore::instance().value("theme/custom", QString()).toString();
+    if (!customThemeId.isEmpty()) {
+        ThemeManager tm;
+        tm.applyCustomTheme(ThemeManager::pluginsDir(), customThemeId);
+        themeWindowColor = tm.backgroundColor();
+    } else {
+        int legacyTheme = SettingsStore::instance().value("theme/selected", 0).toInt();
+        ThemeColorFamily family = getThemeFamily(legacyTheme);
+        ThemeMode mode = getThemeMode(legacyTheme);
+        themeWindowColor = getThemeWindowColor(family, mode);
+    }
 
     // Determine if a CLI project was provided — if so, skip the menu screen entirely
     bool hasCliProject = !initialProject.isEmpty();

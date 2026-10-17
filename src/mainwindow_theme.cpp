@@ -300,6 +300,7 @@ QWidget* MainWindow::createUnifiedSettingsWidget()
                     selectedTheme = e.theme;
                     applyTheme(selectedTheme);
                     SettingsStore::instance().setValue("theme/selected", themeToLegacyInt(selectedTheme));
+                    SettingsStore::instance().setValue("theme/custom", QString());
                 }
                 break;
             }
@@ -631,6 +632,7 @@ void MainWindow::applyTheme(const Theme &theme)
     applyThemeDefinition(def, theme.isDark());
 
     SettingsStore::instance().setValue("theme/selected", themeToLegacyInt(theme));
+    SettingsStore::instance().setValue("theme/custom", QString());
 }
 
 void MainWindow::applyThemeDefinition(const ThemeDefinition &def, bool isDark)

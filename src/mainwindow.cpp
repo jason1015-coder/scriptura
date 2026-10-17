@@ -346,9 +346,14 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
 
     loadRecentProjects();
 
-    int legacyTheme = SettingsStore::instance().value("theme/selected", 0).toInt();
-    selectedTheme = themeFromLegacyInt(legacyTheme);
-    applyTheme(selectedTheme);
+    QString customThemeId = SettingsStore::instance().value("theme/custom", QString()).toString();
+    if (!customThemeId.isEmpty()) {
+        m_themeManager->applyCustomTheme(ThemeManager::pluginsDir(), customThemeId);
+    } else {
+        int legacyTheme = SettingsStore::instance().value("theme/selected", 0).toInt();
+        selectedTheme = themeFromLegacyInt(legacyTheme);
+        applyTheme(selectedTheme);
+    }
 
     QScreen *screen = QApplication::primaryScreen();
     if (screen) {
