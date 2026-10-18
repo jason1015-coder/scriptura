@@ -2,7 +2,7 @@
 
 Built by the [Nano Collective](https://nanocollective.org) — a community collective building AI tooling not for profit, but for the community.
 
-A hybrid Qt and Rust code editor — Qt for the UI, Rust for safe backend services — shipping LSP, DAP, and git today, with a local-first AI assistant built on [Nanocoder](https://github.com/Nano-Collective/nanocoder) still to come.
+A hybrid Qt and Rust code editor — Qt for the UI, Rust for safe backend services — with a local-first AI assistant built on [Nanocoder](https://github.com/Nano-Collective/nanocoder) still to come.
 
 [![Build & Deploy Scriptura](https://github.com/jason1015-coder/scriptura/actions/workflows/build.yml/badge.svg)](https://github.com/jason1015-coder/scriptura/actions/workflows/build.yml)
 [![Run Unit Tests](https://github.com/jason1015-coder/scriptura/actions/workflows/test.yml/badge.svg)](https://github.com/jason1015-coder/scriptura/actions/workflows/test.yml)
