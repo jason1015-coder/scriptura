@@ -19,8 +19,8 @@ namespace {
 // Every panel the app registers. They are opened on demand from the "+" menu, so
 // this list is what the menu has to offer.
 const QStringList kBuiltInPanels = {
-    QStringLiteral("Search"),      QStringLiteral("Rebase"),    QStringLiteral("Tasks"),
-    QStringLiteral("Terminal"),    QStringLiteral("Bookmarks"), QStringLiteral("Plugins"),
+    QStringLiteral("Search"),      QStringLiteral("Tasks"),
+    QStringLiteral("Terminal"),    QStringLiteral("Plugins"),
 };
 
 QString writeTempFile(QTemporaryDir &dir, const QString &name, const QString &contents)
@@ -329,38 +329,6 @@ void TestMainWindowPanels::testClosingPanelTabKeepsPanelInMenu()
     QVERIFY(!search->isChecked());
     QVERIFY(actionIn(menu, QStringLiteral("Terminal")));
     menu->close();
-}
-
-void TestMainWindowPanels::testReopenedPanelGetsItsTabBack()
-{
-    Fixture fx;
-    QVERIFY(fx.create());
-
-    const int searchIndex = fx.panelIndex(QStringLiteral("Search"));
-    const int bookmarksIndex = fx.panelIndex(QStringLiteral("Bookmarks"));
-    QVERIFY(searchIndex >= 0 && bookmarksIndex >= 0);
-    fx.win->openPanelAsTab(searchIndex);
-    fx.win->openPanelAsTab(bookmarksIndex);
-    QCOMPARE(openPanelTabTitles(fx.tabBar).size(), 2);
-
-    fx.win->closePanelTab(searchIndex);
-    QCoreApplication::processEvents();
-
-    // Reopening gives the panel a fresh tab next to the one still open, and the
-    // other panel keeps its own (panel indices never shift).
-    fx.win->openPanelAsTab(searchIndex);
-    QCoreApplication::processEvents();
-    const QStringList titles = openPanelTabTitles(fx.tabBar);
-    QCOMPARE(titles.size(), 2);
-    QVERIFY(titles.contains(QStringLiteral("Search")));
-    QVERIFY(titles.contains(QStringLiteral("Bookmarks")));
-    QCOMPARE(panelTabIndex(fx.tabBar, bookmarksIndex) >= 0, true);
-    QCOMPARE(fx.tabBar->currentIndex(), panelTabIndex(fx.tabBar, searchIndex));
-
-    fx.tabBar->setCurrentIndex(panelTabIndex(fx.tabBar, bookmarksIndex));
-    QCoreApplication::processEvents();
-    QCOMPARE(fx.editorStack->currentWidget()->metaObject()->className(),
-             QByteArray("BookmarkPanelWidget"));
 }
 
 void TestMainWindowPanels::testEveryPanelOpensAsTab()

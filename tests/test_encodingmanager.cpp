@@ -9,7 +9,8 @@ QString writeTempFile(const QTemporaryDir &dir, const QByteArray &data)
 {
     QString path = dir.filePath("enc_test.bin");
     QFile f(path);
-    f.open(QIODevice::WriteOnly | QIODevice::Truncate);
+    if (!f.open(QIODevice::WriteOnly | QIODevice::Truncate))
+        return path;
     f.write(data);
     f.close();
     return path;

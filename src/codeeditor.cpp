@@ -1,7 +1,6 @@
 #include "codeeditor.h"
 #include "foldmanager.h"
 #include "bracketcolorizer.h"
-#include "bookmarkmanager.h"
 #include "snippetmanager.h"
 #include "codelensmanager.h"
 #include "rust_backend.h"
@@ -625,7 +624,6 @@ CodeEditor::CodeEditor(QWidget *parent)
     , m_tabWidth(4)
     , m_foldManager(new FoldManager(this, this))
     , m_bracketColorizer(new BracketColorizer(this, this))
-    , m_bookmarkManager(new BookmarkManager(this))
     , m_snippetManager(new SnippetManager(this))
 {
     connect(this, &CodeEditor::blockCountChanged, this, &CodeEditor::updateLineNumberAreaWidth);
@@ -658,10 +656,6 @@ void CodeEditor::setLanguageForFile(const QString &filePath)
     syntaxHighlighter->setLanguage(
         LanguageRegistry::instance().languageForFile(filePath));
 
-    // Keep the bookmark manager's file scope in sync so navigation stays
-    // scoped to the current file.
-    if (m_bookmarkManager)
-        m_bookmarkManager->setEditorFilePath(filePath);
     if (m_foldManager)
         m_foldManager->setEditorFilePath(filePath);
 }
@@ -669,8 +663,6 @@ void CodeEditor::setLanguageForFile(const QString &filePath)
 void CodeEditor::setFilePath(const QString &path)
 {
     m_filePath = path;
-    if (m_bookmarkManager)
-        m_bookmarkManager->setEditorFilePath(path);
     if (m_foldManager)
         m_foldManager->setEditorFilePath(path);
 }
@@ -909,7 +901,7 @@ int CodeEditor::lineNumberAreaWidth() const
     }
 
     int numberWidth = fontMetrics().horizontalAdvance(QLatin1Char('9')) * digits;
-    // Reserve a fixed icon gutter for fold/breakpoint/bookmark markers so
+    // Reserve a fixed icon gutter for fold/breakpoint markers so
     // they never collide with the line numbers or each other.
     const int iconGutter = 32;
     return iconGutter + 3 + numberWidth;
@@ -1427,7 +1419,7 @@ void CodeEditor::lineNumberAreaPaintEvent(QPaintEvent *event)
 
     const int areaWidth = lineNumberArea->width();
     const int fontHeight = fontMetrics().height();
-    // Fixed icon gutter (breakpoint/fold/bookmark) kept left of the line
+    // Fixed icon gutter (breakpoint/fold) kept left of the line
     // numbers so the markers never collide with the numbers or each other.
     const int iconGutter = 32;
     const int numberX = iconGutter;  // Left edge of the right-aligned numbers
@@ -1455,15 +1447,6 @@ void CodeEditor::lineNumberAreaPaintEvent(QPaintEvent *event)
             // Fold indicator
             if (m_foldManager && m_foldManager->isFoldStart(line - 1)) {
                 m_foldManager->paintFoldIndicator(painter, 2, top, line - 1, bottom - top);
-            }
-
-            // Bookmark indicator
-            if (m_bookmarkManager && !m_filePath.isEmpty() &&
-                m_bookmarkManager->isBookmarked(m_filePath, line - 1)) {
-                painter.setPen(Qt::NoPen);
-                painter.setBrush(QColor(255, 215, 0));  // Gold bookmark dot
-                painter.drawEllipse(8, top + 3, 8, 8);
-                painter.setPen(numberPen);
             }
 
             // --- Line number (right-aligned in the remaining space) -------

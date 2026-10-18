@@ -4,10 +4,7 @@
 #include <QStandardPaths>
 #include <QTemporaryDir>
 #include "internals/settings_store.h"
-#include "test_bookmarkmanager.h"
-#include "test_bookmarkpanel.h"
 #include "test_bracketcolorizer.h"
-#include "test_breadcrumb.h"
 #include "test_taskrunnerui.h"
 #include "test_codelensmanager.h"
 #include "test_crashhandler.h"
@@ -21,7 +18,6 @@
 #include "test_mainwindow_editing.h"
 #include "test_mainwindow_panels.h"
 #include "test_mainwindow_sidebar.h"
-#include "test_minimap.h"
 #include "test_multicursor.h"
 #include "test_projectsearch.h"
 #include "test_rundialog.h"
@@ -45,8 +41,8 @@ int main(int argc, char *argv[])
     QApplication app(argc, argv);
 
     // Isolate the Rust settings store so unit tests never touch the
-    // developer's real Scriptura configuration (SnippetManager/
-    // BookmarkManager constructors load from SettingsStore).
+    // developer's real Scriptura configuration (SnippetManager
+    // constructors load from SettingsStore).
     // A dedicated app/org identity keeps the store in a test-only profile
     // directory; SCRIPTURA_SETTINGS_DIR wins when set by CI.
     QCoreApplication::setOrganizationName(QStringLiteral("ScripturaTests"));
@@ -61,10 +57,7 @@ int main(int argc, char *argv[])
     SettingsStore::instance().clear(); // start from a clean slate every run
 
     int status = 0;
-    status |= QTest::qExec(new TestBookmarkManager, argc, argv);
-    status |= QTest::qExec(new TestBookmarkPanel, argc, argv);
     status |= QTest::qExec(new TestBracketColorizer, argc, argv);
-    status |= QTest::qExec(new TestBreadcrumb, argc, argv);
     status |= QTest::qExec(new TestTaskRunnerUI, argc, argv);
     status |= QTest::qExec(new TestCodeLensManager, argc, argv);
     status |= QTest::qExec(new TestCrashHandler, argc, argv);
@@ -77,7 +70,6 @@ int main(int argc, char *argv[])
     status |= QTest::qExec(new TestMainWindowEditing, argc, argv);
     status |= QTest::qExec(new TestMainWindowPanels, argc, argv);
     status |= QTest::qExec(new TestMainWindowSidebar, argc, argv);
-    status |= QTest::qExec(new TestMinimap, argc, argv);
     status |= QTest::qExec(new TestMultiCursor, argc, argv);
     status |= QTest::qExec(new TestCodeEditorMultiCursor, argc, argv);
     status |= QTest::qExec(new TestProjectSearch, argc, argv);

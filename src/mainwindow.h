@@ -43,10 +43,8 @@
 #include "statusbarwidget.h"
 #include "encodingmanager.h"
 #include "notificationcenter.h"
-#include "gitrebase.h"
 #include "shortcuteditor.h"
 #include "taskrunnerui.h"
-#include "bookmarkpanel.h"
 #include "cssbreadcrumb.h"
 #include "snippeteditordialog.h"
 #include "projectsearch.h"
@@ -375,9 +373,7 @@ protected:
     StatusBarWidget *m_statusBarWidget;
     EncodingManager *m_encodingManager;
     NotificationCenter *m_notificationCenter;
-    GitRebaseWidget *m_gitRebase;
     TaskRunnerUI *m_taskRunnerUI;
-    BookmarkPanelWidget *m_bookmarkPanel;
     CssBreadcrumbParser *m_cssBreadcrumbParser;
     SnippetEditorDialog *m_snippetEditorDialog;
     TerminalPanel *m_terminalPanel = nullptr;

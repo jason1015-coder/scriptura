@@ -509,7 +509,7 @@ QWidget* MainWindow::createUnifiedSettingsWidget()
     QLabel *dangerLabel = new QLabel(tr(
         "Reset Scriptura to its factory state. This permanently deletes all stored "
         "preferences: theme, editor options, keyboard shortcuts, code snippets, "
-        "bookmarks, recent files, and session data."), dangerGroup);
+        "recent files, and session data."), dangerGroup);
     dangerLabel->setWordWrap(true);
     dangerLayout->addWidget(dangerLabel);
 
@@ -532,7 +532,7 @@ QWidget* MainWindow::createUnifiedSettingsWidget()
             tr("This will permanently delete ALL of Scriptura's settings, including:\n\n"
                "\u2022 Theme, fonts, and editor preferences\n"
                "\u2022 Keyboard shortcuts and code snippets\n"
-               "\u2022 Bookmarks, recent files, and sessions\n"
+               "\u2022 Recent files and sessions\n"
                "\u2022 Other stored data\n\n"
                "This action cannot be undone.\n\n"
                "Continue?"),

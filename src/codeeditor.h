@@ -35,7 +35,6 @@ struct LspInlayHint {
 
 class FoldManager;
 class BracketColorizer;
-class BookmarkManager;
 class SnippetManager;
 struct CodeLensItem;
 
@@ -138,9 +137,6 @@ public:
     void setBracketColorization(bool enabled);
     bool bracketColorizationEnabled() const { return m_bracketColorEnabled; }
 
-    // Bookmarks
-    BookmarkManager* bookmarkManager() const { return m_bookmarkManager; }
-
     // Snippets
     SnippetManager* snippetManager() const { return m_snippetManager; }
 
@@ -148,7 +144,7 @@ public:
     void setCodeLensItems(const QList<CodeLensItem> &items) { m_codeLensItems = items; update(); }
     QList<CodeLensItem> codeLensItems() const { return m_codeLensItems; }
 
-    // File path tracking (for bookmarks, file watcher, etc.)
+    // File path tracking (for file watcher, etc.)
     void setFilePath(const QString &path);
     QString filePath() const { return m_filePath; }
 
@@ -223,7 +219,6 @@ private:
     // New features
     FoldManager *m_foldManager;
     BracketColorizer *m_bracketColorizer;
-    BookmarkManager *m_bookmarkManager;
     SnippetManager *m_snippetManager;
     bool m_bracketColorEnabled = true;
     bool m_smartIndent = true;

@@ -16,7 +16,6 @@
 #include "themeicons.h"
 #include "fileicons.h"
 #include "foldmanager.h"
-#include "bookmarkmanager.h"
 #include "snippetmanager.h"
 #include "rust_adapter.h"
 
@@ -123,9 +122,7 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
     , m_statusBarWidget(nullptr)
     , m_encodingManager(nullptr)
     , m_notificationCenter(nullptr)
-    , m_gitRebase(nullptr)
     , m_taskRunnerUI(nullptr)
-    , m_bookmarkPanel(nullptr)
 {
     ui->setupUi(this);
 
@@ -748,30 +745,6 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
         }
     });
 
-    // Bookmarks: Ctrl+K toggles, F2 next, Shift+F2 previous
-    QShortcut *shortcutBookmarkToggle = new QShortcut(QKeySequence("Ctrl+B"), this);
-    connect(shortcutBookmarkToggle, &QShortcut::activated, this, [this]() {
-        CodeEditor *editor = getCurrentCodeEditor();
-        if (!editor || !editor->bookmarkManager()) return;
-        QString path = editor->filePath();
-        int line = editor->textCursor().blockNumber();
-        QString text = editor->textCursor().block().text();
-        editor->bookmarkManager()->toggleBookmark(path, line, text);
-        editor->update();
-    });
-    QShortcut *shortcutBookmarkNext = new QShortcut(QKeySequence("Shift+F2"), this);
-    connect(shortcutBookmarkNext, &QShortcut::activated, this, [this]() {
-        CodeEditor *editor = getCurrentCodeEditor();
-        if (editor && editor->bookmarkManager())
-            editor->bookmarkManager()->nextBookmark();
-    });
-    QShortcut *shortcutBookmarkPrev = new QShortcut(QKeySequence("Ctrl+Shift+F2"), this);
-    connect(shortcutBookmarkPrev, &QShortcut::activated, this, [this]() {
-        CodeEditor *editor = getCurrentCodeEditor();
-        if (editor && editor->bookmarkManager())
-            editor->bookmarkManager()->previousBookmark();
-    });
-
     // Toggle folding: Ctrl+Shift+[
     QShortcut *shortcutFoldToggle = new QShortcut(QKeySequence("Ctrl+Shift+["), this);
     connect(shortcutFoldToggle, &QShortcut::activated, this, [this]() {
@@ -827,7 +800,6 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
         close();
     });
 
-    // Keyboard shortcuts previously defined on .ui action shortcuts (now removed with menus)
     QShortcut *shortcutSave = new QShortcut(QKeySequence("Ctrl+S"), this);
     connect(shortcutSave, &QShortcut::activated, this, &MainWindow::on_action_save_triggered);
 
@@ -844,8 +816,6 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
         qDebug() << "Replace all complete:" << count;
     });
 
-    // Menu bar stays hidden: built-in menus were removed in favor of shortcuts
-    // and the universal search, so there is nothing to display in it.
     connect(projectSearchPanel, &ProjectSearchPanel::resultActivated, this, [this](const QString &filePath, int line, int column) {
         QModelIndex index = fileModel->index(filePath);
         if (index.isValid())
@@ -985,10 +955,6 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
     m_statusBarWidget->setIndentation("Spaces: 4");
 
     // ── P1/P2 Feature Modules (infrastructure, not standalone apps) ───
-    m_gitRebase = new GitRebaseWidget(this);
-    m_gitRebase->hide();
-    registerPanel(":/icons/git.svg", tr("Git Rebase"), tr("Rebase"), true, m_gitRebase);
-
     m_taskRunnerUI = new TaskRunnerUI(this);
     m_taskRunnerUI->hide();
     registerPanel(":/icons/check.svg", tr("Task Runner"), tr("Tasks"), true, m_taskRunnerUI);
@@ -1019,12 +985,6 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
         openPanelAsTab(m_terminalPanelIndex);
         m_terminalPanel->focusTerminal();
     });
-
-    CodeEditor *currentEditor = getCurrentCodeEditor();
-    BookmarkManager *bm = currentEditor ? currentEditor->bookmarkManager() : nullptr;
-    m_bookmarkPanel = new BookmarkPanelWidget(bm, this);
-    m_bookmarkPanel->hide();
-    registerPanel(":/icons/file.svg", tr("Bookmarks"), tr("Bookmarks"), true, m_bookmarkPanel);
 
     // ── Plugins Panel ────────────────────────────────────────────────────
     // Dedicated tab for managing plugins (enable/disable, view details)
@@ -1228,45 +1188,6 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
             });
 
     registerPanel(":/icons/config.svg", tr("Manage Plugins"), tr("Plugins"), true, pluginsPanel);
-    // Connect bookmark panel to active editor (per-tab sync)
-    connect(ui->tabWidget, &QTabWidget::currentChanged, this, [this](int index) {
-        if (index >= 0 && index < ui->tabWidget->count()) {
-            CodeEditor *ce = qobject_cast<CodeEditor*>(ui->tabWidget->widget(index));
-            if (ce) {
-                m_bookmarkPanel->setManager(ce->bookmarkManager());
-            }
-        }
-    });
-
-    // Bookmark panel navigation: open file if needed and go to line
-    connect(m_bookmarkPanel, &BookmarkPanelWidget::bookmarkActivated, this, [this](const QString &filePath, int line) {
-        if (filePath != currentFile) {
-            openFileInTab(filePath);
-        }
-        CodeEditor *editor = getCurrentCodeEditor();
-        if (editor) {
-            QTextBlock block = editor->document()->findBlockByNumber(line);
-            if (block.isValid()) {
-                QTextCursor cursor(block);
-                editor->setTextCursor(cursor);
-                editor->centerCursor();
-            }
-        }
-    });
-    connect(m_bookmarkPanel, &BookmarkPanelWidget::navigateToBookmark, this, [this](const QString &filePath, int line) {
-        if (filePath != currentFile) {
-            openFileInTab(filePath);
-        }
-        CodeEditor *editor = getCurrentCodeEditor();
-        if (editor) {
-            QTextBlock block = editor->document()->findBlockByNumber(line);
-            if (block.isValid()) {
-                QTextCursor cursor(block);
-                editor->setTextCursor(cursor);
-                editor->centerCursor();
-            }
-        }
-    });
 
     // P2: CSS Breadcrumb parser
     m_cssBreadcrumbParser = new CssBreadcrumbParser(this);
@@ -1753,7 +1674,7 @@ int MainWindow::registerPanel(const QString &iconPath, const QString &tooltip,
     m_panelIcons.insert(index, iconPath);
 
     if (m_newTabMenu)
-        m_newTabMenuPanelCount = -1;   // the "+" menu lists panels: rebuild it
+        m_newTabMenuPanelCount = -1;
 
     return index;
 }
@@ -1791,7 +1712,7 @@ void MainWindow::openPanelAsTab(int panelIndex)
     if (tabIndex < 0) {
         tabIndex = addPanelTab(panelIndex);
         if (m_newTabMenu)
-            m_newTabMenuPanelCount = -1;   // its entry is now checked in the menu
+            m_newTabMenuPanelCount = -1;
     }
     if (tabIndex >= 0 && tabBar->currentIndex() != tabIndex) {
         QSignalBlocker blocker(tabBar);
@@ -1848,7 +1769,7 @@ void MainWindow::closePanelTab(int panelIndex)
     }
 
     if (m_newTabMenu)
-        m_newTabMenuPanelCount = -1;   // no longer checked in the "+" menu
+        m_newTabMenuPanelCount = -1;
 
     if (tabIdx >= 0 && tabIdx < tabBar->count()) {
         // Someone else's tab is now on screen; make sure its page is shown too.

@@ -5,7 +5,6 @@
 #include "themeicons.h"
 #include "fileicons.h"
 #include "foldmanager.h"
-#include "bookmarkmanager.h"
 #include "snippetmanager.h"
 
 #include <QFileDialog>

@@ -16,7 +16,7 @@ use std::sync::Mutex;
 
 use serde_json::Value;
 
-use crate::theme_engine::{resolve_all_themes, resolve_colors, ThemeManifest, ThemeLoadResult};
+use crate::theme_engine::{resolve_all_themes, ThemeManifest};
 
 /// Host API version this build supports. A manifest whose `apiVersion`
 /// exceeds this is rejected (PLUGINS.md §2).

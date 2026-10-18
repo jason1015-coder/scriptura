@@ -35,7 +35,7 @@ The backend services are compiled into a static library (`libscriptura_backend.a
 - Project workflow: open project / file-tree (`QFileSystemModel`) / expand-collapse / tabbed editing / save / save-as / recent projects-files / auto-save
 - Syntax highlighting (`CodeHighlighter` + `languageregistry.*`), line numbers, current-line, indent guides, `LargeFileHandler`, `EncodingManager` (detect / BOM / LF-CRLF), smart-indent + bracket auto-close
 - `BreadcrumbBarWidget` + `CssBreadcrumbParser` (html / css / scss / xml / svg)
-- `FoldManager`, `BracketColorizer`, `MultiCursorManager` (`Ctrl+D`, above / below), `ColumnSelection`, `SnippetManager` + editor dialog, `BookmarkManager` + `BookmarkPanelWidget`, inlay-hints, ghost-text infra, `CodeLensManager`, `RefactoringManager`
+- `FoldManager`, `BracketColorizer`, `MultiCursorManager` (`Ctrl+D`, above / below), `ColumnSelection`, `SnippetManager` + editor dialog, inlay-hints, ghost-text infra, `CodeLensManager`, `RefactoringManager`
 
 **Search / navigate**
 - `FindReplaceBar`, `ProjectSearchPanel` (bottom panel), `UniversalSearchPopup`, command palette, `ShortcutEditor`
@@ -48,7 +48,7 @@ The backend services are compiled into a static library (`libscriptura_backend.a
 
 **Tasks / Git (basic)**
 - Rust `task_runner.rs` + `TaskRunnerUI` bottom panel + `Ctrl+Shift+B`, detects `package.json` / `Makefile` / `Cargo` tasks
-- Git commit / push / pull / fetch via `QProcess`, `GitRebaseWidget` bottom panel, `GitBlame` gutter + Rust `blame_engine` / `diff_engine`, status-bar branch
+- Git commit / push / pull / fetch via `QProcess`, `GitBlame` gutter + Rust `blame_engine` / `diff_engine`, status-bar branch
 
 **Rust backend (`src/rust_backend/src/ffi.rs`, 122 `pub extern "C"`)**
 - `eventbus`, `workspace` (folders / settings / recent), `updater` + `version_fetcher` (Stable / Pre-release check), `config_validator`, `language_registry` + `language_server_manager`, `session_engine` (restore + hot-exit), `filewatcher`, `diff / encoding / blame / emmet / test / ui_actions`, `framer`
@@ -59,7 +59,7 @@ The backend services are compiled into a static library (`libscriptura_backend.a
 
 ### Partially implemented (present but incomplete or unwired)
 
-- `widgets/minimap.*` and `widgets/breadcrumb.*`: legacy per-tab minimap and path-breadcrumb widgets, with `tests/test_minimap.*` / `tests/test_breadcrumb.*`. Neither is wired into the editor today (the breadcrumb strip is `BreadcrumbBarWidget`)
+- (none currently)
 - `rust_backend/src/config_validator.rs`: only JSON well-formedness, no schema enforcement
 
 ### Planned (explicit placeholders / TODOs)

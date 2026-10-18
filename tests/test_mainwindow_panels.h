@@ -18,7 +18,6 @@ private slots:
     void testPlusMenuOpensPanelAsTab();
     void testFileTabTakesContentAreaBack();
     void testClosingPanelTabKeepsPanelInMenu();
-    void testReopenedPanelGetsItsTabBack();
     void testEveryPanelOpensAsTab();
     void testTerminalShortcutOpensTerminalTab();
 };
