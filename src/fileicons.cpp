@@ -18,9 +18,9 @@ const QHash<QString, QString> &FileIcons::fileNameTable()
     static const QHash<QString, QString> table = {
         // ── Version control ───────────────────────────────────────────
         { QStringLiteral(".gitignore"),        icon("gitignore") },
-        { QStringLiteral(".gitattributes"),    icon("git-file") },
-        { QStringLiteral(".gitmodules"),       icon("git-file") },
-        { QStringLiteral(".gitconfig"),        icon("git-file") },
+        { QStringLiteral(".gitattributes"),    icon("git") },
+        { QStringLiteral(".gitmodules"),       icon("git") },
+        { QStringLiteral(".gitconfig"),        icon("git") },
         { QStringLiteral(".git-blame-ignore-revs"), icon("gitignore") },
 
         // ── Project / legal ───────────────────────────────────────────
