@@ -41,6 +41,7 @@ protected:
     void mouseReleaseEvent(QMouseEvent *event) override;
     void changeEvent(QEvent *event) override;
 
+
 private:
     void setupUI();
     void updateRecentProjectsList();
@@ -52,8 +53,8 @@ private:
     // Top logo (recoloured to match theme in setThemeBackground)
     QLabel *m_logoLabel = nullptr;
 
-    // Window dragging state
-    bool m_dragging = false;
+    // Window dragging state (only used when the platform omits a title bar).
+    bool m_windowDrag = false;
     QPoint m_dragStartPos;
 
     // Window control buttons

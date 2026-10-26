@@ -105,6 +105,13 @@ bool MainWindow::eventFilter(QObject *watched, QEvent *event)
     }
 
     // ── Window resize edges (frameless window support) ────────────
+    // These handlers only apply when the window is intentionally frameless.
+    // With a native frame active, the platform already provides resize cursors
+    // and hit-testing on the frame, so this code would fight the frame.
+    if (!m_isFrameless) {
+        return QMainWindow::eventFilter(watched, event);
+    }
+
     const int MARGIN = 6;
     if (event->type() == QEvent::MouseMove && watched == this) {
         QMouseEvent *me = static_cast<QMouseEvent*>(event);
@@ -235,7 +242,9 @@ void MainWindow::closeEvent(QCloseEvent *event)
 void MainWindow::showEvent(QShowEvent *event)
 {
     QMainWindow::showEvent(event);
-    
+
+    m_isFrameless = (windowFlags() & Qt::FramelessWindowHint);
+
     // Apply platform-specific backdrop effects after window is shown
 #ifdef Q_OS_WIN
     if (windowHandle()) {

@@ -156,6 +156,8 @@ void UniversalSearchPopup::setFileModel(QFileSystemModel *model, const QString &
 
 void UniversalSearchPopup::showPopup()
 {
+    // Anchor the frameless popup directly beneath the search field so it reads
+    // as a single combined control rather than a detached window.
     QPoint pos = m_searchField->mapToGlobal(QPoint(0, m_searchField->height() + 4));
     move(pos);
     show();

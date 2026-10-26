@@ -46,8 +46,9 @@ void WelcomeMenuScreen::markLaunched()
 
 WelcomeMenuScreen::WelcomeMenuScreen(QWidget *parent)
     : QWidget(parent)
+    , m_windowDrag(false)
 {
-    setWindowFlags(Qt::Window | Qt::FramelessWindowHint);
+    setWindowFlags(windowFlags() & ~Qt::FramelessWindowHint);
     setAttribute(Qt::WA_ShowWithoutActivating);
 
     // Start with a fixed size — user can maximize but not resize freely
@@ -58,19 +59,21 @@ WelcomeMenuScreen::WelcomeMenuScreen(QWidget *parent)
     loadRecentProjects();
 }
 
+
 // ── Window dragging ───────────────────────────────────────────────────
 
 void WelcomeMenuScreen::mousePressEvent(QMouseEvent *event)
 {
-    if (event->button() == Qt::LeftButton) {
-        // Allow dragging on the window itself and passive children (labels, frames)
-        // but NOT on interactive widgets (buttons, list widgets, etc.)
+    // If the platform does not give us a window frame, provide a minimal drag
+    // surface on the window body itself and on passive children (labels, frames)
+    // but not on interactive widgets (buttons, list widgets, line edits, etc.).
+    if (event->button() == Qt::LeftButton && (windowFlags() & Qt::FramelessWindowHint)) {
         QWidget *child = childAt(event->position().toPoint());
         bool onInteractive = qobject_cast<QPushButton*>(child)
                           || qobject_cast<QListWidget*>(child)
                           || qobject_cast<QLineEdit*>(child);
         if (!onInteractive) {
-            m_dragging = true;
+            m_windowDrag = true;
             m_dragStartPos = event->globalPosition().toPoint();
         }
     }
@@ -79,7 +82,7 @@ void WelcomeMenuScreen::mousePressEvent(QMouseEvent *event)
 
 void WelcomeMenuScreen::mouseMoveEvent(QMouseEvent *event)
 {
-    if (m_dragging && (event->buttons() & Qt::LeftButton)) {
+    if (m_windowDrag && (event->buttons() & Qt::LeftButton)) {
         QPoint delta = event->globalPosition().toPoint() - m_dragStartPos;
         move(pos() + delta);
         m_dragStartPos = event->globalPosition().toPoint();
@@ -89,7 +92,7 @@ void WelcomeMenuScreen::mouseMoveEvent(QMouseEvent *event)
 void WelcomeMenuScreen::mouseReleaseEvent(QMouseEvent *event)
 {
     if (event->button() == Qt::LeftButton) {
-        m_dragging = false;
+        m_windowDrag = false;
     }
     QWidget::mouseReleaseEvent(event);
 }

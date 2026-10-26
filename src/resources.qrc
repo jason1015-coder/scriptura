@@ -52,7 +52,6 @@
 
     <!-- Special-purpose files that are not tied to a single language. -->
     <file alias="icons/gitignore.svg">resources/icons/gitignore.svg</file>
-    <file alias="icons/git-file.svg">resources/icons/git-file.svg</file>
     <file alias="icons/image.svg">resources/icons/image.svg</file>
     <file alias="icons/svg-image.svg">resources/icons/svg-image.svg</file>
     <file alias="icons/console.svg">resources/icons/console.svg</file>

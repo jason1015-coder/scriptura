@@ -169,17 +169,9 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
     // below only execute the decided commands (Qt's "drawer" role).
     UiActionBridge *uiActions = RustBackend::instance()->uiActions();
 
-    connect(m_titleBar, &CustomTitleBar::minimizeRequest, this, [uiActions]() {
-        uiActions->handle(UiActions::TitlebarMinimize);
-    });
-    connect(m_titleBar, &CustomTitleBar::maximizeRequest, this, [uiActions]() {
-        uiActions->handle(UiActions::TitlebarMaximize);
-    });
-    connect(m_titleBar, &CustomTitleBar::closeRequest, this, [uiActions]() {
-        uiActions->handle(UiActions::TitlebarClose);
-    });
-
-    // Execute the commands Rust decided:
+    // Execute the commands Rust decided (window controls come from the
+    // platform frame, so only the minimize / maximize / close Rust→Qt route
+    // remains — the title bar no longer emits those requests):
     connect(uiActions, &UiActionBridge::windowMinimizeRequested, this, &MainWindow::showMinimized);
     connect(uiActions, &UiActionBridge::windowToggleMaximizedRequested, this, [this]() {
         if (isMaximized()) {
@@ -326,13 +318,17 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
 
     // Install title bar as event filter for dragging
     m_titleBar->installEventFilter(this);
-    
-    // Setup frameless window with custom title bar
-    setWindowFlags(windowFlags() | Qt::FramelessWindowHint);
-    
+
+    // Frameless mode is still the app's built-in theme here, but the custom
+    // title bar is implemented now and the platform can paint its own frame.
+    // Remove FriselessWindowHint so standard decorations (traffic-light/min/max/
+    // close buttons, resize edges, alt-tab ordering) work on Windows/Linux/macOS.
+    // (Keep this line in place if you intentionally want a fully custom frame.)
+    m_isFrameless = (windowFlags() & Qt::FramelessWindowHint);
+
     // Add title bar to editor container layout at the top
     ui->editorContainerLayout->insertWidget(0, m_titleBar);
-    
+
     // Apply initial theme through ThemeManager
     ThemeManager::Theme initialTheme(
         static_cast<ThemeManager::ColorFamily>(static_cast<int>(selectedTheme.family)),

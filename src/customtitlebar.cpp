@@ -11,27 +11,8 @@
 #include <QLineEdit>
 #include <QDebug>
 
-namespace {
-// Perceived luminance in 0..1 (ITU-R BT.601 weights). Used to guarantee the
-// window control glyphs stay visible against any theme's title bar colour.
-qreal colorLuminance(const QColor &c)
-{
-    return 0.299 * c.redF() + 0.587 * c.greenF() + 0.114 * c.blueF();
-}
-
-qreal colorContrastRatio(const QColor &a, const QColor &b)
-{
-    const qreal hi = qMax(colorLuminance(a), colorLuminance(b));
-    const qreal lo = qMin(colorLuminance(a), colorLuminance(b));
-    return (hi + 0.05) / (lo + 0.05);
-}
-} // namespace
-
 CustomTitleBar::CustomTitleBar(QWidget *parent)
     : QWidget(parent)
-    , minimizeButton(nullptr)
-    , maximizeButton(nullptr)
-    , closeButton(nullptr)
     , titleLabel(nullptr)
     , sidebarToggleButton(nullptr)
     , inspectorToggleButton(nullptr)
@@ -103,7 +84,8 @@ void CustomTitleBar::setupLayout()
 
     layout->addSpacing(spacingXs);
 
-    // -- Trailing: inspector toggle + window controls --
+    // -- Trailing: inspector toggle only — the window already has its own
+    // frame, so the − / □ / ✕ controls are not needed here.
     inspectorToggleButton = new QPushButton(this);
     inspectorToggleButton->setObjectName("TitleBarInspectorToggle");
     inspectorToggleButton->setFixedSize(36, 36);
@@ -114,39 +96,6 @@ void CustomTitleBar::setupLayout()
                                     ThemeIcons::Role::Normal, 18);
     connect(inspectorToggleButton, &QPushButton::clicked, this, &CustomTitleBar::inspectorToggleClicked);
     layout->addWidget(inspectorToggleButton);
-
-    layout->addSpacing(spacingSm);
-
-    // -- Window controls (traffic lights) --
-    minimizeButton = new QPushButton(this);
-    maximizeButton = new QPushButton(this);
-    closeButton = new QPushButton(this);
-
-    minimizeButton->setObjectName("TitleBarMinimize");
-    maximizeButton->setObjectName("TitleBarMaximize");
-    closeButton->setObjectName("TitleBarClose");
-
-    minimizeButton->setFixedSize(28, 28);
-    maximizeButton->setFixedSize(28, 28);
-    closeButton->setFixedSize(28, 28);
-
-    layout->addWidget(minimizeButton);
-    layout->addWidget(maximizeButton);
-    layout->addWidget(closeButton);
-
-    connect(minimizeButton, &QPushButton::clicked, this, [this]() { emit minimizeRequest(); });
-    connect(maximizeButton, &QPushButton::clicked, this, [this]() { emit maximizeRequest(); });
-    connect(closeButton, &QPushButton::clicked, this, [this]() { emit closeRequest(); });
-
-    // These buttons are fully transparent — this title bar paints their glyphs
-    // and hover/pressed backgrounds (see paintWindowControls). They must not
-    // take focus, and must notify this bar so it can repaint on state changes.
-    minimizeButton->setFocusPolicy(Qt::NoFocus);
-    maximizeButton->setFocusPolicy(Qt::NoFocus);
-    closeButton->setFocusPolicy(Qt::NoFocus);
-    minimizeButton->installEventFilter(this);
-    maximizeButton->installEventFilter(this);
-    closeButton->installEventFilter(this);
 }
 
 void CustomTitleBar::setMirrored(bool mirrored)
@@ -173,17 +122,9 @@ void CustomTitleBar::setMirrored(bool mirrored)
         layout->addWidget(searchField, 0, Qt::AlignVCenter);
         layout->addSpacing(m_spacingXs);
         layout->addWidget(inspectorToggleButton);
-        layout->addSpacing(m_spacingSm);
-        layout->addWidget(minimizeButton);
-        layout->addWidget(maximizeButton);
-        layout->addWidget(closeButton);
     } else {
         // Exact reverse of the order above, so each control sits opposite the
         // pane it toggles and close ends up on the leading edge.
-        layout->addWidget(closeButton);
-        layout->addWidget(maximizeButton);
-        layout->addWidget(minimizeButton);
-        layout->addSpacing(m_spacingSm);
         layout->addWidget(inspectorToggleButton);
         layout->addWidget(searchField, 0, Qt::AlignVCenter);
         layout->addStretch(1);
@@ -240,9 +181,7 @@ void CustomTitleBar::styleButtons()
         }
     )";
 
-    minimizeButton->setStyleSheet(windowButtonStyle);
-    maximizeButton->setStyleSheet(windowButtonStyle);
-    closeButton->setStyleSheet(windowButtonStyle);
+
     
     // File tree toggle button - non-checkable, simple button style
     const QString simpleButtonStyle = QString(R"(
@@ -294,11 +233,7 @@ void CustomTitleBar::paintEvent(QPaintEvent *event)
 
     paintTitleBarBackground(p);
 
-    // Window control glyphs and their hover/pressed backgrounds are drawn here
-    // with theme-aware colours so the − / □ / ✕ stay visible in every theme.
-    paintWindowControls(p, minimizeButton, QStringLiteral("\u2014"));
-    paintWindowControls(p, maximizeButton, QStringLiteral("\u25a1"));
-    paintWindowControls(p, closeButton, QStringLiteral("\u2715"));
+
 }
 
 void CustomTitleBar::paintTitleBarBackground(QPainter &p)
@@ -329,78 +264,10 @@ void CustomTitleBar::paintTitleBarBackground(QPainter &p)
     p.drawPath(path);
 }
 
-void CustomTitleBar::paintWindowControls(QPainter &p, QPushButton *button, const QString &glyph)
-{
-    if (!button || glyph.isEmpty())
-        return;
-
-    const QRect buttonRect = button->geometry();
-    const bool hovered = button->underMouse();
-    const bool pressed = button->isDown();
-    const bool hoverActive = hovered || pressed;
-
-    QColor glyphColor = windowControlForeground();
-
-    auto tm = qobject_cast<ThemeManager*>(qApp->property("themeManager").value<QObject*>());
-    const int radius = tm ? tm->radiusMd() : 8;
-
-    if (button == closeButton && hoverActive) {
-        // Close: red hover background + white glyph — readable on any theme.
-        QColor red(0xE8, 0x11, 0x23);
-        if (pressed)
-            red = red.darker(115);
-        p.setPen(Qt::NoPen);
-        p.setBrush(red);
-        p.drawRoundedRect(buttonRect.adjusted(2, 2, -2, -2), radius, radius);
-        glyphColor = Qt::white;
-    } else if (hoverActive) {
-        // Minimize/Maximize: subtle overlay derived from the theme foreground,
-        // so it reads on both light and dark themes.
-        QColor overlay = glyphColor;
-        overlay.setAlphaF(pressed ? 0.22 : 0.12);
-        p.setPen(Qt::NoPen);
-        p.setBrush(overlay);
-        p.drawRoundedRect(buttonRect.adjusted(2, 2, -2, -2), radius, radius);
-    }
-
-    QFont font = p.font();
-    font.setPixelSize(10);
-    p.setFont(font);
-    p.setPen(glyphColor);
-    p.drawText(buttonRect.adjusted(0, 2, 0, -2), Qt::AlignCenter, glyph);
-}
-
-QColor CustomTitleBar::windowControlForeground() const
-{
-    const QColor background = palette().color(QPalette::Window);
-    const QColor themeForeground = palette().color(QPalette::WindowText);
-
-    // Prefer the theme's own text colour, but only when it clearly contrasts
-    // with the title bar background — otherwise fall back to black/white so the
-    // glyph never disappears regardless of the active theme.
-    if (colorContrastRatio(themeForeground, background) >= 3.0)
-        return themeForeground;
-
-    return colorLuminance(background) > 0.5 ? QColor(25, 25, 28) : QColor(235, 235, 238);
-}
 
 bool CustomTitleBar::eventFilter(QObject *watched, QEvent *event)
 {
-    // The transparent window control buttons are painted by this bar, so
-    // repaint whenever their hover/pressed state may have changed.
-    if (watched == minimizeButton || watched == maximizeButton || watched == closeButton) {
-        switch (event->type()) {
-        case QEvent::Enter:
-        case QEvent::Leave:
-        case QEvent::MouseButtonPress:
-        case QEvent::MouseButtonRelease:
-        case QEvent::MouseMove:
-            update();
-            break;
-        default:
-            break;
-        }
-    }
+
     return QWidget::eventFilter(watched, event);
 }
 

@@ -443,11 +443,13 @@ protected:
     Theme themeFromLegacyInt(int legacy) const;
     int themeToLegacyInt(const Theme &theme) const;
 
-    // Frameless window resize state
+    // Frameless window resize state. These are only active when the window is
+    // deliberately shown frameless; with a native frame they stay idle.
     int m_resizeEdge = 0;
     bool m_resizing = false;
     QPoint m_resizeStartPos;
     QRect m_resizeStartGeometry;
+    bool m_isFrameless = false;
 
 };
 

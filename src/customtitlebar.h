@@ -21,9 +21,6 @@ public:
     void handleMouseMove(QMouseEvent *event);
     void stopDrag();
 
-    QPushButton* minimizeButton;
-    QPushButton* maximizeButton;
-    QPushButton* closeButton;
     QLabel* titleLabel;
     QPushButton* sidebarToggleButton;
     QPushButton* inspectorToggleButton;
@@ -35,10 +32,6 @@ public:
     bool isMirrored() const { return m_mirrored; }
 
 signals:
-    void windowMoveRequested();
-    void maximizeRequest();
-    void minimizeRequest();
-    void closeRequest();
     void sidebarToggleClicked();
     void inspectorToggleClicked();
     void searchRequested(const QString &query);
@@ -63,10 +56,6 @@ private:
     // editor container, so its square edges don't poke out over the rounded
     // frame (or let the window's mid-coloured ring show through the corners).
     void paintTitleBarBackground(QPainter &p);
-    void paintWindowControls(QPainter &p, QPushButton *button, const QString &glyph);
-    // Theme text colour when it contrasts with the title bar background,
-    // otherwise black/white — guarantees the glyphs are always visible.
-    QColor windowControlForeground() const;
 };
 
 #endif // CUSTOMTITLEBAR_H
