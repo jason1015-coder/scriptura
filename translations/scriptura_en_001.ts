@@ -92,101 +92,8 @@
         <translation type="unfinished"></translation>
     </message>
 </context>
-<context>
-    <name>FindReplaceBar</name>
-    <message>
-        <location filename="../src/panels/findreplace.cpp" line="+14"/>
-        <source>▲</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>▼</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>Replace</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>Replace All</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>⇅</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>Aa</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>W</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>.*</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+7"/>
-        <source>Find...</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+2"/>
-        <source>Replace...</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+4"/>
-        <source>Previous match</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+2"/>
-        <source>Next match</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>Replace current match</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>Replace all matches</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+2"/>
-        <source>Toggle replace field</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>Case sensitive</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>Whole word</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>Regular expression</source>
-        <translation type="unfinished"></translation>
-    </message>
-</context>
-<context>
-    <name>GitBranchWidget</name>
+ <context>
+     <name>GitBranchWidget</name>
     <message>
         <location filename="../src/panels/gitbranchwidget.cpp" line="+11"/>
         <source>Checkout</source>
@@ -604,7 +511,7 @@
     </message>
     <message>
         <location line="+34"/>
-        <source>&lt;b&gt;Keyboard Shortcuts:&lt;/b&gt;&lt;br&gt;Ctrl+S: Save&lt;br&gt;Ctrl+Shift+S: Save As&lt;br&gt;Ctrl+Z: Undo&lt;br&gt;Ctrl+Y: Redo&lt;br&gt;Ctrl+F: Find&lt;br&gt;Ctrl+H: Replace&lt;br&gt;Ctrl+G: Find Next&lt;br&gt;Ctrl+Shift+P: Command Palette&lt;br&gt;Ctrl+K: Keyboard Shortcuts</source>
+        <source>&lt;b&gt;Keyboard Shortcuts:&lt;/b&gt;&lt;br&gt;Ctrl+S: Save&lt;br&gt;Ctrl+Shift+S: Save As&lt;br&gt;Ctrl+Z: Undo&lt;br&gt;Ctrl+Y: Redo&lt;br&gt;Ctrl+G: Find Next&lt;br&gt;Ctrl+Shift+P: Command Palette&lt;br&gt;Ctrl+K: Keyboard Shortcuts</source>
         <translation type="unfinished"></translation>
     </message>
     <message>

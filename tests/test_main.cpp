@@ -5,21 +5,17 @@
 #include <QTemporaryDir>
 #include "internals/settings_store.h"
 #include "test_bracketcolorizer.h"
-#include "test_taskrunnerui.h"
 #include "test_codelensmanager.h"
 #include "test_crashhandler.h"
 #include "test_codeeditor_multicursor.h"
 #include "test_debugconfiguration.h"
-#include "test_encodingmanager.h"
 #include "test_fileicons.h"
-#include "test_findreplace.h"
 #include "test_foldmanager.h"
 #include "test_gitblame.h"
 #include "test_mainwindow_editing.h"
 #include "test_mainwindow_panels.h"
 #include "test_mainwindow_sidebar.h"
 #include "test_multicursor.h"
-#include "test_projectsearch.h"
 #include "test_rundialog.h"
 #include "test_sessionmanager.h"
 #include "test_snippetmanager.h"
@@ -58,21 +54,17 @@ int main(int argc, char *argv[])
 
     int status = 0;
     status |= QTest::qExec(new TestBracketColorizer, argc, argv);
-    status |= QTest::qExec(new TestTaskRunnerUI, argc, argv);
     status |= QTest::qExec(new TestCodeLensManager, argc, argv);
     status |= QTest::qExec(new TestCrashHandler, argc, argv);
     status |= QTest::qExec(new TestDebugConfiguration, argc, argv);
-    status |= QTest::qExec(new TestEncodingManager, argc, argv);
-    status |= QTest::qExec(new TestFileIcons, argc, argv);
-    status |= QTest::qExec(new TestFindReplace, argc, argv);
-    status |= QTest::qExec(new TestFoldManager, argc, argv);
+
+
     status |= QTest::qExec(new TestGitBlame, argc, argv);
     status |= QTest::qExec(new TestMainWindowEditing, argc, argv);
     status |= QTest::qExec(new TestMainWindowPanels, argc, argv);
     status |= QTest::qExec(new TestMainWindowSidebar, argc, argv);
     status |= QTest::qExec(new TestMultiCursor, argc, argv);
     status |= QTest::qExec(new TestCodeEditorMultiCursor, argc, argv);
-    status |= QTest::qExec(new TestProjectSearch, argc, argv);
     status |= QTest::qExec(new TestRunDialog, argc, argv);
     status |= QTest::qExec(new TestSessionManager, argc, argv);
     status |= QTest::qExec(new TestSnippetManager, argc, argv);

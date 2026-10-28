@@ -19,7 +19,6 @@ namespace {
 // Every panel the app registers. They are opened on demand from the "+" menu, so
 // this list is what the menu has to offer.
 const QStringList kBuiltInPanels = {
-    QStringLiteral("Search"),      QStringLiteral("Tasks"),
     QStringLiteral("Terminal"),    QStringLiteral("Plugins"),
 };
 
@@ -185,9 +184,8 @@ void TestMainWindowPanels::testPlusMenuOffersEveryTabKind()
     QVERIFY2(menu, "the + button must open the tab-kind menu");
     const QStringList entries = entryTexts(menu);
 
-    // The three non-panel kinds...
+    // The two non-panel kinds...
     QVERIFY(entries.contains(QStringLiteral("New Empty File")));
-    QVERIFY(entries.contains(QStringLiteral("Open File...")));
     QVERIFY(entries.contains(QStringLiteral("Settings")));
 
     // ...and every panel, listed by name.
@@ -195,7 +193,7 @@ void TestMainWindowPanels::testPlusMenuOffersEveryTabKind()
         QVERIFY2(entries.contains(title),
                  qPrintable(QStringLiteral("the + menu is missing %1").arg(title)));
     }
-    QCOMPARE(entries.size(), kBuiltInPanels.size() + 3);
+    QCOMPARE(entries.size(), kBuiltInPanels.size() + 2);
 
     // Nothing is open yet, so no panel entry is ticked.
     for (const QString &title : kBuiltInPanels) {
@@ -216,7 +214,7 @@ void TestMainWindowPanels::testPanelTabFillsContentArea()
     Fixture fx;
     QVERIFY(fx.create());
 
-    const int panelIndex = fx.panelIndex(QStringLiteral("Search"));
+    const int panelIndex = fx.panelIndex(QStringLiteral("Plugins"));
     QVERIFY(panelIndex >= 0);
     fx.win->openPanelAsTab(panelIndex);
     QCoreApplication::processEvents();
@@ -272,7 +270,6 @@ void TestMainWindowPanels::testPlusMenuOpensPanelAsTab()
     QMenu *again = openPlusMenu(fx.win);
     QVERIFY(again);
     QVERIFY(actionIn(again, QStringLiteral("Terminal"))->isChecked());
-    QVERIFY(!actionIn(again, QStringLiteral("Search"))->isChecked());
     again->close();
 }
 
@@ -281,7 +278,7 @@ void TestMainWindowPanels::testFileTabTakesContentAreaBack()
     Fixture fx;
     QVERIFY(fx.create());
 
-    const int panelIndex = fx.panelIndex(QStringLiteral("Search"));
+    const int panelIndex = fx.panelIndex(QStringLiteral("Plugins"));
     QVERIFY(panelIndex >= 0);
     fx.win->openPanelAsTab(panelIndex);
 
@@ -302,7 +299,7 @@ void TestMainWindowPanels::testClosingPanelTabKeepsPanelInMenu()
     Fixture fx;
     QVERIFY(fx.create());
 
-    const int panelIndex = fx.panelIndex(QStringLiteral("Search"));
+    const int panelIndex = fx.panelIndex(QStringLiteral("Plugins"));
     QVERIFY(panelIndex >= 0);
     fx.win->openPanelAsTab(panelIndex);
     QWidget *panel = fx.editorStack->currentWidget();
@@ -324,9 +321,9 @@ void TestMainWindowPanels::testClosingPanelTabKeepsPanelInMenu()
     // opened again.
     QMenu *menu = openPlusMenu(fx.win);
     QVERIFY(menu);
-    QAction *search = actionIn(menu, QStringLiteral("Search"));
-    QVERIFY2(search, "a closed panel must still be listed in the + menu");
-    QVERIFY(!search->isChecked());
+    QAction *plugins = actionIn(menu, QStringLiteral("Plugins"));
+    QVERIFY2(plugins, "a closed panel must still be listed in the + menu");
+    QVERIFY(!plugins->isChecked());
     QVERIFY(actionIn(menu, QStringLiteral("Terminal")));
     menu->close();
 }
@@ -336,39 +333,34 @@ void TestMainWindowPanels::testEveryPanelOpensAsTab()
     Fixture fx;
     QVERIFY(fx.create());
 
-    for (const QString &title : kBuiltInPanels) {
-        // Terminal spawns a shell via PTY; offscreen CI (especially macOS) hangs
-        // waiting for the pty. Skip it here; test_terminal.cpp covers TerminalPanel.
-        if (title == QStringLiteral("Terminal"))
-            continue;
+    // Only Plugins is left as a non-Terminal panel; Terminal is skipped (PTY).
+    const QString &title = QStringLiteral("Plugins");
+    const int panelIndex = fx.panelIndex(title);
+    QVERIFY2(panelIndex >= 0, qPrintable(QStringLiteral("no panel called %1").arg(title)));
 
-        const int panelIndex = fx.panelIndex(title);
-        QVERIFY2(panelIndex >= 0, qPrintable(QStringLiteral("no panel called %1").arg(title)));
+    const int pagesBefore = fx.editorStack->count();
+    const int tabsBefore = fx.tabBar->count();
+    fx.win->openPanelAsTab(panelIndex);
+    QCoreApplication::processEvents();
 
-        const int pagesBefore = fx.editorStack->count();
-        const int tabsBefore = fx.tabBar->count();
-        fx.win->openPanelAsTab(panelIndex);
-        QCoreApplication::processEvents();
+    QWidget *panel = fx.editorStack->currentWidget();
+    QVERIFY2(panel && panel->isVisible(),
+             qPrintable(QStringLiteral("%1 did not become the visible page").arg(title)));
+    QCOMPARE(panel->pos(), QPoint(0, 0));
+    QCOMPARE(panel->size(), fx.editorStack->size());
+    QCOMPARE(fx.tabBar->count(), tabsBefore + 1);
+    QCOMPARE(panelTitleForTab(fx.tabBar, fx.tabBar->currentIndex()), title);
 
-        QWidget *panel = fx.editorStack->currentWidget();
-        QVERIFY2(panel && panel->isVisible(),
-                 qPrintable(QStringLiteral("%1 did not become the visible page").arg(title)));
-        QCOMPARE(panel->pos(), QPoint(0, 0));
-        QCOMPARE(panel->size(), fx.editorStack->size());
-        QCOMPARE(fx.tabBar->count(), tabsBefore + 1);
-        QCOMPARE(panelTitleForTab(fx.tabBar, fx.tabBar->currentIndex()), title);
+    // Opening the same panel again re-selects its tab, it does not stack a
+    // second copy.
+    fx.win->openPanelAsTab(panelIndex);
+    QCOMPARE(fx.editorStack->count(), pagesBefore + 1);
+    QCOMPARE(fx.tabBar->count(), tabsBefore + 1);
 
-        // Opening the same panel again re-selects its tab, it does not stack a
-        // second copy.
-        fx.win->openPanelAsTab(panelIndex);
-        QCOMPARE(fx.editorStack->count(), pagesBefore + 1);
-        QCOMPARE(fx.tabBar->count(), tabsBefore + 1);
-
-        fx.win->closePanelTab(panelIndex);
-        QCoreApplication::processEvents();
-        QCOMPARE(fx.editorStack->count(), pagesBefore);
-        QCOMPARE(fx.tabBar->count(), tabsBefore);
-    }
+    fx.win->closePanelTab(panelIndex);
+    QCoreApplication::processEvents();
+    QCOMPARE(fx.editorStack->count(), pagesBefore);
+    QCOMPARE(fx.tabBar->count(), tabsBefore);
 }
 
 void TestMainWindowPanels::testTerminalShortcutOpensTerminalTab()

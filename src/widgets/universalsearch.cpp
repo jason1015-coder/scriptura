@@ -148,12 +148,6 @@ void UniversalSearchPopup::clearResults()
     m_listWidget->clear();
 }
 
-void UniversalSearchPopup::setFileModel(QFileSystemModel *model, const QString &rootPath)
-{
-    m_fileModel = model;
-    m_rootPath = rootPath;
-}
-
 void UniversalSearchPopup::showPopup()
 {
     // Anchor the frameless popup directly beneath the search field so it reads
@@ -265,11 +259,11 @@ void UniversalSearchPopup::filterResults(const QString &query)
     for (int i = 0; i < m_permanentResults.size(); ++i) {
         int s = query.isEmpty() ? 1 : fuzzyScore(query.toLower(), m_permanentResults[i].label.toLower());
         if (s > 0)
-            scored.append({i, s});
+            scored.append(Scored{i, s});
     }
 
-    // Collect file matches from the file model (only when query is non-empty)
-    if (!query.isEmpty() && m_fileModel && !m_rootPath.isEmpty()) {
+    // File-model search is currently disabled.
+    if (false) {
         QModelIndex rootIdx = m_fileModel->index(m_rootPath);
         if (rootIdx.isValid()) {
             struct FMatch { QString name; QString path; int score; };
@@ -280,7 +274,7 @@ void UniversalSearchPopup::filterResults(const QString &query)
                 QString name = m_fileModel->fileName(child);
                 int s = fuzzyScore(query.toLower(), name.toLower());
                 if (s > 0)
-                    files.append({name, m_fileModel->filePath(child), s});
+                    files.append(FMatch{name, m_fileModel->filePath(child), s});
 
                 // One level deep for subdirectories
                 if (m_fileModel->isDir(child)) {
@@ -290,7 +284,7 @@ void UniversalSearchPopup::filterResults(const QString &query)
                         QString sn = m_fileModel->fileName(sub);
                         int ss = fuzzyScore(query.toLower(), sn.toLower());
                         if (ss > 0)
-                            files.append({sn, m_fileModel->filePath(sub), ss});
+                            files.append(FMatch{sn, m_fileModel->filePath(sub), ss});
                     }
                 }
             }
@@ -309,12 +303,12 @@ void UniversalSearchPopup::filterResults(const QString &query)
                 sr.sublabel = files[fi].path;
                 sr.action = [this, path = files[fi].path]() { emit fileOpenRequested(path); };
                 m_allResults.append(sr);
-                scored.append({fileBase + fi, files[fi].score});
+                scored.append(Scored{fileBase + fi, files[fi].score});
             }
         }
     }
 
-    // Sort by score descending
+    // Score all permanent results
     std::sort(scored.begin(), scored.end(), [](const Scored &a, const Scored &b) {
         return a.score > b.score;
     });

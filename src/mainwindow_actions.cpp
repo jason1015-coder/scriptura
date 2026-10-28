@@ -2,8 +2,6 @@
 #include "ui_mainwindow.h"
 #include "codeeditor.h"
 #include "rust_adapter.h"
-#include "findreplace.h"
-#include "projectsearch.h"
 #include "themeicons.h"
 #include "rust_adapter.h"
 #include "windowanimator.h"
@@ -185,10 +183,7 @@ void MainWindow::toggleInspector()
 
 void MainWindow::showSearchBar(bool show)
 {
-    findReplaceBar->setVisible(show);
-    if (show) {
-        findReplaceBar->setEditor(qobject_cast<QPlainTextEdit*>(ui->tabWidget->currentWidget()));
-    }
+    Q_UNUSED(show);
     CodeEditor *editor = getCurrentCodeEditor();
     if (editor)
         editor->setExtraSelections(QList<QTextEdit::ExtraSelection>());
@@ -398,41 +393,7 @@ void MainWindow::on_action_git_fetch_triggered()
            "Install Git to use Git features."));
 }
 
-void MainWindow::on_action_find_triggered()
-{
-    showEditorInterface();
-    showSearchBar(true);
-    findReplaceBar->setReplaceVisible(false);
-    findReplaceBar->setEditor(getCurrentCodeEditor());
-    findReplaceBar->findNext();
-}
-
-void MainWindow::on_action_replace_triggered()
-{
-    showEditorInterface();
-    showSearchBar(true);
-    findReplaceBar->setReplaceVisible(true);
-    findReplaceBar->setEditor(getCurrentCodeEditor());
-    findReplaceBar->findNext();
-}
-
-void MainWindow::on_action_project_search_triggered()
-{
-    QString root = projectDir.isEmpty() ? QDir::homePath() : projectDir;
-    findReplaceBar->setVisible(false);
-    // The results panel is a tab like any other; search just fills it in.
-    const int idx = findPanelIndex(tr("Search"));
-    if (idx < 0)
-        return;
-    projectSearchPanel->setRootPath(root);
-    projectSearchPanel->search(QString(), root);
-    openPanelAsTab(idx);
-}
 
 void MainWindow::on_action_command_palette_triggered()
-{
-    // The command palette was merged into the universal search popup so there
-    // is a single surface for commands, files, settings, and themes.
-    if (m_universalSearch)
-        m_universalSearch->openSearch();
-}
+{}
+

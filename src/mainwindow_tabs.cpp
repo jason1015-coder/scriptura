@@ -7,6 +7,7 @@
 #include "foldmanager.h"
 #include "snippetmanager.h"
 
+
 #include <QFileDialog>
 #include <QFile>
 #include <QTextStream>
@@ -69,14 +70,10 @@ void MainWindow::loadProjectDirectory(const QString &dirName)
 
     // New terminals open in the project folder rather than the home directory.
     if (m_terminalPanel)
-        m_terminalPanel->setWorkingDirectory(projectDir);
-    
-    // Update the universal search file model to the current project
-    if (m_universalSearch) {
-        m_universalSearch->setFileModel(fileModel, projectDir);
-    }
-    ui->fileTreeView->hideColumn(2);
+        m_terminalPanel->setWorkingDirectory(projectDir);    ui->fileTreeView->hideColumn(2);
     ui->fileTreeView->hideColumn(3);
+
+
 
     // Auto-save is armed via idle debounce (see constructor) — nothing to re-start
     // here; opening a project changes no auto-save behavior.
@@ -250,18 +247,6 @@ void MainWindow::on_action_save_as_triggered()
     currentFile = fileName;
     setWindowTitle(QFileInfo(fileName).fileName() + " - Scriptura");
 }
-
-void MainWindow::on_action_open_file_triggered()
-{
-    QString fileName = QFileDialog::getOpenFileName(this, tr("Open File"),
-        projectDir.isEmpty() ? QDir::homePath() : projectDir,
-        tr("C/C++ Files (*.c *.cpp *.h *.hpp *.hxx);;Python Files (*.py);;JavaScript Files (*.js *.ts);;HTML Files (*.html);;CSS Files (*.css);;Markdown Files (*.md);;JSON Files (*.json);;XML Files (*.xml);;All Files (*)"));
-    if (fileName.isEmpty())
-        return;
-
-    openFileInTab(fileName);
-}
-
 
 void MainWindow::openFileInTab(const QString &fileName)
 {
@@ -863,10 +848,6 @@ void MainWindow::rebuildNewTabMenu()
     QAction *emptyAction = m_newTabMenu->addAction(tr("New Empty File"));
     icons->setIcon(emptyAction, ":/icons/file.svg");
     connect(emptyAction, &QAction::triggered, this, &MainWindow::newUntitledFile);
-
-    QAction *openAction = m_newTabMenu->addAction(tr("Open File..."));
-    icons->setIcon(openAction, ":/icons/folder.svg");
-    connect(openAction, &QAction::triggered, this, &MainWindow::on_action_open_file_triggered);
 
     QAction *settingsAction = m_newTabMenu->addAction(tr("Settings"));
     icons->setIcon(settingsAction, ":/icons/settings.svg");

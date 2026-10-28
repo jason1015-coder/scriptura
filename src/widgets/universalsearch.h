@@ -32,8 +32,6 @@ public:
     void registerResults(const QVector<SearchResult> &results);
     void clearResults();
 
-    // File model for searching file names (optional)
-    void setFileModel(QFileSystemModel *model, const QString &rootPath);
 
     void showPopup();
     void hidePopup();
@@ -61,13 +59,17 @@ private:
     QLineEdit *m_searchField;
     QListWidget *m_listWidget;
 
+    // File-model search (disabled in this build).
+    // Kept so the disabled path compiles against a concrete model rather than
+    // leaving orphaned, undeclared identifiers in filterResults().
+    QFileSystemModel *m_fileModel = nullptr;
+    QString m_rootPath;
+
     // Permanent registered results (commands, settings, themes)
     QVector<SearchResult> m_permanentResults;
     // Total results including temporary file matches
     QVector<SearchResult> m_allResults;
 
-    QFileSystemModel *m_fileModel = nullptr;
-    QString m_rootPath;
 };
 
 #endif // UNIVERSALSEARCH_H

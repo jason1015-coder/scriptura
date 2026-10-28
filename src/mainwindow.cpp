@@ -4,8 +4,6 @@
 #include "ui_mainwindow.h"
 #include "codeeditor.h"
 #include "version.h"
-#include "findreplace.h"
-#include "projectsearch.h"
 #include "debugconfiguration.h"
 #include "rundialog.h"
 #include "splitmanager.h"
@@ -18,6 +16,7 @@
 #include "foldmanager.h"
 #include "snippetmanager.h"
 #include "rust_adapter.h"
+
 
 #include <QFileDialog>
 #include <QFile>
@@ -109,7 +108,6 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
     , m_isDebugging(false)
     , m_workspace(RustBackend::instance()->workspace())
     , m_inspectorDrawer(nullptr)
-    , m_universalSearch(nullptr)
     , m_splitManager(new SplitManager(this))
     , m_zenMode(nullptr)
     , m_sessionManager(nullptr)
@@ -122,7 +120,6 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
     , m_statusBarWidget(nullptr)
     , m_encodingManager(nullptr)
     , m_notificationCenter(nullptr)
-    , m_taskRunnerUI(nullptr)
 {
     ui->setupUi(this);
 
@@ -209,112 +206,10 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
     });
     connect(uiActions, &UiActionBridge::settingsOpenRequested, this, [this]() {
         on_action_editor_settings_triggered();
-    });
-    connect(uiActions, &UiActionBridge::searchOpenRequested, this, [this](const QString &query) {
-        if (!query.isEmpty())
-            m_titleBar->searchField->setText(query);
-        m_universalSearch->openSearch();
-    });
-    connect(uiActions, &UiActionBridge::actionError, this, [](const QString &action, const QString &error) {
+    });    connect(uiActions, &UiActionBridge::actionError, this, [](const QString &action, const QString &error) {
         qWarning() << "[ui-action] rejected:" << action << "—" << error;
     });
-    // ---- Universal Search ----
-    m_universalSearch = new UniversalSearchPopup(m_titleBar->searchField, this);
 
-    // Connect file search results to open files
-    connect(m_universalSearch, &UniversalSearchPopup::fileOpenRequested, this, [this](const QString &path) {
-        openFileInTab(path);
-    });
-
-    // Register commands in universal search
-    {
-        using Cat = SearchResult::Category;
-        auto regCmd = [this](const QString &label, const QString &sub, auto fn, Cat cat = Cat::Command) {
-            m_universalSearch->registerResult({cat, label, sub, fn});
-        };
-
-        // Commands
-        regCmd(tr("Open Project..."),         tr("Ctrl+Shift+O"), [this]() { on_action_open_project_triggered(); });
-        regCmd(tr("Open File..."),            tr("Ctrl+O"),      [this]() { on_action_open_file_triggered(); });
-        regCmd(tr("Save"),                    tr("Ctrl+S"),      [this]() { on_action_save_triggered(); });
-        regCmd(tr("Save As..."),              tr("Ctrl+Shift+S"),[this]() { on_action_save_as_triggered(); });
-        regCmd(tr("New File"),                tr("Ctrl+N"),      [this]() { on_action_add_file_directory_triggered(); });
-        regCmd(tr("Undo"),                    tr("Ctrl+Z"),      [this]() { on_action_Undo_triggered(); });
-        regCmd(tr("Redo"),                    tr("Ctrl+Y"),      [this]() { on_action_Redo_triggered(); });
-        regCmd(tr("Cut"),                     tr("Ctrl+X"),      [this]() { on_actionCu_t_triggered(); });
-        regCmd(tr("Copy"),                    tr("Ctrl+C"),      [this]() { on_action_copy_triggered(); });
-        regCmd(tr("Paste"),                   tr("Ctrl+V"),      [this]() { on_action_Paste_triggered(); });
-        regCmd(tr("Find in File"),            tr("Ctrl+F"),      [this]() { on_action_find_triggered(); });
-        regCmd(tr("Find and Replace"),        tr("Ctrl+H"),      [this]() { on_action_replace_triggered(); });
-        regCmd(tr("Project Search"),          tr("Ctrl+Shift+F"),[this]() { on_action_project_search_triggered(); });
-        regCmd(tr("Command Palette"),         tr("Ctrl+Shift+P"),[this]() { on_action_command_palette_triggered(); });
-        regCmd(tr("Git Commit"),              QString(),          [this]() { on_action_git_commit_triggered(); });
-        regCmd(tr("Git Push"),                QString(),          [this]() { on_action_git_push_triggered(); });
-        regCmd(tr("Git Pull"),                QString(),          [this]() { on_action_git_pull_triggered(); });
-        regCmd(tr("Git Fetch"),               QString(),          [this]() { on_action_git_fetch_triggered(); });
-        regCmd(tr("Format Document"),          tr("Ctrl+Shift+I"),[this]() { on_action_format_document_triggered(); });
-        regCmd(tr("Go to Definition"),        tr("F12"),         [this]() { on_action_go_to_definition_triggered(); });
-        regCmd(tr("Find References"),         QString(),          [this]() {
-            CodeEditor *editor = getCurrentCodeEditor();
-            if (!editor || currentFile.isEmpty() || !lspClient->isRunning())
-                return;
-            QTextCursor c = editor->textCursor();
-            lspClient->references(QUrl::fromLocalFile(currentFile).toString(),
-                                  c.blockNumber(), c.positionInBlock());
-        });
-        regCmd(tr("Toggle Breakpoint"),       tr("F9"),          [this]() { on_action_toggle_breakpoint_triggered(); });
-        regCmd(tr("Run / Debug"),             tr("F5"),          [this]() { on_action_run_debug_triggered(); });
-        regCmd(tr("Step Over"),               tr("F10"),         [this]() { on_action_step_over_triggered(); });
-        regCmd(tr("Step Into"),               tr("F11"),         [this]() { on_action_step_into_triggered(); });
-        regCmd(tr("Step Out"),                tr("Shift+F11"),   [this]() { on_action_step_out_triggered(); });
-        regCmd(tr("Continue"),                tr("Ctrl+F5"),     [this]() { on_action_continue_debug_triggered(); });
-        regCmd(tr("Check for Updates..."),    QString(),          [this]() { on_action_check_updates_triggered(); });
-        regCmd(tr("Keyboard Shortcuts"),      tr("Ctrl+K"),      [this]() { showKeyboardShortcuts(); });
-        regCmd(tr("About Scriptura"),         QString(),          [this]() { on_action_about_triggered(); });
-
-        // Settings pages — all unified into one scrollable page
-        regCmd(tr("Settings"),                 QString(), [this]() { on_action_editor_settings_triggered(); }, Cat::Setting);
-        regCmd(tr("Theme Settings"),           QString(), [this]() { on_action_theme_triggered(); }, Cat::Setting);
-        regCmd(tr("Update Settings"),          QString(), [this]() { on_action_editor_settings_triggered(); }, Cat::Setting);
-
-        // Theme quick-switches
-        struct ThemeEntry { QString name; ThemeColorFamily family; ThemeMode mode; };
-        ThemeEntry themes[] = {
-            {tr("Default Light"), ThemeColorFamily::Default, ThemeMode::Light},
-            {tr("Default Dark"),  ThemeColorFamily::Default, ThemeMode::Dark},
-            {tr("Blue Light"),    ThemeColorFamily::Blue,   ThemeMode::Light},
-            {tr("Blue Dark"),     ThemeColorFamily::Blue,   ThemeMode::Dark},
-            {tr("Green Light"),   ThemeColorFamily::Green,  ThemeMode::Light},
-            {tr("Green Dark"),    ThemeColorFamily::Green,  ThemeMode::Dark},
-            {tr("Red Light"),     ThemeColorFamily::Red,    ThemeMode::Light},
-            {tr("Red Dark"),      ThemeColorFamily::Red,    ThemeMode::Dark},
-            {tr("Cyan Light"),    ThemeColorFamily::Cyan,   ThemeMode::Light},
-            {tr("Cyan Dark"),     ThemeColorFamily::Cyan,   ThemeMode::Dark},
-            {tr("Violet Light"),  ThemeColorFamily::Violet, ThemeMode::Light},
-            {tr("Violet Dark"),   ThemeColorFamily::Violet, ThemeMode::Dark},
-        };
-        for (const auto &t : themes) {
-            Theme targetTheme(t.family, t.mode);
-            regCmd(t.name, tr("Theme"), [this, targetTheme]() {
-                if (targetTheme != selectedTheme) {
-                    selectedTheme = targetTheme;
-                    applyTheme(selectedTheme);
-                    SettingsStore::instance().setValue("theme/selected", themeToLegacyInt(selectedTheme));
-                }
-            }, Cat::Theme);
-        }
-
-        // Layout quick-switches
-        struct LayoutCmdEntry { QString name; LayoutType type; };
-        LayoutCmdEntry layoutCmds[] = {
-            {tr("Layout: Classic"),  LayoutType::Classic},
-            {tr("Layout: Mirrored"), LayoutType::Mirrored},
-        };
-        for (const auto &l : layoutCmds) {
-            LayoutType target = l.type;
-            regCmd(l.name, tr("Layout"), [this, target]() { setLayoutType(target); }, Cat::Setting);
-        }
-    }
 
     // Install title bar as event filter for dragging
     m_titleBar->installEventFilter(this);
@@ -384,10 +279,6 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
     connect(ui->fileTreeView, &QTreeView::customContextMenuRequested,
             this, &MainWindow::on_fileTreeView_contextMenu);
 
-    // Wire file model into universal search for file name searching
-    if (m_universalSearch) {
-        m_universalSearch->setFileModel(fileModel, QDir::homePath());
-    }
 
     editorStack = ui->editorStack;
     tabBar = ui->tabBar;
@@ -434,23 +325,6 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
     // Welcome page is now a standalone pre-launch window (WelcomeMenuScreen)
     // shown in main.cpp before MainWindow is created.
 
-    // Panels are pages of the content area, opened from their own tab. They are
-    // created hidden — otherwise they float, unmanaged, at the window's top-left
-    // (a bare 100x30 box over the title bar) until their tab is picked.
-    projectSearchPanel = new ProjectSearchPanel(this);
-    projectSearchPanel->hide();
-
-    findReplaceBar = new FindReplaceBar(this);
-    findReplaceBar->setVisible(false);
-    // Anchor the find/replace bar into the editor's top layout (between the title
-    // bar and the tab bar). Without this it floated, unmanaged, at the window's
-    // top-left with no width, which made its buttons overlap/cramble together
-    // whenever a file was opened (showSearchBar() only toggles its visibility).
-    if (QVBoxLayout *edLayout = ui->editorContainerLayout) {
-        edLayout->insertWidget(1, findReplaceBar);
-    }
-
-    registerPanel(":/icons/search.svg", tr("Search Results"), tr("Search"), true, projectSearchPanel);
 
     // Keep an empty icon bar at the drawer's foot for future quick actions
     QWidget *iconBar = new QWidget(ui->sidebarDrawer);
@@ -652,21 +526,6 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
     QShortcut *shortcutDialog = new QShortcut(QKeySequence("Ctrl+K"), this);
     connect(shortcutDialog, &QShortcut::activated, this, &MainWindow::showKeyboardShortcuts);
 
-    QShortcut *shortcutFind = new QShortcut(QKeySequence("Ctrl+F"), this);
-    connect(shortcutFind, &QShortcut::activated, this, &MainWindow::on_action_find_triggered);
-
-    QShortcut *shortcutReplace = new QShortcut(QKeySequence("Ctrl+H"), this);
-    connect(shortcutReplace, &QShortcut::activated, this, &MainWindow::on_action_replace_triggered);
-
-    QShortcut *shortcutFindNext = new QShortcut(QKeySequence("Ctrl+G"), this);
-    connect(shortcutFindNext, &QShortcut::activated, this, [this]() { if (findReplaceBar) findReplaceBar->findNext(); });
-
-    QShortcut *shortcutFindPrev = new QShortcut(QKeySequence("Ctrl+Shift+G"), this);
-    connect(shortcutFindPrev, &QShortcut::activated, this, [this]() { if (findReplaceBar) findReplaceBar->findPrev(); });
-
-    QShortcut *shortcutProjectSearch = new QShortcut(QKeySequence("Ctrl+Shift+F"), this);
-    connect(shortcutProjectSearch, &QShortcut::activated, this, &MainWindow::on_action_project_search_triggered);
-
     QShortcut *shortcutCommandPalette = new QShortcut(QKeySequence("Ctrl+Shift+P"), this);
     connect(shortcutCommandPalette, &QShortcut::activated, this, &MainWindow::on_action_command_palette_triggered);
 
@@ -805,27 +664,6 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
     QShortcut *shortcutOpenProject = new QShortcut(QKeySequence("Ctrl+O"), this);
     connect(shortcutOpenProject, &QShortcut::activated, this, &MainWindow::on_action_open_project_triggered);
 
-    QShortcut *shortcutOpenFile = new QShortcut(QKeySequence("Ctrl+Shift+O"), this);
-    connect(shortcutOpenFile, &QShortcut::activated, this, &MainWindow::on_action_open_file_triggered);
-
-    connect(findReplaceBar, &FindReplaceBar::replaceAllComplete, this, [](int count) {
-        qDebug() << "Replace all complete:" << count;
-    });
-
-    connect(projectSearchPanel, &ProjectSearchPanel::resultActivated, this, [this](const QString &filePath, int line, int column) {
-        QModelIndex index = fileModel->index(filePath);
-        if (index.isValid())
-            on_fileTreeView_clicked(index);
-        CodeEditor *editor = getCurrentCodeEditor();
-        if (editor) {
-            QTextBlock block = editor->document()->findBlockByNumber(line - 1);
-            QTextCursor cursor(block);
-            if (column > 0)
-                cursor.setPosition(block.position() + column);
-            editor->setTextCursor(cursor);
-            editor->centerCursor();
-        }
-    });
 
     // LSP connections
     connect(lspClient, &RustLspClientAdapter::diagnosticsReceived, this, &MainWindow::onDiagnosticsReceived);
@@ -949,11 +787,6 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
     m_statusBarWidget->setEncoding("UTF-8");
     m_statusBarWidget->setLineEnding("LF");
     m_statusBarWidget->setIndentation("Spaces: 4");
-
-    // ── P1/P2 Feature Modules (infrastructure, not standalone apps) ───
-    m_taskRunnerUI = new TaskRunnerUI(this);
-    m_taskRunnerUI->hide();
-    registerPanel(":/icons/check.svg", tr("Task Runner"), tr("Tasks"), true, m_taskRunnerUI);
 
     // ── Terminal ─────────────────────────────────────────────────────
     // The shell starts lazily: the panel creates its first session the first
@@ -1191,30 +1024,6 @@ MainWindow::MainWindow(const QString &initialProject, const QStringList &initial
     // Breadcrumb bar below tab bar
     m_breadcrumbBar = new BreadcrumbBarWidget(ui->editorContainer);
     ui->editorContainerLayout->insertWidget(1, m_breadcrumbBar);
-
-    // Task Runner shortcuts
-    QShortcut *shortcutTaskRun = new QShortcut(QKeySequence("Ctrl+Shift+B"), this);
-    connect(shortcutTaskRun, &QShortcut::activated, this, [this]() {
-        if (!m_taskRunnerUI) return;
-        QString projectPath = projectDir.isEmpty() ? QDir::homePath() : projectDir;
-        m_taskRunnerUI->detectTasks(projectPath);
-        openPanelAsTab(findPanelIndex(tr("Tasks")));
-    });
-
-    // Connect task runner to terminal
-    connect(m_taskRunnerUI, &TaskRunnerUI::taskRun, this, [this](const QString &command) {
-        if (command == "refresh") {
-            QString projectPath = projectDir.isEmpty() ? QDir::homePath() : projectDir;
-            m_taskRunnerUI->detectTasks(projectPath);
-            return;
-        }
-        if (command.isEmpty()) return;
-        // Run it in the terminal: the task's output stays visible and can be
-        // inspected after it finishes, and the shell applies its own quoting.
-        if (m_terminalPanelIndex >= 0)
-            openPanelAsTab(m_terminalPanelIndex);
-        m_terminalPanel->runCommand(command);
-    });
 
     // Connect notification center to status bar
     connect(m_notificationCenter, &NotificationCenter::unreadCountChanged, this, [this](int count) {
@@ -1511,8 +1320,6 @@ void MainWindow::applyLayout(LayoutType layout)
         m_titleBar->setMirrored(mirrored);
     if (m_statusBarWidget)
         m_statusBarWidget->setMirrored(mirrored);
-    if (findReplaceBar)
-        findReplaceBar->setMirrored(mirrored);
     applyPaneMirroring(mirrored);
 
     updateTabBarVisibility();

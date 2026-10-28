@@ -4,6 +4,7 @@
 #include <QMainWindow>
 #include <QString>
 #include <QFileSystemModel>
+#include <QListWidget>
 #include <QTabWidget>
 #include <QTreeView>
 #include <QPlainTextEdit>
@@ -33,7 +34,6 @@
 #include <QHBoxLayout>
 #include <memory>
 #include "codeeditor.h"
-#include "findreplace.h"
 #include "zenmode.h"
 #include "snippetmanager.h"
 #include "sessionmanager.h"
@@ -44,12 +44,9 @@
 #include "encodingmanager.h"
 #include "notificationcenter.h"
 #include "shortcuteditor.h"
-#include "taskrunnerui.h"
 #include "cssbreadcrumb.h"
 #include "snippeteditordialog.h"
-#include "projectsearch.h"
 #include "splitmanager.h"
-#include "universalsearch.h"
 #include "customtitlebar.h"
 #include "windowanimator.h"
 #include "thememanager.h"
@@ -74,8 +71,6 @@ namespace DrawerMetrics {
 constexpr int ExpandedWidth = 320;
 } // namespace DrawerMetrics
 
-class FindReplaceBar;
-class ProjectSearchPanel;
 class TerminalPanel;
 
 #include "themedefs.h"
@@ -137,7 +132,9 @@ class MainWindow : public QMainWindow
     Q_OBJECT
 
 public:
-    MainWindow(const QString &initialProject = QString(), const QStringList &initialFiles = QStringList(), QWidget *parent = nullptr);
+    explicit MainWindow(const QString &initialProject = QString(),
+                        const QStringList &initialFiles = QStringList(),
+                        QWidget *parent = nullptr);
     ~MainWindow();
 
     CodeEditor* getCurrentCodeEditor();
@@ -148,7 +145,11 @@ public:
 
     // Panels are tabs, not a separate area: every registered panel gets a tab
     // in the top tab bar and fills the whole content area when it is selected.
-    int registerPanel(const QString &iconPath, const QString &tooltip, const QString &title, bool builtin = false, QWidget *panelWidget = nullptr);
+    int registerPanel(const QString &iconPath,
+                       const QString &tooltip,
+                       const QString &title,
+                       bool builtin = false,
+                       QWidget *panelWidget = nullptr);
     void showPanelIndex(int index);
     int findPanelTabIndex(int panelIndex) const;
     int findPanelIndex(const QString &title) const;
@@ -184,7 +185,6 @@ protected:
     void on_action_delete_file_directory_triggered();
     void on_fileTreeView_clicked(const QModelIndex &index);
     void on_tabWidget_tabCloseRequested(int index);
-    void showSearchBar(bool show);
     void showKeyboardShortcuts();
     void onEditorTextChanged();
     void requestHover();
@@ -202,16 +202,12 @@ protected:
     void on_action_license_triggered();
     void on_action_check_updates_triggered();
     void on_action_format_document_triggered();
+    void on_action_command_palette_triggered();
     void on_action_go_to_definition_triggered();
     void on_action_go_to_declaration_triggered();
     void on_action_go_to_type_definition_triggered();
     void on_action_go_to_implementation_triggered();
     void on_action_show_document_symbols_triggered();
-    void on_action_open_file_triggered();
-    void on_action_find_triggered();
-    void on_action_replace_triggered();
-    void on_action_project_search_triggered();
-    void on_action_command_palette_triggered();
     void on_action_run_debug_triggered();
     void on_action_stop_debug_triggered();
     void on_action_step_over_triggered();
@@ -288,8 +284,6 @@ protected:
     QAction *m_ctxDelete = nullptr;
     QMenu *m_newTabMenu = nullptr;
     int m_newTabMenuPanelCount = -1;
-    FindReplaceBar *findReplaceBar;
-    ProjectSearchPanel *projectSearchPanel;
     QStackedWidget *editorStack;
 
     Theme selectedTheme;
@@ -359,8 +353,6 @@ protected:
     // UI/UX Polish
     SplitManager *m_splitManager;
     QWidget *m_inspectorDrawer;
-    UniversalSearchPopup *m_universalSearch;
-
     BreadcrumbBarWidget *m_breadcrumbBar;
     QMetaObject::Connection m_cssBreadcrumbConnection;
 
@@ -373,7 +365,6 @@ protected:
     StatusBarWidget *m_statusBarWidget;
     EncodingManager *m_encodingManager;
     NotificationCenter *m_notificationCenter;
-    TaskRunnerUI *m_taskRunnerUI;
     CssBreadcrumbParser *m_cssBreadcrumbParser;
     SnippetEditorDialog *m_snippetEditorDialog;
     TerminalPanel *m_terminalPanel = nullptr;
@@ -403,6 +394,7 @@ protected:
     void onUpdateCheckFailed(const QString &error);
     void onTestResultsReceived(const QString &output);
     void showEditorInterface();
+    void showSearchBar(bool show);
     void loadProjectDirectory(const QString &dirName);
     void openFileInTab(const QString &fileName);
     void applyTheme(const Theme &theme);
