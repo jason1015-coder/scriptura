@@ -19,6 +19,7 @@
 
 #include "themeicons.h"
 
+
 // ── Static helpers ────────────────────────────────────────────────────
 
 QString WelcomeMenuScreen::storagePath()
@@ -99,14 +100,6 @@ void WelcomeMenuScreen::mouseReleaseEvent(QMouseEvent *event)
 
 void WelcomeMenuScreen::changeEvent(QEvent *event)
 {
-    if (event->type() == QEvent::WindowStateChange) {
-        bool isMax = windowState().testFlag(Qt::WindowMaximized);
-        m_maximized = isMax;
-        if (m_maxBtn) {
-            m_maxBtn->setText(isMax ? "\u25a3" : "\u25a1");
-            m_maxBtn->setToolTip(isMax ? tr("Restore") : tr("Maximize"));
-        }
-    }
     QWidget::changeEvent(event);
 }
 
@@ -117,98 +110,20 @@ void WelcomeMenuScreen::setupUI()
     mainLayout->setContentsMargins(32, 28, 32, 28);
     mainLayout->setSpacing(0);
 
-    // ── Top section: big logo + title + window controls ───────────────
+    // ── Top section: big logo + title ─────────────────────────────
     QHBoxLayout *headerLayout = new QHBoxLayout();
     headerLayout->setSpacing(16);
 
-    // Large logo
+    // Large logo — rendered through ThemeIcons so it inherits the theme color
+    // from the start (the raw QPixmap path is never used).
     m_logoLabel = new QLabel(this);
-    QPixmap logoPixmap(":/icons/app-icon.svg");
-    if (!logoPixmap.isNull()) {
-        m_logoLabel->setPixmap(logoPixmap.scaled(64, 64, Qt::KeepAspectRatio, Qt::SmoothTransformation));
-    } else {
-        // Fallback text logo
-        m_logoLabel->setText("SC");
-        QFont logoFont = m_logoLabel->font();
-        logoFont.setPointSize(28);
-        logoFont.setBold(true);
-        m_logoLabel->setFont(logoFont);
-    }
+    m_logoLabel->setPixmap(ThemeIcons::instance()->pixmap(":/icons/app-icon.svg", Qt::white, 64));
     m_logoLabel->setFixedSize(64, 64);
     m_logoLabel->setAlignment(Qt::AlignCenter);
+    m_logoLabel->setStyleSheet("QLabel { color: white; }");
 
     headerLayout->addWidget(m_logoLabel);
     headerLayout->addStretch();
-
-    // ── Window control buttons (minimize, maximize, close) ─────────────
-    QHBoxLayout *winCtrlLayout = new QHBoxLayout();
-    winCtrlLayout->setSpacing(6);
-    winCtrlLayout->setContentsMargins(0, 0, 0, 0);
-
-    auto makeWinBtn = [this](const QString &glyph, const QString &tip) -> QPushButton* {
-        QPushButton *btn = new QPushButton(glyph, this);
-        btn->setFixedSize(32, 32);
-        btn->setToolTip(tip);
-        btn->setCursor(Qt::ArrowCursor);
-        btn->setObjectName("windowControlButton");
-        btn->setStyleSheet(
-            "QPushButton#windowControlButton {"
-            "  border: none;"
-            "  border-radius: 8px;"
-            "  background: transparent;"
-            "  font-size: 14px;"
-            "  font-weight: bold;"
-            "}"
-            // Neutral hover overlay — visible on both light and dark themes.
-            "QPushButton#windowControlButton:hover {"
-            "  background-color: rgba(128, 128, 128, 0.18);"
-            "}"
-        );
-        return btn;
-    };
-
-    m_minBtn = makeWinBtn("\u2014", tr("Minimize"));
-    m_maxBtn = makeWinBtn("\u25a1", tr("Maximize"));
-    m_closeBtn = makeWinBtn("\u2715", tr("Close"));
-
-    // Close button hover turns solid red — the white glyph stays readable on
-    // both light and dark themes (a translucent red washes out on light ones).
-    m_closeBtn->setStyleSheet(
-        "QPushButton#windowControlButton {"
-        "  border: none;"
-        "  border-radius: 8px;"
-        "  background: transparent;"
-        "  font-size: 14px;"
-        "  font-weight: bold;"
-        "}"
-        "QPushButton#windowControlButton:hover {"
-        "  background-color: #E81123;"
-        "  color: white;"
-        "}"
-        "QPushButton#windowControlButton:pressed {"
-        "  background-color: #B00E1E;"
-        "  color: white;"
-        "}"
-    );
-
-    // Window controls route through the Rust UiActionHandler — Qt only draws
-    // the buttons and executes the commands Rust decides (see main.cpp). The
-    // maximize glyph/tooltip stay in sync via changeEvent() below.
-    connect(m_minBtn, &QPushButton::clicked, this, [this]() {
-        RustBackend::instance()->uiActions()->handle(UiActions::WelcomeMinimize);
-    });
-    connect(m_maxBtn, &QPushButton::clicked, this, [this]() {
-        RustBackend::instance()->uiActions()->handle(UiActions::WelcomeMaximize);
-    });
-    connect(m_closeBtn, &QPushButton::clicked, this, [this]() {
-        RustBackend::instance()->uiActions()->handle(UiActions::WelcomeClose);
-    });
-
-    winCtrlLayout->addWidget(m_minBtn);
-    winCtrlLayout->addWidget(m_maxBtn);
-    winCtrlLayout->addWidget(m_closeBtn);
-
-    headerLayout->addLayout(winCtrlLayout);
 
     mainLayout->addLayout(headerLayout);
 
@@ -381,12 +296,7 @@ void WelcomeMenuScreen::setThemeBackground(const QColor &color)
             color: %2;
         }
 
-        /* Window control buttons (minimize, maximize, close) */
-        QPushButton#windowControlButton {
-            color: %2;
-        }
-
-        /* Secondary buttons (Clone Repository, New File) */
+/* Secondary buttons (Clone Repository, New File) */
         QPushButton#cloneBtn, QPushButton#newFileBtn {
             color: %3;
             border: 1px solid %4;
@@ -415,12 +325,10 @@ void WelcomeMenuScreen::setThemeBackground(const QColor &color)
         .arg(midColor.name())
         .arg(isDark ? QColor(180, 180, 255).name() : QColor(0, 100, 200).name()));
 
-    // Tint SVG icons to match the theme, through the shared cache. buttonTextColor
-    // is computed from the widget's own palette, so pass it explicitly rather
-    // than let a role guess it.
+
     auto themeIcons = ThemeIcons::instance();
     if (m_logoLabel)
-        m_logoLabel->setPixmap(themeIcons->pixmap(":/icons/app-icon.svg", textColor, 64));
+        m_logoLabel->setPixmap(themeIcons->pixmap(":/icons/app-icon.svg", QColor(255, 255, 255), 64));
     if (m_openProjectBtn)
         m_openProjectBtn->setIcon(themeIcons->icon(":/icons/folder.svg", buttonTextColor));
     if (m_cloneBtn)

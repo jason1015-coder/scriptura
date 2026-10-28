@@ -728,7 +728,6 @@ QDialogButtonBox > QPushButton {
     if (hasCliProject) {
         // Short splash, then go straight to main window
         SplashScreen *splash = new SplashScreen;
-        splash->setThemeBackground(themeWindowColor);
         splash->showWithDelay(1500);
 
         QTimer::singleShot(1500, [splash, initialProject, initialFiles]() {
@@ -747,7 +746,6 @@ QDialogButtonBox > QPushButton {
     } else {
         // Show splash briefly, then present the WelcomeMenuScreen
         SplashScreen *splash = new SplashScreen;
-        splash->setThemeBackground(themeWindowColor);
         splash->showWithDelay(1000);
 
         QTimer::singleShot(1000, [splash, themeWindowColor]() {

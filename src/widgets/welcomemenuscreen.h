@@ -57,11 +57,6 @@ private:
     bool m_windowDrag = false;
     QPoint m_dragStartPos;
 
-    // Window control buttons
-    QPushButton *m_minBtn = nullptr;
-    QPushButton *m_maxBtn = nullptr;
-    QPushButton *m_closeBtn = nullptr;
-    bool m_maximized = false;
 
     // Action buttons (for icon recoloring)
     QPushButton *m_openProjectBtn = nullptr;

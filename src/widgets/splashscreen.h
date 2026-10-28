@@ -6,12 +6,6 @@
 #include <QVBoxLayout>
 #include <QApplication>
 #include <QScreen>
-#include <QTimer>
-#include <QPalette>
-#include <QColor>
-#include <QSvgRenderer>
-#include <QPainter>
-#include "themeicons.h"
 
 class SplashScreen : public QWidget
 {
@@ -24,56 +18,24 @@ public:
         setAttribute(Qt::WA_ShowWithoutActivating);
 
         QVBoxLayout *layout = new QVBoxLayout(this);
-        layout->setContentsMargins(20, 20, 20, 20);
-        layout->setSpacing(10);
+        layout->setContentsMargins(0, 0, 0, 0);
+        layout->setSpacing(0);
 
-        // App icon (SVG)
-        QLabel *iconLabel = new QLabel(this);
-        iconLabel->setObjectName("splashIcon");
-        iconLabel->setAlignment(Qt::AlignCenter);
-
-        // App name
-        QLabel *nameLabel = new QLabel(tr("Scriptura"), this);
+        QLabel *nameLabel = new QLabel(tr("sc"), this);
         nameLabel->setObjectName("splashName");
         nameLabel->setAlignment(Qt::AlignCenter);
-        nameLabel->setStyleSheet("font-size: 24px; font-weight: bold;");
+        nameLabel->setStyleSheet("font-size: 140px; color: white; font-weight: bold;");
 
         layout->addStretch();
-        layout->addWidget(iconLabel, 0, Qt::AlignCenter);
         layout->addWidget(nameLabel, 0, Qt::AlignCenter);
         layout->addStretch();
 
-        // Set initial style (will be overridden by setThemeBackground)
-        setStyleSheet(R"(
-            SplashScreen {
-                background-color: palette(window);
-                border: none;
-                border-radius: 14px;
-            }
-        )");
-    }
-
-    void setThemeBackground(const QColor &color)
-    {
-        double lum = 0.299 * color.red() + 0.587 * color.green() + 0.114 * color.blue();
-        bool isDark = lum < 160.0;
-        QColor textColor = isDark ? QColor(220, 220, 220) : QColor(30, 30, 32);
-
-        setStyleSheet(QString(R"(
-            SplashScreen {
-                background-color: %1;
-                border: none;
-                border-radius: 14px;
-            }
-            QLabel {
-                color: %2;
-            }
-        )").arg(color.name()).arg(textColor.name()));
-
-        QLabel *iconLabel = findChild<QLabel*>("splashIcon");
-        if (iconLabel) {
-            iconLabel->setPixmap(ThemeIcons::instance()->pixmap(":/icons/app-icon.svg", textColor, 128));
-        }
+        QSizePolicy sp = sizePolicy();
+        sp.setHeightForWidth(true);
+        setSizePolicy(sp);
+        setMinimumSize(560, 380);
+        setMaximumSize(560, 380);
+        setStyleSheet("background-color: black;");
     }
 
     void showWithDelay(int milliseconds = 2500)
