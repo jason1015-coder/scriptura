@@ -26,53 +26,10 @@ Scriptura uses a **dual-language architecture**:
 The backend services are compiled into a static library (`libscriptura_backend.a`) via **Cargo** and linked into the C++ executable. Cross-language communication uses **C FFI** (`extern "C"`) with JSON strings for complex data. All state management and protocol handling runs in safe Rust.
 
 ---
-
-## Features
-
-### Working
-
-**Editor core (`src/codeeditor.*`, `src/mainwindow_tabs.cpp`)**
-- Project workflow: open project / file-tree (`QFileSystemModel`) / expand-collapse / tabbed editing / save / save-as / recent projects-files / auto-save
-- Syntax highlighting (`CodeHighlighter` + `languageregistry.*`), line numbers, current-line, indent guides, `LargeFileHandler`, `EncodingManager` (detect / BOM / LF-CRLF), smart-indent + bracket auto-close
-- `BreadcrumbBarWidget` + `CssBreadcrumbParser` (html / css / scss / xml / svg)
-- `FoldManager`, `BracketColorizer`, `MultiCursorManager` (`Ctrl+D`, above / below), `ColumnSelection`, `SnippetManager` + editor dialog, inlay-hints, ghost-text infra, `CodeLensManager`, `RefactoringManager`
-
-**Search / navigate**
-- `FindReplaceBar`, `ProjectSearchPanel` (bottom panel), `UniversalSearchPopup`, command palette, `ShortcutEditor`
-
-**LSP (`src/mainwindow_lsp.cpp`, `rust_backend/src/lsp/`)**
-- `start / stop / initialize / didOpen / didChange / didClose`, `completion / definition / declaration / implementation / typeDefinition / hover / references / rename / codeAction / documentSymbol / workspaceSymbol / formatting / signatureHelp`, diagnostics render + jump-to-error
-
-**DAP / Run (`src/mainwindow_debug.cpp`, `services/dap/`, `rust_backend/src/dap/`)**
-- `RunDialog`, `.vscode/launch.json` load / save, `startDebug / stopDebug`, breakpoint gutter, `continue / next / stepIn / stepOut / pause`, stack / scopes / variables / evaluate, run-without-debug via `QProcess`
-
-**Tasks / Git (basic)**
-- Rust `task_runner.rs` + `TaskRunnerUI` bottom panel + `Ctrl+Shift+B`, detects `package.json` / `Makefile` / `Cargo` tasks
-- Git commit / push / pull / fetch via `QProcess`, `GitBlame` gutter + Rust `blame_engine` / `diff_engine`, status-bar branch
-
-**Rust backend (`src/rust_backend/src/ffi.rs`, 122 `pub extern "C"`)**
-- `eventbus`, `workspace` (folders / settings / recent), `updater` + `version_fetcher` (Stable / Pre-release check), `config_validator`, `language_registry` + `language_server_manager`, `session_engine` (restore + hot-exit), `filewatcher`, `diff / encoding / blame / emmet / test / ui_actions`, `framer`
-
-**Themes / shell**
-- `ThemeManager` (8 families × Light / Dark) + `ThemeIcons`, `CustomTitleBar`, `WindowAnimator`, `WelcomeMenuScreen`, `StatusBarWidget`, `NotificationCenter`, `ZenMode`, `SplitManager`
-- Tests: `cargo test` + 30 `tests/test_*.cpp` (`ctest`), CI `build.yml` / `test.yml` on Linux / macOS / Windows
-
-### Partially implemented (present but incomplete or unwired)
-
-- (none currently)
-- `rust_backend/src/config_validator.rs`: only JSON well-formedness, no schema enforcement
-
-### Planned (explicit placeholders / TODOs)
-
-- Inspector drawer (`mainwindow.cpp:485-578`): sparkle placeholder + `AI Assistant is in development` + `Coming soon — intelligent code assistance, refactoring suggestions`
-- `TODO: nanocoder assistant in here` (`mainwindow.cpp:551`); `TODO: nanocoder settings UI (AI & Completions section goes here)` (`mainwindow_theme.cpp:347`)
-
 ### Roadmap
 
 1. `nanocoder` AI assistant (inspector) + inline completion + `AI & Completions` settings
-2. Wire in or remove the legacy `Minimap` / `Breadcrumb` widgets
-3. Schema-aware `ConfigValidator`
-4. Prod hardening toward `v1`: macOS sign / notarize
+2. Prod hardening toward `v1`: macOS sign / notarize(maybe)
 
 ---
 
